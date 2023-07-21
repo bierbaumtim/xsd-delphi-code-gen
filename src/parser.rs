@@ -137,7 +137,23 @@ impl Parser {
                     b"xs:element" => current_element_name = None,
                     _ => (),
                 },
-                Ok(Event::Empty(e)) => println!("{:?}", e),
+                Ok(Event::Empty(e)) => match e.name().as_ref() {
+                    b"xs:element" => {
+                        let name = Self::get_attribute_value(&e, "name")?;
+                        let b_type = Self::get_attribute_value(&e, "type")?;
+                        let b_type = self.resolve_namespace(b_type)?;
+
+                        let node_type = match Self::base_type_str_to_node_type(b_type.as_str()) {
+                            Some(t) => t,
+                            None => return Err(ParserError::MissingOrNotSupportedBaseType(b_type)),
+                        };
+                        let base_attributes = Self::get_base_attributes(&e)?;
+                        let node = Node::new(node_type, name, base_attributes, vec![]);
+
+                        nodes.push(node);
+                    }
+                    _ => println!("{:?}", e),
+                },
                 // There are several other `Event`s we do not consider here
                 _ => (),
             }
@@ -263,6 +279,7 @@ impl Parser {
                     b"xs:element" => {
                         let name = Self::get_attribute_value(&e, "name")?;
                         let b_type = Self::get_attribute_value(&e, "type")?;
+                        let b_type = self.resolve_namespace(b_type)?;
 
                         let node_type = match Self::base_type_str_to_node_type(b_type.as_str()) {
                             Some(t) => t,
@@ -326,7 +343,6 @@ impl Parser {
                     b"xs:list" => {
                         let l_type = Self::get_attribute_value(&e, "itemType")?;
                         list_type = self.resolve_namespace(l_type)?;
-                        println!("{:?}", list_type);
                     }
                     _ => (),
                 },
@@ -489,7 +505,7 @@ impl Parser {
     fn extract_schema_namespace_aliases(&mut self, s: &BytesStart<'_>) -> Option<ParserError> {
         let prefix = b"xmlns:";
 
-        while let Some(attr) = s.attributes().find(|a| {
+        for attr in s.attributes().filter(|a| {
             a.as_ref()
                 .is_ok_and(|a| a.key.0.starts_with(prefix) && a.key.0 != b"xmlns:xs")
         }) {
