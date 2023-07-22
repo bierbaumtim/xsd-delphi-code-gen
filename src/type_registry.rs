@@ -16,7 +16,7 @@ impl TypeRegistry {
     }
 
     pub(crate) fn register_type(&mut self, custom_type: CustomTypeDefinition) {
-        let name = custom_type.get_name();
+        let name = custom_type.get_qualified_name();
 
         if !self.types.contains_key(&name) {
             self.types.insert(name, custom_type);

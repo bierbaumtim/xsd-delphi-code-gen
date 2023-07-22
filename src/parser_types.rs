@@ -71,6 +71,13 @@ pub(crate) enum CustomTypeDefinition {
 impl CustomTypeDefinition {
     pub(crate) fn get_name(&self) -> String {
         match self {
+            CustomTypeDefinition::Simple(t) => t.name.clone(),
+            CustomTypeDefinition::Complex(t) => t.name.clone(),
+        }
+    }
+
+    pub(crate) fn get_qualified_name(&self) -> String {
+        match self {
             CustomTypeDefinition::Simple(t) => match &t.qualified_name {
                 Some(v) => v.clone(),
                 None => t.name.clone(),

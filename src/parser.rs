@@ -152,7 +152,7 @@ impl Parser {
 
                         nodes.push(node);
                     }
-                    _ => println!("{:?}", e),
+                    _ => (),
                 },
                 // There are several other `Event`s we do not consider here
                 _ => (),

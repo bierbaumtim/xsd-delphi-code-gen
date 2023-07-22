@@ -9,4 +9,5 @@ edition = "2021"
 clap = { version = "4.3.14", features = ["derive"] }
 # crossterm = "0.26.1"
 quick-xml = "0.29.0"
+unicode-segmentation = "1.10.1"
 # ratatui = { version = "0.21.0", features = ["all-widgets"] }
