@@ -2,9 +2,15 @@ use std::{fs::File, io::Write};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
+    generator::{dependency_graph::DependencyGraph, types::*},
     parser_types::{CustomTypeDefinition, Node, NodeBaseType, NodeType, SimpleType},
     type_registry::TypeRegistry,
 };
+
+// TODO: No forward declaration for document
+// TODO: build IR(Intermediate Representation) with more informations about DataType, Inheritance
+// TODO: Sort Document class first
+// TODO: Sort class Declarations by occurance in document, then by inheritance and dependency
 
 pub(crate) struct Generator<'a> {
     file: &'a mut File,
@@ -30,7 +36,7 @@ impl<'a> Generator<'a> {
         nodes: Vec<Node>,
         registry: &TypeRegistry,
     ) -> Result<(), std::io::Error> {
-        self.build_ir(registry);
+        self.build_ir(&nodes, registry);
 
         self.write_unit()?;
         self.write_interface_start()?;
@@ -88,6 +94,7 @@ impl<'a> Generator<'a> {
         self.newline()?;
 
         self.file.write_all(b"  // Forward Declarations\n")?;
+
         for c in &self.classes {
             c.generate_forward_declaration(self.file, 2)?;
         }
@@ -122,7 +129,16 @@ impl<'a> Generator<'a> {
         self.file.write_all(b"\n")
     }
 
-    fn build_ir(&mut self, registry: &TypeRegistry) {
+    fn build_ir(&mut self, nodes: &Vec<Node>, registry: &TypeRegistry) {
+        let mut classes_dep_graph = DependencyGraph::<String, ClassType, _>::new(|c| {
+            (c.name.clone(), c.super_type.as_ref().map(|v| v.clone()))
+        });
+        let mut aliases_dep_graph =
+            DependencyGraph::<String, TypeAlias, _>::new(|a| match &a.for_type {
+                DataType::Custom(name) => (a.name.clone(), Some(name.clone())),
+                _ => (a.name.clone(), None),
+            });
+
         for c_type in registry.types.values() {
             match c_type {
                 CustomTypeDefinition::Simple(st) if st.enumeration.is_some() => {
@@ -133,7 +149,7 @@ impl<'a> Generator<'a> {
                 CustomTypeDefinition::Simple(st) if !st.is_local && st.base_type.is_some() => {
                     let alias = self.build_type_alias_ir(st);
 
-                    self.types_aliases.push(alias);
+                    aliases_dep_graph.push(alias);
                 }
                 CustomTypeDefinition::Simple(_) => (),
                 CustomTypeDefinition::Complex(ct) => {
@@ -147,7 +163,8 @@ impl<'a> Generator<'a> {
 
                                 let variable = Variable {
                                     name: self.first_char_uppercase(&child.name),
-                                    type_name: d_type,
+                                    data_type: d_type,
+                                    requires_free: false,
                                 };
 
                                 variables.push(variable);
@@ -158,7 +175,15 @@ impl<'a> Generator<'a> {
                                 if let Some(c_type) = c_type {
                                     let variable = Variable {
                                         name: self.first_char_uppercase(&child.name),
-                                        type_name: self.as_type_name(&c_type.get_name()),
+                                        data_type: DataType::Custom(
+                                            self.as_type_name(&c_type.get_name()),
+                                        ),
+                                        requires_free: match c_type {
+                                            CustomTypeDefinition::Simple(s) => {
+                                                s.list_type.is_some()
+                                            }
+                                            CustomTypeDefinition::Complex(_) => true,
+                                        },
                                     };
 
                                     variables.push(variable);
@@ -171,7 +196,7 @@ impl<'a> Generator<'a> {
                         Some(t) => registry
                             .types
                             .get(t)
-                            .map(|ct| self.as_type_name(&ct.get_name())),
+                            .map(|ct| self.first_char_uppercase(&ct.get_name())),
                         None => None,
                     };
 
@@ -184,12 +209,56 @@ impl<'a> Generator<'a> {
                         // enumerations: Vec::new(), // TODO
                     };
 
-                    self.classes.push(class_type);
+                    classes_dep_graph.push(class_type);
                 }
             }
         }
 
-        // TODO: Write document type
+        let mut document_variables = Vec::new();
+
+        for node in nodes {
+            let variable = Variable {
+                name: node.name.clone(),
+                data_type: match &node.node_type {
+                    NodeType::Standard(s) => self.node_base_type_to_datatype(s),
+                    NodeType::Custom(e) => {
+                        let c_type = registry.types.get(e);
+
+                        match c_type {
+                            Some(c) => DataType::Custom(self.as_type_name(&c.get_name())),
+                            None => todo!(),
+                        }
+                    }
+                },
+                requires_free: match &node.node_type {
+                    NodeType::Standard(_) => false,
+                    NodeType::Custom(c) => {
+                        let c_type = registry.types.get(c);
+
+                        match c_type {
+                            Some(t) => match t {
+                                CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                                CustomTypeDefinition::Complex(_) => true,
+                            },
+                            None => false,
+                        }
+                    }
+                },
+            };
+
+            document_variables.push(variable);
+        }
+
+        let document_type = ClassType {
+            super_type: None,
+            name: "Document".to_owned(),
+            variables: document_variables,
+        };
+
+        classes_dep_graph.push(document_type);
+
+        self.classes = classes_dep_graph.get_sorted_elements();
+        self.types_aliases = aliases_dep_graph.get_sorted_elements();
     }
 
     fn build_enumeration_ir(&self, st: &SimpleType) -> Enumeration {
@@ -200,8 +269,11 @@ impl<'a> Generator<'a> {
             .as_ref()
             .unwrap()
             .iter()
-            .map(|v| self.first_char_lowercase(v))
-            .collect::<Vec<String>>();
+            .map(|v| EnumationValue {
+                variant_name: self.first_char_lowercase(v),
+                xml_value: v.clone(),
+            })
+            .collect::<Vec<EnumationValue>>();
 
         Enumeration {
             name: capitalized_name,
@@ -213,7 +285,7 @@ impl<'a> Generator<'a> {
         let capitalized_name = self.first_char_uppercase(&st.name);
         let for_type = match st.base_type.as_ref().unwrap() {
             NodeType::Standard(t) => self.node_base_type_to_datatype(t),
-            NodeType::Custom(n) => self.as_type_name(&n),
+            NodeType::Custom(n) => DataType::Custom(self.as_type_name(&n)),
         };
 
         TypeAlias {
@@ -244,116 +316,16 @@ impl<'a> Generator<'a> {
         String::from("T") + self.first_char_uppercase(name).as_str()
     }
 
-    fn node_base_type_to_datatype(&self, base_type: &NodeBaseType) -> String {
+    fn node_base_type_to_datatype(&self, base_type: &NodeBaseType) -> DataType {
         match base_type {
-            NodeBaseType::Boolean => "Boolean",
-            NodeBaseType::DateTime => "TDateTime",
-            NodeBaseType::Date => "TDate",
-            NodeBaseType::Decimal | NodeBaseType::Double | NodeBaseType::Float => "Double",
-            NodeBaseType::HexBinary | NodeBaseType::Base64Binary => "TBytes",
-            NodeBaseType::Integer => "Integer",
-            NodeBaseType::String => "String",
-            NodeBaseType::Time => "TTime",
+            NodeBaseType::Boolean => DataType::Boolean,
+            NodeBaseType::DateTime => DataType::DateTime,
+            NodeBaseType::Date => DataType::Date,
+            NodeBaseType::Decimal | NodeBaseType::Double | NodeBaseType::Float => DataType::Double,
+            NodeBaseType::HexBinary | NodeBaseType::Base64Binary => DataType::Binary,
+            NodeBaseType::Integer => DataType::Integer,
+            NodeBaseType::String => DataType::String,
+            NodeBaseType::Time => DataType::Time,
         }
-        .to_owned()
-    }
-}
-
-trait CodeType {
-    fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error>;
-}
-
-struct Enumeration {
-    name: String,
-    values: Vec<String>,
-}
-
-impl CodeType for Enumeration {
-    fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
-        file.write_fmt(format_args!(
-            "{}T{} = ({});\n",
-            " ".repeat(indentation),
-            self.name,
-            self.values.join(", ")
-        ))
-    }
-}
-
-struct TypeAlias {
-    name: String,
-    for_type: String,
-}
-
-impl CodeType for TypeAlias {
-    fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
-        file.write_fmt(format_args!(
-            "{}T{} = {};\n",
-            " ".repeat(indentation),
-            self.name,
-            self.for_type
-        ))
-    }
-}
-
-struct ClassType {
-    name: String,
-    super_type: Option<String>,
-    variables: Vec<Variable>,
-    // local_types: Vec<ClassType>,
-    // type_aliases: Vec<TypeAlias>,
-    // enumerations: Vec<Enumeration>,
-}
-
-impl ClassType {
-    fn generate_forward_declaration(
-        &self,
-        file: &mut File,
-        indentation: usize,
-    ) -> Result<(), std::io::Error> {
-        file.write_fmt(format_args!(
-            "{}T{} = class;\n",
-            " ".repeat(indentation),
-            self.name,
-        ))
-    }
-}
-
-impl CodeType for ClassType {
-    fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
-        file.write_fmt(format_args!(
-            "{}T{} = class{}",
-            " ".repeat(indentation),
-            self.name,
-            self.super_type
-                .as_ref()
-                .map_or_else(|| "(TObject)".to_owned(), |v| format!("({})", v))
-        ))?;
-        file.write_all(b"\n")?;
-        file.write_fmt(format_args!("{}public\n", " ".repeat(indentation)))?;
-
-        // Variables
-        for v in &self.variables {
-            v.generate_code(file, indentation + 2)?;
-        }
-
-        file.write_fmt(format_args!("{}end;\n\n", " ".repeat(indentation)))?;
-
-        Ok(())
-    }
-}
-
-struct Variable {
-    name: String,
-    type_name: String,
-}
-
-impl CodeType for Variable {
-    fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
-        file.write_fmt(format_args!(
-            "{}{}: {};\n",
-            " ".repeat(indentation),
-            self.name,
-            self.type_name
-        ))
     }
 }

@@ -7,7 +7,7 @@ mod parser;
 mod parser_types;
 mod type_registry;
 
-use generator::Generator;
+use generator::generator::Generator;
 use parser::Parser as XmlParser;
 use parser_types::Node;
 use type_registry::TypeRegistry;
