@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{fs::File, path::PathBuf, time::Instant};
 
 use clap::Parser;
 
@@ -7,6 +7,7 @@ mod parser;
 mod parser_types;
 mod type_registry;
 
+use generator::Generator;
 use parser::Parser as XmlParser;
 use parser_types::Node;
 use type_registry::TypeRegistry;
@@ -14,12 +15,14 @@ use type_registry::TypeRegistry;
 fn main() {
     let args = Args::parse();
 
+    let instant = Instant::now();
+
     let output_path: PathBuf;
     if args.output.is_relative() {
         let dir = match std::env::current_dir() {
             Ok(d) => d,
             Err(e) => {
-                println!(
+                eprintln!(
                     "Relative path not supported due to following error: \"{:?}\"",
                     e
                 );
@@ -32,7 +35,7 @@ fn main() {
         output_path = match args.output.canonicalize() {
             Ok(p) => p,
             Err(e) => {
-                println!(
+                eprintln!(
                     "Could not resolve output path due to following error: \"{:?}\"",
                     e
                 );
@@ -44,7 +47,7 @@ fn main() {
     let mut output_file = match File::create(output_path) {
         Ok(f) => f,
         Err(e) => {
-            println!(
+            eprintln!(
                 "Could not create output file due to following error: \"{:?}\"",
                 e
             );
@@ -59,7 +62,7 @@ fn main() {
         match parser.parse_file(args.input.first().unwrap(), &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
-                println!("An error occured: {}", error);
+                eprintln!("An error occured: {}", error);
                 return;
             }
         }
@@ -67,23 +70,21 @@ fn main() {
         match parser.parse_files(args.input, &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
-                println!("An error occured: {}", error);
+                eprintln!("An error occured: {}", error);
                 return;
             }
         }
     };
 
-    // println!("Nodes: {:#?}", nodes);
-    // println!("");
-    // println!("Types: {:#?}", type_registry.types);
-
-    let res = output_file
-        .write_all(format!("Nodes: {:#?}\n\nTypes: {:#?}", nodes, type_registry.types).as_bytes());
-
+    let mut generator = Generator::new(&mut output_file, args.unit_name);
+    let res = generator.generate(nodes, &type_registry);
     match res {
-        Ok(_) => println!("Completed successfully"),
+        Ok(_) => println!(
+            "Completed successfully within {}ms",
+            instant.elapsed().as_millis()
+        ),
         Err(e) => {
-            println!(
+            eprintln!(
                 "Failed to write output to file due to following error: \"{:?}\"",
                 e
             );
@@ -102,7 +103,7 @@ pub struct Args {
     pub(crate) output: std::path::PathBuf,
 
     #[arg(long, required(true))]
-    pub(crate) unit_name: Option<String>,
+    pub(crate) unit_name: String,
 
     #[arg(long, num_args(0..=1))]
     pub(crate) type_prefix: Option<String>,
