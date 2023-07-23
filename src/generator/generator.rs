@@ -60,7 +60,8 @@ impl<'a> Generator<'a> {
     }
 
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"uses System.Types;")?;
+        self.file.write_all(b"uses System.Types,\n")?;
+        self.file.write_all(b"     System.Xml;")?;
         self.newline()?;
         self.newline()
     }
@@ -79,36 +80,51 @@ impl<'a> Generator<'a> {
         self.newline()?;
         self.newline()?;
 
-        self.file.write_all(b"  // Enumerations\n")?;
-        for e in &self.enumerations {
-            e.generate_code(self.file, 2)?;
+        if !self.enumerations.is_empty() {
+            self.file.write_all(b"  {$REGION 'Enumerations'}\n")?;
+            for e in &self.enumerations {
+                e.generate_declarations_code(self.file, 2)?;
+            }
+            self.file.write_all(b"  {$ENDREGION}\n")?;
+
+            self.newline()?;
+            self.file
+                .write_all(b"  {$REGION 'Enumerations Helper'}\n")?;
+            for e in &self.enumerations {
+                e.generate_helper_declaration_code(self.file, 2)?;
+            }
+            self.file.write_all(b"  {$ENDREGION}\n")?;
+            self.newline()?;
         }
 
-        self.newline()?;
-
-        self.file.write_all(b"  // Aliases\n")?;
-        for a in &self.types_aliases {
-            a.generate_code(self.file, 2)?;
+        if !self.types_aliases.is_empty() {
+            self.file.write_all(b"  {$REGION 'Aliases'}\n")?;
+            for a in &self.types_aliases {
+                a.generate_code(self.file, 2)?;
+            }
+            self.file.write_all(b"  {$ENDREGION}\n")?;
+            self.newline()?;
         }
 
-        self.newline()?;
-
-        self.file.write_all(b"  // Forward Declarations\n")?;
-
-        for c in &self.classes {
-            c.generate_forward_declaration(self.file, 2)?;
+        if !self.classes.is_empty() {
+            self.file
+                .write_all(b"  {$REGION 'Forward Declarations}\n")?;
+            for c in &self.classes {
+                c.generate_forward_declaration(self.file, 2)?;
+            }
+            self.file.write_all(b"  {$ENDREGION}\n")?;
+            self.newline()?;
         }
-
-        self.newline()?;
 
         Ok(())
     }
 
     fn write_declarations(&mut self, registry: &TypeRegistry) -> Result<(), std::io::Error> {
-        self.file.write_all(b"  // Declarations\n")?;
+        self.file.write_all(b"  {$REGION 'Declarations}\n")?;
         for c in &self.classes {
             c.generate_code(self.file, 2)?;
         }
+        self.file.write_all(b"  {$ENDREGION}\n")?;
 
         self.newline()?;
 
@@ -259,6 +275,7 @@ impl<'a> Generator<'a> {
 
         self.classes = classes_dep_graph.get_sorted_elements();
         self.types_aliases = aliases_dep_graph.get_sorted_elements();
+        self.enumerations.sort_by_key(|e| e.name.clone());
     }
 
     fn build_enumeration_ir(&self, st: &SimpleType) -> Enumeration {
@@ -269,11 +286,11 @@ impl<'a> Generator<'a> {
             .as_ref()
             .unwrap()
             .iter()
-            .map(|v| EnumationValue {
+            .map(|v| EnumerationValue {
                 variant_name: self.first_char_lowercase(v),
                 xml_value: v.clone(),
             })
-            .collect::<Vec<EnumationValue>>();
+            .collect::<Vec<EnumerationValue>>();
 
         Enumeration {
             name: capitalized_name,

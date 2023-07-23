@@ -29,22 +29,26 @@ impl DataType {
     }
 }
 
-pub(crate) trait CodeType {
+pub(crate) trait DeclarationType {
     fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error>;
 }
 
 pub(crate) struct Enumeration {
     pub(crate) name: String,
-    pub(crate) values: Vec<EnumationValue>,
+    pub(crate) values: Vec<EnumerationValue>,
 }
 
-pub(crate) struct EnumationValue {
+pub(crate) struct EnumerationValue {
     pub(crate) variant_name: String,
     pub(crate) xml_value: String,
 }
 
-impl CodeType for Enumeration {
-    fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
+impl Enumeration {
+    pub(crate) fn generate_declarations_code(
+        &self,
+        file: &mut File,
+        indentation: usize,
+    ) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
             "{}T{} = ({});\n",
             " ".repeat(indentation),
@@ -56,6 +60,33 @@ impl CodeType for Enumeration {
                 .join(", ")
         ))
     }
+
+    pub(crate) fn generate_helper_declaration_code(
+        &self,
+        file: &mut File,
+        indentation: usize,
+    ) -> Result<(), std::io::Error> {
+        file.write_fmt(format_args!(
+            "{}T{}Helper = record helper for T{}\n",
+            " ".repeat(indentation),
+            self.name,
+            self.name,
+        ))?;
+        file.write_fmt(format_args!(
+            "{}class function FromXmlValue(const pXmlValue: String): T{}; static;\n",
+            " ".repeat(indentation + 2),
+            self.name,
+        ))?;
+        file.write_fmt(format_args!(
+            "{}function ToXmlValue: String;\n",
+            " ".repeat(indentation + 2),
+        ))?;
+        file.write_fmt(format_args!("{}end;", " ".repeat(indentation),))?;
+        file.write(b"\n")?;
+        file.write(b"\n")?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -64,7 +95,7 @@ pub(crate) struct TypeAlias {
     pub(crate) for_type: DataType,
 }
 
-impl CodeType for TypeAlias {
+impl DeclarationType for TypeAlias {
     fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
             "{}T{} = {};\n",
@@ -99,7 +130,7 @@ impl ClassType {
     }
 }
 
-impl CodeType for ClassType {
+impl DeclarationType for ClassType {
     fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
             "{}T{} = class{}",
@@ -114,7 +145,7 @@ impl CodeType for ClassType {
 
         // constructors and destructors
         file.write_fmt(format_args!(
-            "{}constructor FromXml(node: IXmlNode);\n",
+            "{}constructor FromXml(node: IXMLNode);\n",
             " ".repeat(indentation + 2),
         ))?;
 
@@ -126,7 +157,7 @@ impl CodeType for ClassType {
         }
         file.write_all(b"\n")?;
         file.write_fmt(format_args!(
-            "{}function ToXmlRaw: IXmlNode;\n",
+            "{}function ToXmlRaw: IXMLNode;\n",
             " ".repeat(indentation + 2),
         ))?;
         // file.write_fmt(format_args!(
@@ -153,7 +184,7 @@ pub(crate) struct Variable {
     pub(crate) requires_free: bool,
 }
 
-impl CodeType for Variable {
+impl DeclarationType for Variable {
     fn generate_code(&self, file: &mut File, indentation: usize) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
             "{}{}: {};\n",
