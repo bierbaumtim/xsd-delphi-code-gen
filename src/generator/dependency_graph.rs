@@ -80,13 +80,10 @@ where
     pub(crate) fn push(&mut self, item: T) {
         let (item_key, dep_key) = (self.keys_fn)(&item);
 
-        println!("Push item \"{}\" with dep \"{:?}\"", item_key, dep_key);
-
         let mut node = Node::empty(item);
 
         if let Some(dep_key) = dep_key {
             if let Some(dependency) = self.dependencies.get_mut(&dep_key) {
-                println!("Found {} as dependency", dep_key);
                 dependency.children.push(item_key.clone());
             }
 
@@ -96,7 +93,6 @@ where
         for value in self.dependencies.values_mut() {
             if value.parents.contains(&item_key) {
                 let (value_key, _) = (self.keys_fn)(&value.item);
-                println!("Found {:?} as child", value_key);
 
                 if !node.children.contains(&value_key) {
                     node.children.push(value_key);
@@ -108,8 +104,6 @@ where
     }
 
     pub(crate) fn get_sorted_elements(&self) -> Vec<T> {
-        // eprintln!("{:#?}", self.dependencies);
-
         let mut elements = Vec::new();
 
         for leaf in self.dependencies.values().filter(|i| i.children.is_empty()) {
