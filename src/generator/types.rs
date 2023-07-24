@@ -4,11 +4,17 @@ pub(crate) enum DataType {
     DateTime,
     Date,
     Double,
-    Binary,
+    Binary(BinaryEncoding),
     Integer,
     String,
     Time,
     Custom(String),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum BinaryEncoding {
+    Hex,
+    Base64,
 }
 
 pub(crate) struct Enumeration {

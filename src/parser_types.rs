@@ -105,6 +105,8 @@ pub(crate) struct SimpleType {
     pub(crate) enumeration: Option<Vec<String>>,
     /// type of items in a list
     pub(crate) list_type: Option<NodeType>,
+    /// type of items in a list
+    pub(crate) pattern: Option<String>,
 }
 
 /// xs:complexType

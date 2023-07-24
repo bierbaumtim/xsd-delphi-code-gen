@@ -327,6 +327,7 @@ impl Parser {
         let mut base_type = String::new();
         let mut list_type = String::new();
         let mut enumerations = Vec::new();
+        let mut pattern = None::<String>;
         let mut buf = Vec::new();
 
         loop {
@@ -343,6 +344,10 @@ impl Parser {
                     b"xs:list" => {
                         let l_type = Self::get_attribute_value(&e, "itemType")?;
                         list_type = self.resolve_namespace(l_type)?;
+                    }
+                    b"xs:pattern" => {
+                        let value = Self::get_attribute_value(&e, "value")?;
+                        pattern = Some(value);
                     }
                     _ => (),
                 },
@@ -376,6 +381,7 @@ impl Parser {
                 Some(enumerations)
             },
             list_type: Self::base_type_str_to_node_type(list_type.as_str()),
+            pattern,
             is_local,
         });
 

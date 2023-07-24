@@ -15,6 +15,13 @@ pub(crate) struct DelphiCodeGenerator<'a> {
     file: &'a mut File,
     unit_name: String,
     internal_representation: InternalRepresentation,
+    // TODO: Add flags to generate helpers:
+    //       - ParseDateTime
+    //       - DateTimeToString
+    //       - HexToBin
+    //       - BinToHex
+    //       - Base64ToBin
+    //       - BintToBase64
 }
 
 impl<'a> DelphiCodeGenerator<'a> {
@@ -114,6 +121,14 @@ impl<'a> DelphiCodeGenerator<'a> {
         self.file.write_all(b"{$REGION 'Enumerations Helper'}\n")?;
         for enumeration in &self.internal_representation.enumerations {
             Self::generate_enumeration_helper_implementation(enumeration, self.file)?;
+        }
+        self.file.write_all(b"{$ENDREGION}\n")?;
+
+        self.newline()?;
+
+        self.file.write_all(b"{$REGION 'Classes'}\n")?;
+        for class_type in &self.internal_representation.classes {
+            Self::generate_class_implementation(class_type, self.file)?;
         }
         self.file.write_all(b"{$ENDREGION}\n")?;
 
@@ -326,7 +341,131 @@ impl<'a> DelphiCodeGenerator<'a> {
         Ok(())
     }
 
-    fn generate_class_implementation() {}
+    fn generate_class_implementation(
+        class_type: &ClassType,
+        file: &mut File,
+    ) -> Result<(), std::io::Error> {
+        let formated_name = Self::as_type_name(&class_type.name);
+        let needs_destroy = class_type.variables.iter().any(|v| v.requires_free);
+
+        file.write_fmt(format_args!("{{ {} }}\n", formated_name))?;
+
+        file.write_fmt(format_args!(
+            "constructor {}.FromXml(node: IXMLNode);\n",
+            formated_name,
+        ))?;
+        file.write(b"begin\n")?;
+
+        for variable in &class_type.variables {
+            match &variable.data_type {
+                DataType::Boolean => {
+                    file.write_fmt(format_args!(
+                        "  {} := (node.ChildNodes['{}'].Text = 'true') or (node.ChildNodes['{}'].Text = '1');\n",
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name, variable.name
+                    ))?;
+                }
+                DataType::DateTime => {
+                    // TODO: Requires Format aka pattern
+                    file.write_fmt(format_args!(
+                        "  {} := raise Exception.Create('Currently not supported');\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Date => {
+                    // TODO: Requires Format aka pattern
+                    file.write_fmt(format_args!(
+                        "  {} := raise Exception.Create('Currently not supported');\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Double => {
+                    file.write_fmt(format_args!(
+                        "  {} := StrToFloat(node.ChildNodes['{}'].Text);\n",
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name
+                    ))?;
+                }
+                DataType::Binary(BinaryEncoding::Base64) => {
+                    file.write_fmt(format_args!(
+                        "  {} := TNetEncoding.Base64.Decode(TNetEncoding.DecodeStringToBytes(node.ChildNodes['{}'].Text));\n",
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name
+                    ))?;
+                }
+                DataType::Binary(BinaryEncoding::Hex) => {
+                    file.write_fmt(format_args!(
+                        "   HexToBin(node.ChildNodes['{}'].Text, 0, {}, 0, Length(node.ChildNodes['{}'].Text));\n",
+                        variable.name,
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name,
+                    ))?;
+                }
+                DataType::Integer => {
+                    file.write_fmt(format_args!(
+                        "  {} := StrToInt(node.ChildNodes['{}'].Text);\n",
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name
+                    ))?;
+                }
+                DataType::String => {
+                    file.write_fmt(format_args!(
+                        "  {} := node.ChildNodes['{}'].Text;\n",
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name
+                    ))?;
+                }
+                DataType::Time => {
+                    // TODO: Requires Format aka pattern
+                    file.write_fmt(format_args!(
+                        "  {} := raise Exception.Create('Currently not supported');\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Custom(name) => {
+                    file.write_fmt(format_args!(
+                        "  {} := {}.FromXml(node.ChildNodes['{}']);\n",
+                        Self::first_char_uppercase(&variable.name),
+                        Self::as_type_name(name),
+                        variable.name
+                    ))?;
+                }
+            }
+        }
+
+        file.write(b"end;\n")?;
+
+        if needs_destroy {
+            file.write(b"\n")?;
+            file.write_fmt(format_args!("destructor {}.Destroy;\n", formated_name))?;
+
+            file.write(b"begin\n")?;
+
+            for variable in class_type.variables.iter().filter(|v| v.requires_free) {
+                file.write_fmt(format_args!(
+                    "  {}.Free;\n",
+                    Self::first_char_uppercase(&variable.name)
+                ))?;
+            }
+
+            file.write_all(b"\n")?;
+            file.write(b"  inherited;\n")?;
+            file.write(b"end;\n")?;
+        }
+
+        file.write_all(b"\n")?;
+        file.write_fmt(format_args!(
+            "function {}.ToXmlRaw: IXMLNode;\n",
+            formated_name
+        ))?;
+
+        file.write(b"begin\n")?;
+        file.write(b"end;\n")?;
+
+        file.write(b"\n")?;
+
+        Ok(())
+    }
 
     // Variable
     fn generate_variable_declaration(
@@ -349,7 +488,7 @@ impl<'a> DelphiCodeGenerator<'a> {
             DataType::DateTime => "TDateTime".to_owned(),
             DataType::Date => "TDate".to_owned(),
             DataType::Double => "Double".to_owned(),
-            DataType::Binary => "TBytes".to_owned(),
+            DataType::Binary(_) => "TBytes".to_owned(),
             DataType::Integer => "TBytes".to_owned(),
             DataType::String => "String".to_owned(),
             DataType::Time => "TTime".to_owned(),
