@@ -9,6 +9,7 @@ pub(crate) enum DataType {
     String,
     Time,
     Custom(String),
+    List(Box<DataType>),
 }
 
 #[derive(Clone, Debug)]
@@ -31,6 +32,7 @@ pub(crate) struct EnumerationValue {
 pub(crate) struct TypeAlias {
     pub(crate) name: String,
     pub(crate) for_type: DataType,
+    pub(crate) pattern: Option<String>,
 }
 
 #[derive(Clone, Debug)]

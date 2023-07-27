@@ -31,7 +31,7 @@ impl InternalRepresentation {
 
                     enumerations.push(enumeration);
                 }
-                CustomTypeDefinition::Simple(st) if !st.is_local && st.base_type.is_some() => {
+                CustomTypeDefinition::Simple(st) if st.base_type.is_some() => {
                     let alias = Self::build_type_alias_ir(st);
 
                     aliases_dep_graph.push(alias);
@@ -170,6 +170,7 @@ impl InternalRepresentation {
 
         TypeAlias {
             name: st.name.clone(),
+            pattern: st.pattern.clone(),
             for_type,
         }
     }

@@ -15,13 +15,8 @@ pub(crate) struct DelphiCodeGenerator<'a> {
     file: &'a mut File,
     unit_name: String,
     internal_representation: InternalRepresentation,
-    // TODO: Add flags to generate helpers:
-    //       - ParseDateTime
-    //       - DateTimeToString
-    //       - HexToBin
-    //       - BinToHex
-    //       - Base64ToBin
-    //       - BintToBase64
+    generate_date_time_helper: bool,
+    generate_hex_binary_helper: bool,
 }
 
 impl<'a> DelphiCodeGenerator<'a> {
@@ -33,7 +28,8 @@ impl<'a> DelphiCodeGenerator<'a> {
     }
 
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"uses System.Types,\n")?;
+        self.file.write_all(b"uses System.DateUtils,\n")?;
+        self.file.write_all(b"     System.Types,\n")?;
         self.file.write_all(b"     System.Xml;")?;
         self.newline()?;
         self.newline()
@@ -126,9 +122,66 @@ impl<'a> DelphiCodeGenerator<'a> {
 
         self.newline()?;
 
+        if self.generate_date_time_helper {
+            // TODO: Anpassen
+            self.file
+                .write_all(b"function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;\n")?;
+            self.file.write_all(b"begin\n")?;
+            self.file
+                .write_all(b"  if pFormat = '' then Exit(ISO8601ToDate(pDateStr));\n")?;
+            self.newline()?;
+            self.file
+                .write_all(b"  Result := ISO8601ToDate(pDateStr);")?;
+            self.file.write_all(b"end;\n")?;
+            self.newline()?;
+
+            self.file
+                .write_all(b"function EncodeDateTime(const pDate: TDateTime; const pFormat: String = ''): String;")?;
+            self.file.write_all(b"begin\n")?;
+            self.file.write_all(b"end;\n")?;
+
+            self.newline()?;
+
+            self.file.write_all(
+                b"function EncodeTime(const pTime: TTime; const pFormat: String): String;",
+            )?;
+            self.file.write_all(b"begin\n")?;
+            self.file
+                .write_all(b"  var vFormatSettings := TFormatSettings.Create;\n")?;
+            self.file
+                .write_all(b"  vFormatSettings.LongTimeFormat := pFormat;\n")?;
+            self.file
+                .write_all(b"  Result := TimeToStr(pTime, vFormatSettings);\n")?;
+            self.file.write_all(b"end;\n")?;
+
+            self.newline()?;
+        }
+
+        if self.generate_hex_binary_helper {
+            self.file
+                .write_all(b"function BinToHexStr(const pBin: TBytes): String;\n")?;
+            self.file.write_all(b"begin\n")?;
+            self.file.write_all(b"  var vTemp: TBytes;\n")?;
+            self.file
+                .write_all(b"  BinToHex(pBin, 0, vTemp, Length(pBin));\n")?;
+            self.file
+                .write_all(b"  Result := TEncoding.GetString(vTemp);\n")?;
+            self.file.write_all(b"end;\n")?;
+
+            self.newline()?;
+        }
+
         self.file.write_all(b"{$REGION 'Classes'}\n")?;
+        // TODO: Generate Document Implementation
+
+        self.newline()?;
+
         for class_type in &self.internal_representation.classes {
-            Self::generate_class_implementation(class_type, self.file)?;
+            Self::generate_class_implementation(
+                class_type,
+                self.file,
+                &self.internal_representation,
+            )?;
         }
         self.file.write_all(b"{$ENDREGION}\n")?;
 
@@ -322,7 +375,7 @@ impl<'a> DelphiCodeGenerator<'a> {
         }
         file.write_all(b"\n")?;
         file.write_fmt(format_args!(
-            "{}function ToXmlRaw: IXMLNode;\n",
+            "{}procedure AppendToXmlRaw(pParent: IXMLNode);\n",
             " ".repeat(indentation + 2),
         ))?;
         // file.write_fmt(format_args!(
@@ -344,6 +397,7 @@ impl<'a> DelphiCodeGenerator<'a> {
     fn generate_class_implementation(
         class_type: &ClassType,
         file: &mut File,
+        internal_representation: &InternalRepresentation,
     ) -> Result<(), std::io::Error> {
         let formated_name = Self::as_type_name(&class_type.name);
         let needs_destroy = class_type.variables.iter().any(|v| v.requires_free);
@@ -365,18 +419,11 @@ impl<'a> DelphiCodeGenerator<'a> {
                         variable.name, variable.name
                     ))?;
                 }
-                DataType::DateTime => {
-                    // TODO: Requires Format aka pattern
+                DataType::DateTime | DataType::Date => {
                     file.write_fmt(format_args!(
-                        "  {} := raise Exception.Create('Currently not supported');\n",
+                        "  {} := ISO8601ToDate(node.ChildNodes['{}'].Text);\n",
                         Self::first_char_uppercase(&variable.name),
-                    ))?;
-                }
-                DataType::Date => {
-                    // TODO: Requires Format aka pattern
-                    file.write_fmt(format_args!(
-                        "  {} := raise Exception.Create('Currently not supported');\n",
-                        Self::first_char_uppercase(&variable.name),
+                        variable.name,
                     ))?;
                 }
                 DataType::Double => {
@@ -388,14 +435,14 @@ impl<'a> DelphiCodeGenerator<'a> {
                 }
                 DataType::Binary(BinaryEncoding::Base64) => {
                     file.write_fmt(format_args!(
-                        "  {} := TNetEncoding.Base64.Decode(TNetEncoding.DecodeStringToBytes(node.ChildNodes['{}'].Text));\n",
+                        "  {} := TNetEncoding.Base64.DecodeStringToBytes(node.ChildNodes['{}'].Text);\n",
                         Self::first_char_uppercase(&variable.name),
                         variable.name
                     ))?;
                 }
                 DataType::Binary(BinaryEncoding::Hex) => {
                     file.write_fmt(format_args!(
-                        "   HexToBin(node.ChildNodes['{}'].Text, 0, {}, 0, Length(node.ChildNodes['{}'].Text));\n",
+                        "  HexToBin(node.ChildNodes['{}'].Text, 0, {}, 0, Length(node.ChildNodes['{}'].Text));\n",
                         variable.name,
                         Self::first_char_uppercase(&variable.name),
                         variable.name,
@@ -416,20 +463,133 @@ impl<'a> DelphiCodeGenerator<'a> {
                     ))?;
                 }
                 DataType::Time => {
-                    // TODO: Requires Format aka pattern
                     file.write_fmt(format_args!(
-                        "  {} := raise Exception.Create('Currently not supported');\n",
+                        "  {} := TimeOf(ISO8601ToDate(node.ChildNodes['{}'].Text));\n",
                         Self::first_char_uppercase(&variable.name),
-                    ))?;
-                }
-                DataType::Custom(name) => {
-                    file.write_fmt(format_args!(
-                        "  {} := {}.FromXml(node.ChildNodes['{}']);\n",
-                        Self::first_char_uppercase(&variable.name),
-                        Self::as_type_name(name),
                         variable.name
                     ))?;
                 }
+                DataType::Custom(name) => {
+                    let type_alias = internal_representation
+                        .types_aliases
+                        .iter()
+                        .find(|t| t.name == name.as_str());
+
+                    match type_alias {
+                        Some(t) => {
+                            let mut pattern = t.pattern.clone();
+                            let mut data_type = t.for_type.clone();
+
+                            loop {
+                                match &data_type {
+                                    DataType::Custom(n) => {
+                                        let type_alias = internal_representation
+                                            .types_aliases
+                                            .iter()
+                                            .find(|t| t.name == n.as_str());
+
+                                        if let Some(alias) = type_alias {
+                                            if pattern.is_none() {
+                                                pattern = alias.pattern.clone();
+                                            }
+
+                                            data_type = alias.for_type.clone();
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    _ => break,
+                                }
+                            }
+
+                            match data_type {
+                                DataType::Boolean => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := (node.ChildNodes['{}'].Text = 'true') or (node.ChildNodes['{}'].Text = '1');\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name, variable.name
+                                    ))?;
+                                }
+                                DataType::DateTime | DataType::Date if pattern.is_some() => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := DecodeDateTime(node.ChildNodes['{}'].Text, '{}');\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name,
+                                        pattern.unwrap_or_default(),
+                                    ))?;
+                                }
+                                DataType::DateTime | DataType::Date => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := ISO8601ToDate(node.ChildNodes['{}'].Text);\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name,
+                                    ))?;
+                                }
+                                DataType::Double => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := StrToFloat(node.ChildNodes['{}'].Text);\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name
+                                    ))?;
+                                }
+                                DataType::Binary(BinaryEncoding::Base64) => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := TNetEncoding.Base64.DecodeStringToBytes(node.ChildNodes['{}'].Text);\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name
+                                    ))?;
+                                }
+                                DataType::Binary(BinaryEncoding::Hex) => {
+                                    file.write_fmt(format_args!(
+                                        "  HexToBin(node.ChildNodes['{}'].Text, 0, {}, 0, Length(node.ChildNodes['{}'].Text));\n",
+                                        variable.name,
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name,
+                                    ))?;
+                                }
+                                DataType::Integer => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := StrToInt(node.ChildNodes['{}'].Text);\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name
+                                    ))?;
+                                }
+                                DataType::String => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := node.ChildNodes['{}'].Text;\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name
+                                    ))?;
+                                }
+                                DataType::Time if pattern.is_some() => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := TimeOf(DecodeDateTime(node.ChildNodes['{}'].Text, '{}'));\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name,
+                                        pattern.unwrap_or_default(),
+                                    ))?;
+                                }
+                                DataType::Time => {
+                                    file.write_fmt(format_args!(
+                                        "  {} := TimeOf(ISO8601ToDate(node.ChildNodes['{}'].Text));\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        variable.name
+                                    ))?;
+                                }
+                                _ => (),
+                            }
+                        }
+                        None => {
+                            file.write_fmt(format_args!(
+                                "  {} := {}.FromXml(node.ChildNodes['{}']);\n",
+                                Self::first_char_uppercase(&variable.name),
+                                Self::as_type_name(name),
+                                variable.name
+                            ))?;
+                        }
+                    }
+                }
+                DataType::List(_) => todo!(),
             }
         }
 
@@ -455,11 +615,252 @@ impl<'a> DelphiCodeGenerator<'a> {
 
         file.write_all(b"\n")?;
         file.write_fmt(format_args!(
-            "function {}.ToXmlRaw: IXMLNode;\n",
+            "procedure {}.AppendToXmlRaw(pParent: IXMLNode);\n",
             formated_name
         ))?;
 
         file.write(b"begin\n")?;
+        file.write(b"  var node: IXMLNode;\n")?;
+        file.write_all(b"\n")?;
+        for variable in &class_type.variables {
+            match &variable.data_type {
+                DataType::Boolean => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := IfThen({}, 'true', 'false');\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::DateTime | DataType::Date => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := DateToISO8601({});\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Double => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := FloatToStr({});\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Binary(BinaryEncoding::Base64) => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := TNetEncoding.Base64.EncodeStringToBytes({});\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Binary(BinaryEncoding::Hex) => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := BinToHexStr({});\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Integer => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := IntToStr({});\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::String => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  node.Text := {};\n",
+                        Self::first_char_uppercase(&variable.name),
+                    ))?;
+                }
+                DataType::Time => {
+                    file.write_fmt(format_args!(
+                        "  node := parent.AddChild('{}');\n",
+                        variable.name,
+                    ))?;
+                    file.write_fmt(format_args!(
+                        "  {} := TimeOf(ISO8601ToDate(node.ChildNodes['{}'].Text));\n",
+                        Self::first_char_uppercase(&variable.name),
+                        variable.name
+                    ))?;
+                }
+                DataType::Custom(name) => {
+                    let type_alias = internal_representation
+                        .types_aliases
+                        .iter()
+                        .find(|t| t.name == name.as_str());
+
+                    match type_alias {
+                        Some(t) => {
+                            let mut pattern = t.pattern.clone();
+                            let mut data_type = t.for_type.clone();
+
+                            loop {
+                                match &data_type {
+                                    DataType::Custom(n) => {
+                                        let type_alias = internal_representation
+                                            .types_aliases
+                                            .iter()
+                                            .find(|t| t.name == n.as_str());
+
+                                        if let Some(alias) = type_alias {
+                                            if pattern.is_none() {
+                                                pattern = alias.pattern.clone();
+                                            }
+
+                                            data_type = alias.for_type.clone();
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    _ => break,
+                                }
+                            }
+
+                            match data_type {
+                                DataType::Boolean => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := IfThen({}, 'true', 'false');\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::DateTime | DataType::Date if pattern.is_some() => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := FormatDateTime('{}', {});\n",
+                                        pattern.unwrap_or_default(),
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::DateTime | DataType::Date => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := ISO8601ToDate({});\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::Double => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := FloatToStr({});\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::Binary(BinaryEncoding::Base64) => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := TNetEncoding.Base64.EncodeStringToBytes({});\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::Binary(BinaryEncoding::Hex) => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := BinToHexStr({});\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::Integer => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := IntToStr({});\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::String => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := {};\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                DataType::Time if pattern.is_some() => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := EncodeTime({}, '{}');\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                        pattern.unwrap_or_default(),
+                                    ))?;
+                                }
+                                DataType::Time => {
+                                    file.write_fmt(format_args!(
+                                        "  node := parent.AddChild('{}');\n",
+                                        variable.name,
+                                    ))?;
+                                    file.write_fmt(format_args!(
+                                        "  node.Text := TimeToStr({});\n",
+                                        Self::first_char_uppercase(&variable.name),
+                                    ))?;
+                                }
+                                _ => (),
+                            }
+                        }
+                        None => {
+                            file.write_fmt(format_args!(
+                                "  node := parent.AddChild('{}');\n",
+                                variable.name,
+                            ))?;
+                            file.write_fmt(format_args!(
+                                "  {}.AppendToXmlRaw(node);\n",
+                                Self::first_char_uppercase(&variable.name),
+                            ))?;
+                        }
+                    }
+                }
+                DataType::List(_) => todo!(),
+            }
+
+            file.write_all(b"\n")?;
+        }
         file.write(b"end;\n")?;
 
         file.write(b"\n")?;
@@ -493,6 +894,11 @@ impl<'a> DelphiCodeGenerator<'a> {
             DataType::String => "String".to_owned(),
             DataType::Time => "TTime".to_owned(),
             DataType::Custom(c) => "T".to_owned() + Self::first_char_uppercase(c).as_str(),
+            DataType::List(s) => {
+                let gt = Self::get_datatype_language_representation(s);
+
+                format!("TList<{}>", gt)
+            }
         }
     }
 
@@ -528,6 +934,28 @@ impl<'a> CodeGenerator<'a> for DelphiCodeGenerator<'a> {
         DelphiCodeGenerator {
             file,
             unit_name: unit_name.clone(),
+            generate_date_time_helper: internal_representation.classes.iter().any(|c| {
+                c.variables.iter().any(|v| match &v.data_type {
+                    DataType::DateTime | DataType::Date | DataType::Time => true,
+                    _ => false,
+                })
+            }) || internal_representation.types_aliases.iter().any(
+                |a| match &a.for_type {
+                    DataType::DateTime | DataType::Date | DataType::Time => true,
+                    _ => false,
+                },
+            ),
+            generate_hex_binary_helper: internal_representation.classes.iter().any(|c| {
+                c.variables.iter().any(|v| match &v.data_type {
+                    DataType::Binary(BinaryEncoding::Hex) => true,
+                    _ => false,
+                })
+            }) || internal_representation.types_aliases.iter().any(
+                |a| match &a.for_type {
+                    DataType::Binary(BinaryEncoding::Hex) => true,
+                    _ => false,
+                },
+            ),
             internal_representation,
         }
     }
