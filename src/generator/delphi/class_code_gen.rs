@@ -1,6 +1,7 @@
 use std::{fs::File, io::Write};
 
 use crate::generator::{
+    code_generator_trait::CodeGenOptions,
     internal_representation::DOCUMENT_NAME,
     types::{BinaryEncoding, ClassType, DataType, TypeAlias},
 };
@@ -36,18 +37,19 @@ impl ClassCodeGenerator {
         file: &mut File,
         classes: &Vec<ClassType>,
         document: &ClassType,
+        options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
         file.write_all(b"  {$REGION 'Declarations}\n")?;
 
-        Self::generate_class_declaration(document, file, indentation)?;
+        Self::generate_class_declaration(file, document, options, indentation)?;
 
         for class_type in classes {
             if class_type.name == DOCUMENT_NAME {
                 continue;
             }
 
-            Self::generate_class_declaration(class_type, file, indentation)?;
+            Self::generate_class_declaration(file, class_type, options, indentation)?;
         }
         file.write_all(b"  {$ENDREGION}\n")?;
 
@@ -59,15 +61,16 @@ impl ClassCodeGenerator {
         classes: &Vec<ClassType>,
         document: &ClassType,
         type_aliases: &Vec<TypeAlias>,
+        options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         file.write_all(b"{$REGION 'Classes'}\n")?;
 
-        Self::generate_class_implementation(document, file, type_aliases)?;
+        Self::generate_class_implementation(file, document, type_aliases, options)?;
 
         file.write_all(b"\n")?;
 
         for class_type in classes {
-            Self::generate_class_implementation(class_type, file, type_aliases)?;
+            Self::generate_class_implementation(file, class_type, type_aliases, options)?;
         }
         file.write_all(b"{$ENDREGION}\n")?;
 
@@ -75,8 +78,9 @@ impl ClassCodeGenerator {
     }
 
     fn generate_class_declaration(
-        class_type: &ClassType,
         file: &mut File,
+        class_type: &ClassType,
+        options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
@@ -92,10 +96,12 @@ impl ClassCodeGenerator {
         file.write_fmt(format_args!("{}public\n", " ".repeat(indentation)))?;
 
         // constructors and destructors
-        file.write_fmt(format_args!(
-            "{}constructor FromXml(node: IXMLNode);\n",
-            " ".repeat(indentation + 2),
-        ))?;
+        if options.generate_from_xml {
+            file.write_fmt(format_args!(
+                "{}constructor FromXml(node: IXMLNode);\n",
+                " ".repeat(indentation + 2),
+            ))?;
+        }
 
         if class_type.variables.iter().any(|v| v.requires_free) {
             file.write_fmt(format_args!(
@@ -103,17 +109,20 @@ impl ClassCodeGenerator {
                 " ".repeat(indentation + 2),
             ))?;
         }
-        file.write_all(b"\n")?;
-        file.write_fmt(format_args!(
-            "{}procedure AppendToXmlRaw(pParent: IXMLNode);\n",
-            " ".repeat(indentation + 2),
-        ))?;
-        // TODO: Introduce GeneratorOptions
-        // file.write_fmt(format_args!(
-        //     "{}function ToXml: String;\n",
-        //     " ".repeat(indentation + 2),
-        // ))?;
-        file.write_all(b"\n")?;
+
+        if options.generate_to_xml {
+            file.write_all(b"\n")?;
+            file.write_fmt(format_args!(
+                "{}procedure AppendToXmlRaw(pParent: IXMLNode);\n",
+                " ".repeat(indentation + 2),
+            ))?;
+            // TODO: Introduce GeneratorOptions
+            // file.write_fmt(format_args!(
+            //     "{}function ToXml: String;\n",
+            //     " ".repeat(indentation + 2),
+            // ))?;
+            file.write_all(b"\n")?;
+        }
 
         // Variables
         for variable in &class_type.variables {
@@ -131,20 +140,59 @@ impl ClassCodeGenerator {
     }
 
     fn generate_class_implementation(
-        class_type: &ClassType,
         file: &mut File,
+        class_type: &ClassType,
         type_aliases: &Vec<TypeAlias>,
+        options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         let formated_name = Helper::as_type_name(&class_type.name);
         let needs_destroy = class_type.variables.iter().any(|v| v.requires_free);
 
         file.write_fmt(format_args!("{{ {} }}\n", formated_name))?;
 
+        if options.generate_from_xml {
+            Self::generate_from_xml_implementation(file, &formated_name, class_type, type_aliases)?;
+        }
+
+        if needs_destroy {
+            file.write_all(b"\n")?;
+            file.write_fmt(format_args!("destructor {}.Destroy;\n", formated_name))?;
+
+            file.write_all(b"begin\n")?;
+
+            for variable in class_type.variables.iter().filter(|v| v.requires_free) {
+                file.write_fmt(format_args!(
+                    "  {}.Free;\n",
+                    Helper::first_char_uppercase(&variable.name)
+                ))?;
+            }
+
+            file.write_all(b"\n")?;
+            file.write_all(b"  inherited;\n")?;
+            file.write_all(b"end;\n")?;
+        }
+
+        if options.generate_to_xml {
+            file.write_all(b"\n")?;
+            Self::generate_to_xml_implementation(file, formated_name, class_type, type_aliases)?;
+        }
+
+        file.write_all(b"\n")?;
+
+        Ok(())
+    }
+
+    fn generate_from_xml_implementation(
+        file: &mut File,
+        formated_name: &String,
+        class_type: &ClassType,
+        type_aliases: &Vec<TypeAlias>,
+    ) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
             "constructor {}.FromXml(node: IXMLNode);\n",
             formated_name,
         ))?;
-        file.write(b"begin\n")?;
+        file.write_all(b"begin\n")?;
 
         for variable in &class_type.variables {
             match &variable.data_type {
@@ -214,35 +262,22 @@ impl ClassCodeGenerator {
                 }
             }
         }
+        file.write_all(b"end;\n")?;
+        Ok(())
+    }
 
-        file.write(b"end;\n")?;
-
-        if needs_destroy {
-            file.write(b"\n")?;
-            file.write_fmt(format_args!("destructor {}.Destroy;\n", formated_name))?;
-
-            file.write(b"begin\n")?;
-
-            for variable in class_type.variables.iter().filter(|v| v.requires_free) {
-                file.write_fmt(format_args!(
-                    "  {}.Free;\n",
-                    Helper::first_char_uppercase(&variable.name)
-                ))?;
-            }
-
-            file.write_all(b"\n")?;
-            file.write(b"  inherited;\n")?;
-            file.write(b"end;\n")?;
-        }
-
-        file.write_all(b"\n")?;
+    fn generate_to_xml_implementation(
+        file: &mut File,
+        formated_name: String,
+        class_type: &ClassType,
+        type_aliases: &Vec<TypeAlias>,
+    ) -> Result<(), std::io::Error> {
         file.write_fmt(format_args!(
             "procedure {}.AppendToXmlRaw(pParent: IXMLNode);\n",
             formated_name
         ))?;
-
-        file.write(b"begin\n")?;
-        file.write(b"  var node: IXMLNode;\n")?;
+        file.write_all(b"begin\n")?;
+        file.write_all(b"  var node: IXMLNode;\n")?;
         file.write_all(b"\n")?;
         for variable in &class_type.variables {
             match &variable.data_type {
@@ -315,10 +350,7 @@ impl ClassCodeGenerator {
 
             file.write_all(b"\n")?;
         }
-        file.write(b"end;\n")?;
-
-        file.write(b"\n")?;
-
+        file.write_all(b"end;\n")?;
         Ok(())
     }
 

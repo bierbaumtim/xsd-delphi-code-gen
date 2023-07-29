@@ -84,6 +84,7 @@ impl<'a> DelphiCodeGenerator<'a> {
             self.file,
             &self.internal_representation.classes,
             &self.internal_representation.document,
+            &self.options,
             2,
         )?;
 
@@ -119,6 +120,7 @@ impl<'a> DelphiCodeGenerator<'a> {
             &self.internal_representation.classes,
             &self.internal_representation.document,
             &self.internal_representation.types_aliases,
+            &self.options,
         )?;
 
         self.newline()?;
