@@ -53,6 +53,7 @@ impl<'a> DelphiCodeGenerator<'a> {
             EnumCodeGenerator::write_declarations(
                 self.file,
                 &self.internal_representation.enumerations,
+                &self.options,
                 2,
             )?;
             self.newline()?;
@@ -99,6 +100,7 @@ impl<'a> DelphiCodeGenerator<'a> {
         EnumCodeGenerator::write_implementation(
             self.file,
             &self.internal_representation.enumerations,
+            &self.options,
         )?;
         self.newline()?;
 
