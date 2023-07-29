@@ -69,8 +69,12 @@ impl ClassCodeGenerator {
 
         file.write_all(b"\n")?;
 
-        for class_type in classes {
+        for (i, class_type) in classes.iter().enumerate() {
             Self::generate_class_implementation(file, class_type, type_aliases, options)?;
+
+            if i < classes.len() - 1 {
+                file.write_all(b"\n")?;
+            }
         }
         file.write_all(b"{$ENDREGION}\n")?;
 
@@ -128,7 +132,7 @@ impl ClassCodeGenerator {
         for variable in &class_type.variables {
             file.write_fmt(format_args!(
                 "{}{}: {};\n",
-                " ".repeat(indentation),
+                " ".repeat(indentation + 2),
                 Helper::first_char_uppercase(&variable.name),
                 Helper::get_datatype_language_representation(&variable.data_type),
             ))?;
@@ -176,8 +180,6 @@ impl ClassCodeGenerator {
             file.write_all(b"\n")?;
             Self::generate_to_xml_implementation(file, formated_name, class_type, type_aliases)?;
         }
-
-        file.write_all(b"\n")?;
 
         Ok(())
     }

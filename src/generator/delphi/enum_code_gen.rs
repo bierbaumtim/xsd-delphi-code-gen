@@ -21,8 +21,12 @@ impl EnumCodeGenerator {
 
         file.write(b"\n")?;
         file.write_all(b"  {$REGION 'Enumerations Helper'}\n")?;
-        for e in enumerations {
+        for (i, e) in enumerations.iter().enumerate() {
             Self::generate_helper_declaration(file, e, options, indentation)?;
+
+            if i < enumerations.len() - 1 {
+                file.write_all(b"\n")?;
+            }
         }
         file.write_all(b"  {$ENDREGION}\n")?;
 
@@ -35,8 +39,12 @@ impl EnumCodeGenerator {
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         file.write_all(b"{$REGION 'Enumerations Helper'}\n")?;
-        for enumeration in enumerations {
+        for (i, enumeration) in enumerations.iter().enumerate() {
             Self::generate_helper_implementation(file, enumeration, options)?;
+
+            if i < enumerations.len() - 1 {
+                file.write_all(b"\n")?;
+            }
         }
         file.write_all(b"{$ENDREGION}\n")?;
 
@@ -91,9 +99,7 @@ impl EnumCodeGenerator {
             ))?;
         }
 
-        file.write_fmt(format_args!("{}end;", " ".repeat(indentation),))?;
-        file.write_all(b"\n")?;
-        file.write_all(b"\n")?;
+        file.write_fmt(format_args!("{}end;\n", " ".repeat(indentation),))?;
 
         Ok(())
     }
@@ -107,12 +113,14 @@ impl EnumCodeGenerator {
 
         if options.generate_from_xml {
             Self::generate_helper_from_xml(file, enumeration, &formatted_enum_name)?;
+        }
+
+        if options.generate_from_xml && options.generate_to_xml {
             file.write_all(b"\n")?;
         }
 
         if options.generate_to_xml {
             Self::generate_helper_to_xml(file, enumeration, formatted_enum_name)?;
-            file.write_all(b"\n")?;
         }
 
         Ok(())
@@ -129,6 +137,7 @@ impl EnumCodeGenerator {
             .map(|v| v.xml_value.len() + 1)
             .max()
             .unwrap_or(4);
+
         file.write_fmt(format_args!(
             "class function {}Helper.FromXmlValue(const pXmlValue: String): {};\n",
             formatted_enum_name, formatted_enum_name,

@@ -74,6 +74,7 @@ impl<'a> DelphiCodeGenerator<'a> {
                 &self.internal_representation.classes,
                 2,
             )?;
+            self.newline()?;
         }
 
         Ok(())
@@ -105,15 +106,12 @@ impl<'a> DelphiCodeGenerator<'a> {
         )?;
         self.newline()?;
 
-        if self.generate_date_time_helper {
-            HelperCodeGenerator::write_date_time_helper(self.file, &self.options)?;
-            self.newline()?;
-        }
-
-        if self.generate_hex_binary_helper {
-            HelperCodeGenerator::write_hex_binary_helper(self.file, &self.options)?;
-            self.newline()?;
-        }
+        HelperCodeGenerator::write(
+            self.file,
+            &self.options,
+            self.generate_date_time_helper,
+            self.generate_hex_binary_helper,
+        )?;
 
         ClassCodeGenerator::write_implementations(
             self.file,
