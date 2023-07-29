@@ -1,6 +1,6 @@
 use std::{fs::File, path::PathBuf, time::Instant};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 mod generator;
 mod parser;
@@ -8,7 +8,8 @@ mod parser_types;
 mod type_registry;
 
 use generator::{
-    code_generator_trait::CodeGenerator, delphi::code_generator::DelphiCodeGenerator,
+    code_generator_trait::{CodeGenOptions, CodeGenerator},
+    delphi::code_generator::DelphiCodeGenerator,
     internal_representation::InternalRepresentation,
 };
 use parser::Parser as XmlParser;
@@ -33,7 +34,7 @@ fn main() {
             }
         };
 
-        output_path = dir.join(args.output);
+        output_path = dir.join(&args.output);
     } else {
         output_path = match args.output.canonicalize() {
             Ok(p) => p,
@@ -70,7 +71,7 @@ fn main() {
             }
         }
     } else {
-        match parser.parse_files(args.input, &mut type_registry) {
+        match parser.parse_files(&args.input, &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
                 eprintln!("An error occured: {}", error);
@@ -80,8 +81,11 @@ fn main() {
     };
 
     let internal_representation = InternalRepresentation::build(&nodes, &type_registry);
-    let mut generator =
-        DelphiCodeGenerator::new(&mut output_file, args.unit_name, internal_representation);
+    let mut generator = DelphiCodeGenerator::new(
+        &mut output_file,
+        build_code_gen_options(&args),
+        internal_representation,
+    );
     let res = generator.generate();
     match res {
         Ok(_) => println!(
@@ -95,6 +99,20 @@ fn main() {
             );
             return;
         }
+    }
+}
+
+fn build_code_gen_options(args: &Args) -> CodeGenOptions {
+    CodeGenOptions {
+        generate_from_xml: match &args.mode {
+            CodeGenMode::ToXml => false,
+            _ => true,
+        },
+        generate_to_xml: match &args.mode {
+            CodeGenMode::FromXml => false,
+            _ => true,
+        },
+        unit_name: args.unit_name.clone(),
     }
 }
 
@@ -112,4 +130,20 @@ pub struct Args {
 
     #[arg(long, num_args(0..=1))]
     pub(crate) type_prefix: Option<String>,
+
+    #[arg(long, value_enum, default_value_t)]
+    pub(crate) mode: CodeGenMode,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum CodeGenMode {
+    All,
+    ToXml,
+    FromXml,
+}
+
+impl Default for CodeGenMode {
+    fn default() -> Self {
+        CodeGenMode::All
+    }
 }

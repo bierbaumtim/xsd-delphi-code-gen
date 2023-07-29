@@ -27,7 +27,7 @@ impl Parser {
 
     pub(crate) fn parse_files<P: AsRef<Path>>(
         &mut self,
-        paths: Vec<P>,
+        paths: &Vec<P>,
         registry: &mut TypeRegistry,
     ) -> Result<Vec<Node>, ParserError> {
         let mut nodes = Vec::new();

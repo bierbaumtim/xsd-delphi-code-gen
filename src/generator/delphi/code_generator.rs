@@ -1,7 +1,9 @@
 use std::{fs::File, io::Write};
 
 use crate::generator::{
-    code_generator_trait::CodeGenerator, internal_representation::InternalRepresentation, types::*,
+    code_generator_trait::{CodeGenOptions, CodeGenerator},
+    internal_representation::InternalRepresentation,
+    types::*,
 };
 
 use super::{
@@ -14,7 +16,7 @@ use super::{
 
 pub(crate) struct DelphiCodeGenerator<'a> {
     file: &'a mut File,
-    unit_name: String,
+    options: CodeGenOptions,
     internal_representation: InternalRepresentation,
     generate_date_time_helper: bool,
     generate_hex_binary_helper: bool,
@@ -23,7 +25,7 @@ pub(crate) struct DelphiCodeGenerator<'a> {
 impl<'a> DelphiCodeGenerator<'a> {
     fn write_unit(&mut self) -> Result<(), std::io::Error> {
         self.file
-            .write_fmt(format_args!("unit {};", self.unit_name))?;
+            .write_fmt(format_args!("unit {};", self.options.unit_name))?;
         self.newline()?;
         self.newline()
     }
@@ -101,12 +103,12 @@ impl<'a> DelphiCodeGenerator<'a> {
         self.newline()?;
 
         if self.generate_date_time_helper {
-            HelperCodeGenerator::write_date_time_helper(self.file)?;
+            HelperCodeGenerator::write_date_time_helper(self.file, &self.options)?;
             self.newline()?;
         }
 
         if self.generate_hex_binary_helper {
-            HelperCodeGenerator::write_hex_binary_helper(self.file)?;
+            HelperCodeGenerator::write_hex_binary_helper(self.file, &self.options)?;
             self.newline()?;
         }
 
@@ -134,12 +136,12 @@ impl<'a> DelphiCodeGenerator<'a> {
 impl<'a> CodeGenerator<'a> for DelphiCodeGenerator<'a> {
     fn new(
         file: &'a mut File,
-        unit_name: String,
+        options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self {
         DelphiCodeGenerator {
             file,
-            unit_name: unit_name.clone(),
+            options,
             generate_date_time_helper: internal_representation.classes.iter().any(|c| {
                 c.variables.iter().any(|v| match &v.data_type {
                     DataType::DateTime | DataType::Date | DataType::Time => true,
