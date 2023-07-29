@@ -61,7 +61,8 @@ impl ClassCodeGenerator {
         type_aliases: &Vec<TypeAlias>,
     ) -> Result<(), std::io::Error> {
         file.write_all(b"{$REGION 'Classes'}\n")?;
-        // TODO: Generate Document Implementation
+
+        Self::generate_class_implementation(document, file, type_aliases)?;
 
         file.write_all(b"\n")?;
 
