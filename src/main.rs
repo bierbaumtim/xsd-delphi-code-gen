@@ -8,7 +8,7 @@ mod parser_types;
 mod type_registry;
 
 use generator::{
-    code_generator_trait::CodeGenerator, delphi_code_generator::DelphiCodeGenerator,
+    code_generator_trait::CodeGenerator, delphi::code_generator::DelphiCodeGenerator,
     internal_representation::InternalRepresentation,
 };
 use parser::Parser as XmlParser;
@@ -80,7 +80,8 @@ fn main() {
     };
 
     let internal_representation = InternalRepresentation::build(&nodes, &type_registry);
-    let mut generator = DelphiCodeGenerator::new(&mut output_file, args.unit_name, internal_representation);
+    let mut generator =
+        DelphiCodeGenerator::new(&mut output_file, args.unit_name, internal_representation);
     let res = generator.generate();
     match res {
         Ok(_) => println!(

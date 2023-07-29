@@ -57,9 +57,23 @@ impl InternalRepresentation {
                                 let c_type = registry.types.get(c);
 
                                 if let Some(c_type) = c_type {
+                                    let data_type = match c_type {
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.enumeration.is_some() =>
+                                        {
+                                            DataType::Enumeration(s.name.clone())
+                                        }
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.base_type.is_some() =>
+                                        {
+                                            DataType::Alias(s.name.clone())
+                                        }
+                                        _ => DataType::Custom(c_type.get_name()),
+                                    };
+
                                     let variable = Variable {
                                         name: child.name.clone(),
-                                        data_type: DataType::Custom(c_type.get_name()),
+                                        data_type,
                                         requires_free: match c_type {
                                             CustomTypeDefinition::Simple(s) => {
                                                 s.list_type.is_some()

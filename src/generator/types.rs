@@ -8,6 +8,8 @@ pub(crate) enum DataType {
     Integer,
     String,
     Time,
+    Alias(String),
+    Enumeration(String),
     Custom(String),
     List(Box<DataType>),
 }
