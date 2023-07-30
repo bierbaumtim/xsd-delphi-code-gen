@@ -1,4 +1,9 @@
-use std::{fs::File, path::PathBuf, time::Instant};
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
+    time::Instant,
+};
 
 use clap::{Parser, ValueEnum};
 
@@ -48,7 +53,7 @@ fn main() {
         };
     }
 
-    let mut output_file = match File::create(output_path) {
+    let output_file = match File::create(output_path) {
         Ok(f) => f,
         Err(e) => {
             eprintln!(
@@ -81,8 +86,9 @@ fn main() {
     };
 
     let internal_representation = InternalRepresentation::build(&nodes, &type_registry);
+    let mut buffer: BufWriter<Box<dyn Write>> = BufWriter::new(Box::new(output_file));
     let mut generator = DelphiCodeGenerator::new(
-        &mut output_file,
+        &mut buffer,
         build_code_gen_options(&args),
         internal_representation,
     );

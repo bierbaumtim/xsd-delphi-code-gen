@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::io::{BufWriter, Write};
 
 use crate::generator::{
     code_generator_trait::{CodeGenOptions, CodeGenerator},
@@ -15,7 +15,7 @@ use super::{
 // TODO: Sort class Declarations by occurance in document, then by inheritance and dependency
 
 pub(crate) struct DelphiCodeGenerator<'a> {
-    file: &'a mut File,
+    buffer: &'a mut BufWriter<Box<dyn Write>>,
     options: CodeGenOptions,
     internal_representation: InternalRepresentation,
     generate_date_time_helper: bool,
@@ -24,34 +24,34 @@ pub(crate) struct DelphiCodeGenerator<'a> {
 
 impl<'a> DelphiCodeGenerator<'a> {
     fn write_unit(&mut self) -> Result<(), std::io::Error> {
-        self.file
+        self.buffer
             .write_fmt(format_args!("unit {};", self.options.unit_name))?;
         self.newline()?;
         self.newline()
     }
 
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"uses System.DateUtils,\n")?;
-        self.file.write_all(b"     System.Types,\n")?;
-        self.file.write_all(b"     System.Xml;")?;
+        self.buffer.write_all(b"uses System.DateUtils,\n")?;
+        self.buffer.write_all(b"     System.Types,\n")?;
+        self.buffer.write_all(b"     System.Xml;")?;
         self.newline()?;
         self.newline()
     }
 
     fn write_interface_start(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"interface")?;
+        self.buffer.write_all(b"interface")?;
         self.newline()?;
         self.newline()
     }
 
     fn write_forward_declerations(&mut self) -> Result<(), std::io::Error> {
-        self.file.write(b"types")?;
+        self.buffer.write(b"types")?;
         self.newline()?;
         self.newline()?;
 
         if !self.internal_representation.enumerations.is_empty() {
             EnumCodeGenerator::write_declarations(
-                self.file,
+                self.buffer,
                 &self.internal_representation.enumerations,
                 &self.options,
                 2,
@@ -61,7 +61,7 @@ impl<'a> DelphiCodeGenerator<'a> {
 
         if !self.internal_representation.types_aliases.is_empty() {
             TypeAliasCodeGenerator::write_declarations(
-                self.file,
+                self.buffer,
                 &self.internal_representation.types_aliases,
                 2,
             )?;
@@ -70,7 +70,7 @@ impl<'a> DelphiCodeGenerator<'a> {
 
         if !self.internal_representation.classes.is_empty() {
             ClassCodeGenerator::write_forward_declerations(
-                self.file,
+                self.buffer,
                 &self.internal_representation.classes,
                 2,
             )?;
@@ -82,7 +82,7 @@ impl<'a> DelphiCodeGenerator<'a> {
 
     fn write_declarations(&mut self) -> Result<(), std::io::Error> {
         ClassCodeGenerator::write_declarations(
-            self.file,
+            self.buffer,
             &self.internal_representation.classes,
             &self.internal_representation.document,
             &self.options,
@@ -93,28 +93,28 @@ impl<'a> DelphiCodeGenerator<'a> {
     }
 
     fn write_implementation_start(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"implementation")?;
+        self.buffer.write_all(b"implementation")?;
         self.newline()?;
         self.newline()
     }
 
     fn write_implementation(&mut self) -> Result<(), std::io::Error> {
         EnumCodeGenerator::write_implementation(
-            self.file,
+            self.buffer,
             &self.internal_representation.enumerations,
             &self.options,
         )?;
         self.newline()?;
 
         HelperCodeGenerator::write(
-            self.file,
+            self.buffer,
             &self.options,
             self.generate_date_time_helper,
             self.generate_hex_binary_helper,
         )?;
 
         ClassCodeGenerator::write_implementations(
-            self.file,
+            self.buffer,
             &self.internal_representation.classes,
             &self.internal_representation.document,
             &self.internal_representation.types_aliases,
@@ -127,22 +127,22 @@ impl<'a> DelphiCodeGenerator<'a> {
     }
 
     fn write_file_end(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"end.")
+        self.buffer.write_all(b"end.")
     }
 
     fn newline(&mut self) -> Result<(), std::io::Error> {
-        self.file.write_all(b"\n")
+        self.buffer.write_all(b"\n")
     }
 }
 
 impl<'a> CodeGenerator<'a> for DelphiCodeGenerator<'a> {
     fn new(
-        file: &'a mut File,
+        buffer: &'a mut BufWriter<Box<dyn Write>>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self {
         DelphiCodeGenerator {
-            file,
+            buffer,
             options,
             generate_date_time_helper: internal_representation.classes.iter().any(|c| {
                 c.variables.iter().any(|v| match &v.data_type {

@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::io::{BufWriter, Write};
 
 use crate::generator::types::TypeAlias;
 
@@ -8,20 +8,20 @@ pub(crate) struct TypeAliasCodeGenerator;
 
 impl TypeAliasCodeGenerator {
     pub(crate) fn write_declarations(
-        file: &mut File,
+        buffer: &mut BufWriter<Box<dyn Write>>,
         type_aliases: &Vec<TypeAlias>,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
-        file.write_all(b"  {$REGION 'Aliases'}\n")?;
+        buffer.write_all(b"  {$REGION 'Aliases'}\n")?;
         for type_alias in type_aliases {
-            file.write_fmt(format_args!(
+            buffer.write_fmt(format_args!(
                 "{}T{} = {};\n",
                 " ".repeat(indentation),
                 type_alias.name,
                 Helper::get_datatype_language_representation(&type_alias.for_type),
             ))?;
         }
-        file.write_all(b"  {$ENDREGION}\n")?;
+        buffer.write_all(b"  {$ENDREGION}\n")?;
 
         Ok(())
     }

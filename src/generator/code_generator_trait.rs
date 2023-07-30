@@ -1,10 +1,10 @@
-use std::fs::File;
+use std::io::{BufWriter, Write};
 
 use super::internal_representation::InternalRepresentation;
 
 pub(crate) trait CodeGenerator<'a> {
     fn new(
-        file: &'a mut File,
+        buffer: &'a mut BufWriter<Box<dyn Write>>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self;
