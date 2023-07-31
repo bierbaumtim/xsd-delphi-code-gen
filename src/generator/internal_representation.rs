@@ -36,6 +36,50 @@ impl InternalRepresentation {
 
                     aliases_dep_graph.push(alias);
                 }
+                CustomTypeDefinition::Simple(st) if st.list_type.is_some() => {
+                    if let Some(lt) = &st.list_type {
+                        match lt {
+                            NodeType::Standard(s) => {
+                                let d_type = Self::node_base_type_to_datatype(s);
+
+                                let type_alias = TypeAlias {
+                                    name: st.name.clone(),
+                                    for_type: DataType::List(Box::new(d_type)),
+                                    pattern: None,
+                                };
+
+                                aliases_dep_graph.push(type_alias);
+                            }
+                            NodeType::Custom(c) => {
+                                let c_type = registry.types.get(c);
+
+                                if let Some(c_type) = c_type {
+                                    let data_type = match c_type {
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.enumeration.is_some() =>
+                                        {
+                                            DataType::Enumeration(s.name.clone())
+                                        }
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.base_type.is_some() =>
+                                        {
+                                            DataType::Alias(s.name.clone())
+                                        }
+                                        _ => DataType::Custom(c_type.get_name()),
+                                    };
+
+                                    let type_alias = TypeAlias {
+                                        name: st.name.clone(),
+                                        for_type: data_type,
+                                        pattern: None,
+                                    };
+
+                                    aliases_dep_graph.push(type_alias);
+                                }
+                            }
+                        }
+                    }
+                }
                 CustomTypeDefinition::Simple(_) => (),
                 CustomTypeDefinition::Complex(ct) => {
                     let mut variables = Vec::new();
@@ -97,9 +141,6 @@ impl InternalRepresentation {
                         name: ct.name.clone(),
                         super_type,
                         variables,
-                        // local_types: Vec::new(),  // TODO
-                        // type_aliases: Vec::new(), // TODO
-                        // enumerations: Vec::new(), // TODO
                     };
 
                     classes_dep_graph.push(class_type);
