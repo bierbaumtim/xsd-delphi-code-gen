@@ -26,32 +26,14 @@ fn main() {
 
     let instant = Instant::now();
 
-    let output_path: PathBuf;
-    if args.output.is_relative() {
-        let dir = match std::env::current_dir() {
-            Ok(d) => d,
-            Err(e) => {
-                eprintln!(
-                    "Relative path not supported due to following error: \"{:?}\"",
-                    e
-                );
-                return;
-            }
-        };
+    let output_path = match resolve_output_path(&args.output) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", e);
 
-        output_path = dir.join(&args.output);
-    } else {
-        output_path = match args.output.canonicalize() {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!(
-                    "Could not resolve output path due to following error: \"{:?}\"",
-                    e
-                );
-                return;
-            }
-        };
-    }
+            return;
+        }
+    };
 
     let output_file = match File::create(output_path) {
         Ok(f) => f,
@@ -103,22 +85,39 @@ fn main() {
                 "Failed to write output to file due to following error: \"{:?}\"",
                 e
             );
-            return;
         }
     }
 }
 
 fn build_code_gen_options(args: &Args) -> CodeGenOptions {
     CodeGenOptions {
-        generate_from_xml: match &args.mode {
-            CodeGenMode::ToXml => false,
-            _ => true,
-        },
-        generate_to_xml: match &args.mode {
-            CodeGenMode::FromXml => false,
-            _ => true,
-        },
+        generate_from_xml: !matches!(&args.mode, CodeGenMode::ToXml),
+        generate_to_xml: !matches!(&args.mode, CodeGenMode::FromXml),
         unit_name: args.unit_name.clone(),
+    }
+}
+
+fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
+    if path.is_relative() {
+        let dir = match std::env::current_dir() {
+            Ok(d) => d,
+            Err(e) => {
+                return Err(format!(
+                    "Relative path not supported due to following error: \"{:?}\"",
+                    e
+                ));
+            }
+        };
+
+        Ok(dir.join(path))
+    } else {
+        match path.canonicalize() {
+            Ok(p) => Ok(p),
+            Err(e) => Err(format!(
+                "Could not resolve output path due to following error: \"{:?}\"",
+                e
+            )),
+        }
     }
 }
 
@@ -141,15 +140,10 @@ pub struct Args {
     pub(crate) mode: CodeGenMode,
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, Default, ValueEnum)]
 enum CodeGenMode {
+    #[default]
     All,
     ToXml,
     FromXml,
-}
-
-impl Default for CodeGenMode {
-    fn default() -> Self {
-        CodeGenMode::All
-    }
 }
