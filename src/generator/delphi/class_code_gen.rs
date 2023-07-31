@@ -214,7 +214,7 @@ impl ClassCodeGenerator {
                         "  {} := {}Helper.FromXmlValue(node.ChildNodes['{}']);\n",
                         Helper::first_char_uppercase(&variable.name),
                         Helper::as_type_name(name),
-                        variable.name
+                        variable.xml_name
                     ))?;
                 }
                 DataType::Alias(name) => {
@@ -242,6 +242,7 @@ impl ClassCodeGenerator {
                             Self::generate_standard_type_from_xml(
                                 &data_type,
                                 &variable.name,
+                                &variable.xml_name,
                                 pattern,
                             )
                             .as_bytes(),
@@ -253,7 +254,7 @@ impl ClassCodeGenerator {
                         "  {} := {}.FromXml(node.ChildNodes['{}']);\n",
                         Helper::first_char_uppercase(&variable.name),
                         Helper::as_type_name(name),
-                        variable.name
+                        variable.xml_name
                     ))?;
                 }
                 DataType::List(_) => {
@@ -267,6 +268,7 @@ impl ClassCodeGenerator {
                         Self::generate_standard_type_from_xml(
                             &variable.data_type,
                             &variable.name,
+                            &variable.xml_name,
                             None,
                         )
                         .as_bytes(),
@@ -463,61 +465,62 @@ impl ClassCodeGenerator {
     fn generate_standard_type_from_xml<'a>(
         data_type: &'a DataType,
         variable_name: &'a String,
+        xml_name: &'a String,
         pattern: Option<String>,
     ) -> String {
         match data_type {
             DataType::Boolean => format!(
                     "  {} := (node.ChildNodes['{}'].Text = 'true') or (node.ChildNodes['{}'].Text = '1');\n",
                     Helper::first_char_uppercase(variable_name),
-                    variable_name,variable_name
+                    xml_name, xml_name
                 ),
                 DataType::DateTime | DataType::Date if pattern.is_some() => format!(
                         "  {} := DecodeDateTime(node.ChildNodes['{}'].Text, '{}');\n",
                         Helper::first_char_uppercase(variable_name),
-                        variable_name,
+                        xml_name,
                         pattern.unwrap_or_default(),
                     ),
                 DataType::DateTime | DataType::Date => format!(
                         "  {} := ISO8601ToDate(node.ChildNodes['{}'].Text);\n",
                         Helper::first_char_uppercase(variable_name),
-                        variable_name,
+                        xml_name,
                     ),
             DataType::Double =>format!(
                     "  {} := StrToFloat(node.ChildNodes['{}'].Text);\n",
                     Helper::first_char_uppercase(variable_name),
-                    variable_name
+                    xml_name
                 ),
             DataType::Binary(BinaryEncoding::Base64) => format!(
                     "  {} := TNetEncoding.Base64.DecodeStringToBytes(node.ChildNodes['{}'].Text);\n",
                     Helper::first_char_uppercase(variable_name),
-                    variable_name
+                    xml_name
                 ),
             DataType::Binary(BinaryEncoding::Hex) => format!(
                     "  HexToBin(node.ChildNodes['{}'].Text, 0, {}, 0, Length(node.ChildNodes['{}'].Text));\n",
-                    variable_name,
+                    xml_name,
                     Helper::first_char_uppercase(variable_name),
-                    variable_name,
+                    xml_name,
                 ),
             DataType::Integer => format!(
                     "  {} := StrToInt(node.ChildNodes['{}'].Text);\n",
                     Helper::first_char_uppercase(variable_name),
-                    variable_name
+                    xml_name
                 ),
             DataType::String => format!(
                     "  {} := node.ChildNodes['{}'].Text;\n",
                     Helper::first_char_uppercase(variable_name),
-                    variable_name
+                    xml_name
                 ),
                 DataType::Time if pattern.is_some() =>format!(
                             "  {} := TimeOf(DecodeDateTime(node.ChildNodes['{}'].Text, '{}'));\n",
                             Helper::first_char_uppercase(variable_name),
-                            variable_name,
+                            xml_name,
                             pattern.unwrap_or_default(),
                         ),
             DataType::Time => format!(
                     "  {} := TimeOf(ISO8601ToDate(node.ChildNodes['{}'].Text));\n",
                     Helper::first_char_uppercase(variable_name),
-                    variable_name
+                    xml_name
                 ),
             _ => String::new(),
         }
