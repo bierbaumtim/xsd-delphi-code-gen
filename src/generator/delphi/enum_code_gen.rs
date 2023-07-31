@@ -19,7 +19,7 @@ impl EnumCodeGenerator {
         }
         buffer.write_all(b"  {$ENDREGION}\n")?;
 
-        buffer.write(b"\n")?;
+        buffer.write_all(b"\n")?;
         buffer.write_all(b"  {$REGION 'Enumerations Helper'}\n")?;
         for (i, e) in enumerations.iter().enumerate() {
             Self::generate_helper_declaration(buffer, e, options, indentation)?;

@@ -5,6 +5,7 @@ use crate::generator::types::DataType;
 pub(crate) struct Helper;
 
 impl Helper {
+    #[inline]
     pub(crate) fn first_char_uppercase(name: &String) -> String {
         let mut graphemes = name.graphemes(true);
 
@@ -14,6 +15,7 @@ impl Helper {
         }
     }
 
+    #[inline]
     pub(crate) fn first_char_lowercase(name: &String) -> String {
         let mut graphemes = name.graphemes(true);
 
@@ -23,20 +25,25 @@ impl Helper {
         }
     }
 
+    #[inline]
     pub(crate) fn as_type_name(name: &String) -> String {
-        String::from("T") + Self::first_char_uppercase(name).as_str()
+        let mut result = String::with_capacity(name.len() + 1);
+        result.push('T');
+        result.push_str(&Self::first_char_uppercase(name));
+
+        result
     }
 
     pub(crate) fn get_datatype_language_representation(datatype: &DataType) -> String {
         match datatype {
-            DataType::Boolean => "Boolean".to_owned(),
-            DataType::DateTime => "TDateTime".to_owned(),
-            DataType::Date => "TDate".to_owned(),
-            DataType::Double => "Double".to_owned(),
-            DataType::Binary(_) => "TBytes".to_owned(),
-            DataType::Integer => "TBytes".to_owned(),
-            DataType::String => "String".to_owned(),
-            DataType::Time => "TTime".to_owned(),
+            DataType::Boolean => String::from("Boolean"),
+            DataType::DateTime => String::from("TDateTime"),
+            DataType::Date => String::from("TDate"),
+            DataType::Double => String::from("Double"),
+            DataType::Binary(_) => String::from("TBytes"),
+            DataType::Integer => String::from("TBytes"),
+            DataType::String => String::from("String"),
+            DataType::Time => String::from("TTime"),
             DataType::Alias(a) => Self::as_type_name(a),
             DataType::Enumeration(e) => Self::as_type_name(e),
             DataType::Custom(c) => Self::as_type_name(c),

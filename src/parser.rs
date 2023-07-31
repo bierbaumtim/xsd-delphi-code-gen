@@ -87,7 +87,6 @@ impl Parser {
                                     NodeType::Custom(name.clone()),
                                     name.clone(),
                                     base_attributes,
-                                    vec![],
                                 );
                                 nodes.push(node);
                             } else {
@@ -116,7 +115,6 @@ impl Parser {
                                     NodeType::Custom(type_name),
                                     name.clone(),
                                     base_attributes,
-                                    vec![],
                                 );
                                 nodes.push(node);
                             } else {
@@ -133,27 +131,25 @@ impl Parser {
                     }
                     //
                 }
-                Ok(Event::End(e)) => match e.name().as_ref() {
-                    b"xs:element" => current_element_name = None,
-                    _ => (),
-                },
-                Ok(Event::Empty(e)) => match e.name().as_ref() {
-                    b"xs:element" => {
+                Ok(Event::End(e)) => {
+                    if let b"xs:element" = e.name().as_ref() {
+                        current_element_name = None
+                    }
+                }
+                Ok(Event::Empty(e)) => {
+                    if let b"xs:element" = e.name().as_ref() {
                         let name = Self::get_attribute_value(&e, "name")?;
                         let b_type = Self::get_attribute_value(&e, "type")?;
                         let b_type = self.resolve_namespace(b_type)?;
-
                         let node_type = match Self::base_type_str_to_node_type(b_type.as_str()) {
                             Some(t) => t,
                             None => return Err(ParserError::MissingOrNotSupportedBaseType(b_type)),
                         };
                         let base_attributes = Self::get_base_attributes(&e)?;
-                        let node = Node::new(node_type, name, base_attributes, vec![]);
-
+                        let node = Node::new(node_type, name, base_attributes);
                         nodes.push(node);
                     }
-                    _ => (),
-                },
+                }
                 // There are several other `Event`s we do not consider here
                 _ => (),
             }
@@ -232,7 +228,6 @@ impl Parser {
                                 NodeType::Custom(type_name),
                                 name.clone(),
                                 base_attributes,
-                                vec![],
                             );
                             children.push(node);
                         } else {
@@ -259,7 +254,6 @@ impl Parser {
                                 NodeType::Custom(name.clone()),
                                 name.clone(),
                                 base_attributes,
-                                vec![],
                             );
                             children.push(node);
                         } else {
@@ -275,8 +269,8 @@ impl Parser {
                     }
                     _ => (),
                 },
-                Ok(Event::Empty(e)) => match e.name().as_ref() {
-                    b"xs:element" => {
+                Ok(Event::Empty(e)) => {
+                    if let b"xs:element" = e.name().as_ref() {
                         let name = Self::get_attribute_value(&e, "name")?;
                         let b_type = Self::get_attribute_value(&e, "type")?;
                         let b_type = self.resolve_namespace(b_type)?;
@@ -287,12 +281,11 @@ impl Parser {
                         };
                         let base_attributes = Self::get_base_attributes(&e)?;
 
-                        let node = Node::new(node_type, name, base_attributes, vec![]);
+                        let node = Node::new(node_type, name, base_attributes);
 
                         children.push(node);
                     }
-                    _ => (),
-                },
+                }
                 Ok(Event::End(e)) => match e.name().as_ref() {
                     b"xs:complexType" => break,
                     b"xs:element" => current_element_name = None,
@@ -313,7 +306,7 @@ impl Parser {
             } else {
                 Some(self.as_qualified_name(name.as_str()))
             },
-            base_type: base_type.clone(),
+            base_type,
             children,
         })
     }
@@ -332,10 +325,11 @@ impl Parser {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(s)) => match s.name().as_ref() {
-                    b"xs:restriction" => base_type = Self::get_attribute_value(&s, "base")?,
-                    _ => (),
-                },
+                Ok(Event::Start(s)) => {
+                    if let b"xs:restriction" = s.name().as_ref() {
+                        base_type = Self::get_attribute_value(&s, "base")?
+                    }
+                }
                 Ok(Event::Empty(e)) => match e.name().as_ref() {
                     b"xs:enumeration" => {
                         let value = Self::get_attribute_value(&e, "value")?;
@@ -382,7 +376,6 @@ impl Parser {
             },
             list_type: Self::base_type_str_to_node_type(list_type.as_str()),
             pattern,
-            is_local,
         });
 
         buf.clear();
@@ -403,37 +396,36 @@ impl Parser {
             "xs:string" => Some(NodeType::Standard(NodeBaseType::String)),
             "xs:time" => Some(NodeType::Standard(NodeBaseType::Time)),
             "" => None,
-            _ => Some(NodeType::Custom(base_type.clone().to_owned())),
+            _ => Some(NodeType::Custom((*base_type).to_owned())),
         }
     }
 
     fn get_attribute_value(node: &BytesStart, name: &str) -> Result<String, ParserError> {
         match node
             .attributes()
-            .filter(|a| a.as_ref().is_ok_and(|v| v.key.0 == name.as_bytes()))
-            .next()
+            .find(|a| a.as_ref().is_ok_and(|v| v.key.0 == name.as_bytes()))
         {
             Some(r) => match r {
                 Ok(a) => match a.value {
-                    Cow::Borrowed(v) => String::from_utf8(v.clone().to_owned()).map_err(|e| {
+                    Cow::Borrowed(v) => String::from_utf8(v.to_vec()).map_err(|e| {
                         ParserError::MalformedAttribute(
-                            name.clone().to_owned(),
+                            String::from(name),
                             Some(format!("{:?}", e)),
                         )
                     }),
                     Cow::Owned(v) => String::from_utf8(v).map_err(|e| {
                         ParserError::MalformedAttribute(
-                            name.clone().to_owned(),
+                            String::from(name),
                             Some(format!("{:?}", e)),
                         )
                     }),
                 },
                 Err(e) => Err(ParserError::MalformedAttribute(
-                    name.clone().to_owned(),
+                    String::from(name),
                     Some(format!("{:?}", e)),
                 )),
             },
-            None => Err(ParserError::MissingAttribute(name.clone().to_owned())),
+            None => Err(ParserError::MissingAttribute(String::from(name))),
         }
     }
 
@@ -458,7 +450,7 @@ impl Parser {
             Some(v) => match v.parse::<i64>() {
                 Ok(m) => Some(m),
                 Err(e) => {
-                    if v == "unbounded".to_owned() {
+                    if v == *"unbounded" {
                         Some(UNBOUNDED_OCCURANCE)
                     } else {
                         return Err(ParserError::MalformedAttribute(
@@ -501,7 +493,7 @@ impl Parser {
 
                 match self.lookup_namespace(&alias) {
                     Some(n) => Ok(n.clone()),
-                    None => return Err(ParserError::FailedToResolveNamespace(alias)),
+                    None => Err(ParserError::FailedToResolveNamespace(alias)),
                 }
             }
             None => Ok(self.as_qualified_name(b_type.as_str())),
@@ -534,13 +526,13 @@ impl Parser {
                     };
 
                     let value = match value {
-                        Some(v) => String::from(v),
-                        None => return Some(ParserError::MalformedAttribute(alias.clone(), None)),
+                        Some(v) => v,
+                        None => return Some(ParserError::MalformedAttribute(alias, None)),
                     };
 
                     self.namespace_aliases.insert(alias, value);
                 }
-                Err(_) => (),
+                Err(e) => return Some(ParserError::MalformedNamespaceAttribute(e.to_string())),
             }
         }
 

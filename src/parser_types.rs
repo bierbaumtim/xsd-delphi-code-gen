@@ -8,21 +8,14 @@ pub(crate) struct Node {
     pub(crate) node_type: NodeType,
     pub(crate) name: String,
     pub(crate) base_attributes: BaseAttributes,
-    pub(crate) attributes: Vec<Attribute>,
 }
 
 impl Node {
-    pub(crate) fn new(
-        node_type: NodeType,
-        name: String,
-        base_attributes: BaseAttributes,
-        attributes: Vec<Attribute>,
-    ) -> Node {
+    pub(crate) fn new(node_type: NodeType, name: String, base_attributes: BaseAttributes) -> Node {
         Node {
             node_type,
             name,
             base_attributes,
-            attributes,
         }
     }
 }
@@ -54,12 +47,6 @@ pub(crate) enum NodeBaseType {
 pub(crate) struct BaseAttributes {
     pub(crate) min_occurs: Option<i64>,
     pub(crate) max_occurs: Option<i64>,
-}
-
-#[derive(Debug)]
-pub(crate) struct Attribute {
-    name: String,
-    // TODO: Was steht in den Specs zu attributes
 }
 
 #[derive(Debug)]
@@ -99,8 +86,6 @@ pub(crate) struct SimpleType {
     pub(crate) qualified_name: Option<String>,
 
     pub(crate) base_type: Option<NodeType>,
-    /// type only defined for one element
-    pub(crate) is_local: bool,
     /// possible values for an enumeration
     pub(crate) enumeration: Option<Vec<String>>,
     /// type of items in a list
@@ -126,6 +111,7 @@ pub(crate) struct ComplexType {
 pub(crate) enum ParserError {
     FailedToResolveNamespace(String),
     MalformedAttribute(String, Option<String>),
+    MalformedNamespaceAttribute(String),
     MissingOrNotSupportedBaseType(String),
     MissingAttribute(String),
     UnableToReadFile,
@@ -145,6 +131,9 @@ impl Display for ParserError {
                 "Attribute \"{}\" is malformed. Error: \"{:?}\"",
                 name, reason
             ),
+            Self::MalformedNamespaceAttribute(message) => {
+                write!(f, "Namespace attribute is malformed: \"{}\"", message)
+            }
             Self::MissingOrNotSupportedBaseType(value) => {
                 write!(f, "Type is missing or unsupported \"{}\"", value)
             }

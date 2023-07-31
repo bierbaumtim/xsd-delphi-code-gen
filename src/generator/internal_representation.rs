@@ -14,7 +14,7 @@ pub(crate) struct InternalRepresentation {
 impl InternalRepresentation {
     pub(crate) fn build(nodes: &Vec<Node>, registry: &TypeRegistry) -> InternalRepresentation {
         let mut classes_dep_graph = DependencyGraph::<String, ClassType, _>::new(|c| {
-            (c.name.clone(), c.super_type.as_ref().map(|v| v.clone()))
+            (c.name.clone(), c.super_type.as_ref().cloned())
         });
         let mut aliases_dep_graph =
             DependencyGraph::<String, TypeAlias, _>::new(|a| match &a.for_type {

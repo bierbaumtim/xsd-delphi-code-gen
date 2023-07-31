@@ -60,7 +60,7 @@ impl ClassCodeGenerator {
         buffer: &mut BufWriter<Box<dyn Write>>,
         classes: &Vec<ClassType>,
         document: &ClassType,
-        type_aliases: &Vec<TypeAlias>,
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         buffer.write_all(b"{$REGION 'Classes'}\n")?;
@@ -93,7 +93,7 @@ impl ClassCodeGenerator {
             Helper::first_char_uppercase(&class_type.name),
             class_type.super_type.as_ref().map_or_else(
                 || "(TObject)".to_owned(),
-                |v| format!("(T{})", Helper::first_char_uppercase(&v))
+                |v| format!("(T{})", Helper::first_char_uppercase(v))
             )
         ))?;
         buffer.write_all(b"\n")?;
@@ -146,7 +146,7 @@ impl ClassCodeGenerator {
     fn generate_class_implementation(
         buffer: &mut BufWriter<Box<dyn Write>>,
         class_type: &ClassType,
-        type_aliases: &Vec<TypeAlias>,
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         let formated_name = Helper::as_type_name(&class_type.name);
@@ -193,7 +193,7 @@ impl ClassCodeGenerator {
         buffer: &mut BufWriter<Box<dyn Write>>,
         formated_name: &String,
         class_type: &ClassType,
-        type_aliases: &Vec<TypeAlias>,
+        type_aliases: &[TypeAlias],
     ) -> Result<(), std::io::Error> {
         buffer.write_fmt(format_args!(
             "constructor {}.FromXml(node: IXMLNode);\n",
@@ -218,23 +218,17 @@ impl ClassCodeGenerator {
                         let mut pattern = t.pattern.clone();
                         let mut data_type = t.for_type.clone();
 
-                        loop {
-                            match &data_type {
-                                DataType::Custom(n) => {
-                                    let type_alias =
-                                        type_aliases.iter().find(|t| t.name == n.as_str());
+                        while let DataType::Custom(n) = &data_type {
+                            let type_alias = type_aliases.iter().find(|t| t.name == n.as_str());
 
-                                    if let Some(alias) = type_alias {
-                                        if pattern.is_none() {
-                                            pattern = alias.pattern.clone();
-                                        }
-
-                                        data_type = alias.for_type.clone();
-                                    } else {
-                                        break;
-                                    }
+                            if let Some(alias) = type_alias {
+                                if pattern.is_none() {
+                                    pattern = alias.pattern.clone();
                                 }
-                                _ => break,
+
+                                data_type = alias.for_type.clone();
+                            } else {
+                                break;
                             }
                         }
 
@@ -277,7 +271,7 @@ impl ClassCodeGenerator {
         buffer: &mut BufWriter<Box<dyn Write>>,
         formated_name: String,
         class_type: &ClassType,
-        type_aliases: &Vec<TypeAlias>,
+        type_aliases: &[TypeAlias],
     ) -> Result<(), std::io::Error> {
         buffer.write_fmt(format_args!(
             "procedure {}.AppendToXmlRaw(pParent: IXMLNode);\n",
@@ -306,23 +300,17 @@ impl ClassCodeGenerator {
                         let mut pattern = t.pattern.clone();
                         let mut data_type = t.for_type.clone();
 
-                        loop {
-                            match &data_type {
-                                DataType::Custom(n) => {
-                                    let type_alias =
-                                        type_aliases.iter().find(|t| t.name == n.as_str());
+                        while let DataType::Custom(n) = &data_type {
+                            let type_alias = type_aliases.iter().find(|t| t.name == n.as_str());
 
-                                    if let Some(alias) = type_alias {
-                                        if pattern.is_none() {
-                                            pattern = alias.pattern.clone();
-                                        }
-
-                                        data_type = alias.for_type.clone();
-                                    } else {
-                                        break;
-                                    }
+                            if let Some(alias) = type_alias {
+                                if pattern.is_none() {
+                                    pattern = alias.pattern.clone();
                                 }
-                                _ => break,
+
+                                data_type = alias.for_type.clone();
+                            } else {
+                                break;
                             }
                         }
 
@@ -420,7 +408,7 @@ impl ClassCodeGenerator {
                     Helper::first_char_uppercase(variable_name),
                     variable_name
                 ),
-            _ => format!(""),
+            _ => String::new(),
         }
     }
 
@@ -442,56 +430,56 @@ impl ClassCodeGenerator {
                 format!(
                     "  node.Text := FormatDateTime('{}', {});\n",
                     pattern.unwrap_or_default(),
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::DateTime | DataType::Date => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := ISO8601ToDate({});\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::Double => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := FloatToStr({});\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::Binary(BinaryEncoding::Base64) => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := TNetEncoding.Base64.EncodeStringToBytes({});\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::Binary(BinaryEncoding::Hex) => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := BinToHexStr({});\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::Integer => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := IntToStr({});\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::String => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := {};\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             DataType::Time if pattern.is_some() => vec![
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := EncodeTime({}, '{}');\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                     pattern.unwrap_or_default(),
                 ),
             ],
@@ -499,7 +487,7 @@ impl ClassCodeGenerator {
                 format!("  node := parent.AddChild('{}');\n", variable_name,),
                 format!(
                     "  node.Text := TimeToStr({});\n",
-                    Helper::first_char_uppercase(&variable_name),
+                    Helper::first_char_uppercase(variable_name),
                 ),
             ],
             _ => vec![],

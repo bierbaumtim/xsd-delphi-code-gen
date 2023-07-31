@@ -42,7 +42,7 @@ impl HelperCodeGenerator {
             .write_all(b"function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;\n")?;
             buffer.write_all(b"begin\n")?;
             buffer.write_all(b"  if pFormat = '' then Exit(ISO8601ToDate(pDateStr));\n")?;
-            buffer.write(b"\n")?;
+            buffer.write_all(b"\n")?;
             buffer.write_all(b"  Result := ISO8601ToDate(pDateStr);\n")?;
             buffer.write_all(b"end;\n")?;
             buffer.write_all(b"\n")?;

@@ -23,6 +23,7 @@ pub(crate) struct DelphiCodeGenerator<'a> {
 }
 
 impl<'a> DelphiCodeGenerator<'a> {
+    #[inline]
     fn write_unit(&mut self) -> Result<(), std::io::Error> {
         self.buffer
             .write_fmt(format_args!("unit {};", self.options.unit_name))?;
@@ -30,6 +31,7 @@ impl<'a> DelphiCodeGenerator<'a> {
         self.newline()
     }
 
+    #[inline]
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"uses System.DateUtils,\n")?;
         self.buffer.write_all(b"     System.Types,\n")?;
@@ -38,14 +40,16 @@ impl<'a> DelphiCodeGenerator<'a> {
         self.newline()
     }
 
+    #[inline]
     fn write_interface_start(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"interface")?;
         self.newline()?;
         self.newline()
     }
 
+    #[inline]
     fn write_forward_declerations(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write(b"types")?;
+        self.buffer.write_all(b"types")?;
         self.newline()?;
         self.newline()?;
 
@@ -80,6 +84,7 @@ impl<'a> DelphiCodeGenerator<'a> {
         Ok(())
     }
 
+    #[inline]
     fn write_declarations(&mut self) -> Result<(), std::io::Error> {
         ClassCodeGenerator::write_declarations(
             self.buffer,
@@ -92,12 +97,14 @@ impl<'a> DelphiCodeGenerator<'a> {
         Ok(())
     }
 
+    #[inline]
     fn write_implementation_start(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"implementation")?;
         self.newline()?;
         self.newline()
     }
 
+    #[inline]
     fn write_implementation(&mut self) -> Result<(), std::io::Error> {
         EnumCodeGenerator::write_implementation(
             self.buffer,
@@ -126,10 +133,12 @@ impl<'a> DelphiCodeGenerator<'a> {
         Ok(())
     }
 
+    #[inline]
     fn write_file_end(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"end.")
     }
 
+    #[inline]
     fn newline(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"\n")
     }
@@ -145,27 +154,28 @@ impl<'a> CodeGenerator<'a> for DelphiCodeGenerator<'a> {
             buffer,
             options,
             generate_date_time_helper: internal_representation.classes.iter().any(|c| {
-                c.variables.iter().any(|v| match &v.data_type {
-                    DataType::DateTime | DataType::Date | DataType::Time => true,
-                    _ => false,
+                c.variables.iter().any(|v| {
+                    matches!(
+                        &v.data_type,
+                        DataType::DateTime | DataType::Date | DataType::Time
+                    )
                 })
             }) || internal_representation.types_aliases.iter().any(
-                |a| match &a.for_type {
-                    DataType::DateTime | DataType::Date | DataType::Time => true,
-                    _ => false,
+                |a| {
+                    matches!(
+                        &a.for_type,
+                        DataType::DateTime | DataType::Date | DataType::Time
+                    )
                 },
             ),
             generate_hex_binary_helper: internal_representation.classes.iter().any(|c| {
-                c.variables.iter().any(|v| match &v.data_type {
-                    DataType::Binary(BinaryEncoding::Hex) => true,
-                    _ => false,
-                })
-            }) || internal_representation.types_aliases.iter().any(
-                |a| match &a.for_type {
-                    DataType::Binary(BinaryEncoding::Hex) => true,
-                    _ => false,
-                },
-            ),
+                c.variables
+                    .iter()
+                    .any(|v| matches!(&v.data_type, DataType::Binary(BinaryEncoding::Hex)))
+            }) || internal_representation
+                .types_aliases
+                .iter()
+                .any(|a| matches!(&a.for_type, DataType::Binary(BinaryEncoding::Hex))),
             internal_representation,
         }
     }
