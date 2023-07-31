@@ -12,6 +12,7 @@ pub(crate) enum DataType {
     Enumeration(String),
     Custom(String),
     List(Box<DataType>),
+    FixedSizeList(Box<DataType>, usize),
 }
 
 #[derive(Clone, Debug)]

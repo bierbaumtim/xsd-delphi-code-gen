@@ -47,10 +47,14 @@ impl Helper {
             DataType::Alias(a) => Self::as_type_name(a),
             DataType::Enumeration(e) => Self::as_type_name(e),
             DataType::Custom(c) => Self::as_type_name(c),
+            DataType::FixedSizeList(t, _) => Self::get_datatype_language_representation(t),
             DataType::List(s) => {
                 let gt = Self::get_datatype_language_representation(s);
 
-                format!("TList<{}>", gt)
+                match **s {
+                    DataType::Custom(_) => format!("TObjectList<{}>", gt),
+                    _ => format!("TList<{}>", gt),
+                }
             }
         }
     }

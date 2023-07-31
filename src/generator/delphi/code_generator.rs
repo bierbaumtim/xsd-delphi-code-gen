@@ -34,6 +34,8 @@ impl<'a> DelphiCodeGenerator<'a> {
     #[inline]
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"uses System.DateUtils,\n")?;
+        self.buffer
+            .write_all(b"     System.Generics.Collections,\n")?;
         self.buffer.write_all(b"     System.Types,\n")?;
         self.buffer.write_all(b"     System.Xml;")?;
         self.newline()?;

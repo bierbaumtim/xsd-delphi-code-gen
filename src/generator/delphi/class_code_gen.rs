@@ -130,18 +130,38 @@ impl ClassCodeGenerator {
 
         // Variables
         for variable in &class_type.variables {
-            let mut variable_name = Helper::first_char_uppercase(&variable.name);
+            match &variable.data_type {
+                DataType::List(_) => {
+                    let mut variable_name = Helper::first_char_uppercase(&variable.name);
+                    variable_name.push_str(&options.plural_suffix);
 
-            if let DataType::List(_) = variable.data_type {
-                variable_name.push_str(&options.plural_suffix);
+                    buffer.write_fmt(format_args!(
+                        "{}{}: {};\n",
+                        " ".repeat(indentation + 2),
+                        variable_name,
+                        Helper::get_datatype_language_representation(&variable.data_type),
+                    ))?;
+                }
+                DataType::FixedSizeList(item_type, size) => {
+                    for i in 1..size + 1 {
+                        buffer.write_fmt(format_args!(
+                            "{}{}{}: {};\n",
+                            " ".repeat(indentation + 2),
+                            Helper::first_char_uppercase(&variable.name),
+                            i,
+                            Helper::get_datatype_language_representation(item_type),
+                        ))?;
+                    }
+                }
+                _ => {
+                    buffer.write_fmt(format_args!(
+                        "{}{}: {};\n",
+                        " ".repeat(indentation + 2),
+                        Helper::first_char_uppercase(&variable.name),
+                        Helper::get_datatype_language_representation(&variable.data_type),
+                    ))?;
+                }
             }
-
-            buffer.write_fmt(format_args!(
-                "{}{}: {};\n",
-                " ".repeat(indentation + 2),
-                variable_name,
-                Helper::get_datatype_language_representation(&variable.data_type),
-            ))?;
         }
 
         buffer.write_fmt(format_args!("{}end;\n\n", " ".repeat(indentation)))?;
@@ -242,7 +262,7 @@ impl ClassCodeGenerator {
                             Self::generate_standard_type_from_xml(
                                 &data_type,
                                 &variable.name,
-                                &variable.xml_name,
+                                format!("node.ChildNodes['{}']", variable.xml_name),
                                 pattern,
                             )
                             .as_bytes(),
@@ -257,18 +277,220 @@ impl ClassCodeGenerator {
                         variable.xml_name
                     ))?;
                 }
-                DataType::List(_) => {
+                DataType::List(item_type) => {
                     buffer.write_fmt(format_args!(
-                        "  // Not supported because type of {} is a List\n",
+                        "  {} = TList<{}>.Create;\n",
+                        Helper::first_char_uppercase(&variable.name),
+                        Helper::as_type_name(&variable.name),
+                    ))?;
+                    buffer.write_all(b"\n")?;
+                    buffer.write_fmt(format_args!(
+                        "  var __{}Index = node.ChildNodes.IndexOf('{}');\n",
+                        variable.name, variable.xml_name
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "  if __{}Index >= 0 then begin\n",
                         variable.name
                     ))?;
+                    buffer.write_fmt(format_args!(
+                        "    for var I := 0 to node.ChildNodes.Count - __{}Index - 1 do begin\n",
+                        variable.name
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "      var __{}Node := node.ChildNodes[__{}Index + I];\n",
+                        variable.name, variable.name,
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "      if __{}Node.LocalName <> '{}' then continue;\n",
+                        variable.name, variable.xml_name,
+                    ))?;
+                    match *(item_type.clone()) {
+                        DataType::Enumeration(name) => {
+                            buffer.write_fmt(format_args!(
+                                "      {}.Add({}Helper.FromXmlValue(__{}Node));\n",
+                                Helper::first_char_uppercase(&variable.name),
+                                Helper::as_type_name(&name),
+                                variable.name,
+                            ))?;
+                        }
+                        DataType::Alias(name) => {
+                            let type_alias = type_aliases.iter().find(|t| t.name == name.as_str());
+
+                            if let Some(t) = type_alias {
+                                let mut pattern = t.pattern.clone();
+                                let mut data_type = t.for_type.clone();
+
+                                while let DataType::Custom(n) = &data_type {
+                                    let type_alias =
+                                        type_aliases.iter().find(|t| t.name == n.as_str());
+
+                                    if let Some(alias) = type_alias {
+                                        if pattern.is_none() {
+                                            pattern = alias.pattern.clone();
+                                        }
+
+                                        data_type = alias.for_type.clone();
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                buffer.write_all(
+                                    Self::generate_standard_type_from_xml(
+                                        &data_type,
+                                        &variable.name,
+                                        format!("__{}Node", variable.name),
+                                        pattern,
+                                    )
+                                    .as_bytes(),
+                                )?;
+                            }
+                        }
+                        DataType::Custom(name) => {
+                            buffer.write_fmt(format_args!(
+                                "      {}.Add({}.FromXml(__{}Node));\n",
+                                Helper::first_char_uppercase(&variable.name),
+                                Helper::as_type_name(&name),
+                                variable.name,
+                            ))?;
+                        }
+                        _ => {
+                            buffer.write_fmt(format_args!(
+                                "      var {}",
+                                Self::generate_standard_type_from_xml(
+                                    item_type,
+                                    &format!("__{}", Helper::first_char_uppercase(&variable.name)),
+                                    format!("__{}Node", variable.name),
+                                    None,
+                                ),
+                            ))?;
+                            buffer.write_fmt(format_args!(
+                                "      {}.Add(__{});\n",
+                                Helper::first_char_uppercase(&variable.name),
+                                Helper::first_char_uppercase(&variable.name)
+                            ))?;
+                        }
+                    }
+                    buffer.write_fmt(format_args!("    end;\n"))?;
+                    buffer.write_fmt(format_args!("  end;\n"))?;
+                    buffer.write_all(b"\n")?;
+                }
+                DataType::FixedSizeList(item_type, size) => {
+                    for i in 1..size + 1 {
+                        buffer.write_fmt(format_args!(
+                            "  {}{} := Default({});\n",
+                            Helper::first_char_uppercase(&variable.name),
+                            i,
+                            Helper::get_datatype_language_representation(item_type),
+                        ))?;
+                    }
+                    buffer.write_all(b"\n")?;
+                    buffer.write_fmt(format_args!(
+                        "  var __{}Index = node.ChildNodes.IndexOf('{}');\n",
+                        variable.name, variable.xml_name
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "  if __{}Index >= 0 then begin\n",
+                        variable.name
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "    for var I := 0 to {} do begin\n",
+                        size - 1
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "      var __{}Node := node.ChildNodes[__{}Index + I];\n",
+                        variable.name, variable.name,
+                    ))?;
+                    buffer.write_fmt(format_args!(
+                        "      if __{}Node.LocalName <> '{}' then break;\n",
+                        variable.name, variable.xml_name,
+                    ))?;
+                    buffer.write_all(b"\n")?;
+                    buffer.write_fmt(format_args!("      case I of\n"))?;
+                    for i in 1..size + 1 {
+                        match *(item_type.clone()) {
+                            DataType::Enumeration(name) => {
+                                buffer.write_fmt(format_args!(
+                                    "        {}: {}{} := {}Helper.FromXmlValue(__{}Node);\n",
+                                    i - 1,
+                                    Helper::first_char_uppercase(&variable.name),
+                                    i,
+                                    Helper::as_type_name(&name),
+                                    variable.name,
+                                ))?;
+                            }
+                            DataType::Alias(name) => {
+                                let type_alias =
+                                    type_aliases.iter().find(|t| t.name == name.as_str());
+
+                                if let Some(t) = type_alias {
+                                    let mut pattern = t.pattern.clone();
+                                    let mut data_type = t.for_type.clone();
+
+                                    while let DataType::Custom(n) = &data_type {
+                                        let type_alias =
+                                            type_aliases.iter().find(|t| t.name == n.as_str());
+
+                                        if let Some(alias) = type_alias {
+                                            if pattern.is_none() {
+                                                pattern = alias.pattern.clone();
+                                            }
+
+                                            data_type = alias.for_type.clone();
+                                        } else {
+                                            break;
+                                        }
+                                    }
+
+                                    buffer.write_all(
+                                        Self::generate_standard_type_from_xml(
+                                            &data_type,
+                                            &variable.name,
+                                            format!("__{}Node", variable.name),
+                                            pattern,
+                                        )
+                                        .as_bytes(),
+                                    )?;
+                                }
+                            }
+                            DataType::Custom(name) => {
+                                buffer.write_fmt(format_args!(
+                                    "        {}: {}{} := {}.FromXml(__{}Node);\n",
+                                    i - 1,
+                                    Helper::first_char_uppercase(&variable.name),
+                                    i,
+                                    Helper::as_type_name(&name),
+                                    variable.name,
+                                ))?;
+                            }
+                            _ => {
+                                buffer.write_fmt(format_args!(
+                                    "        {}: {}",
+                                    i - 1,
+                                    Self::generate_standard_type_from_xml(
+                                        item_type,
+                                        &format!(
+                                            "{}{}",
+                                            Helper::first_char_uppercase(&variable.name),
+                                            i,
+                                        ),
+                                        format!("__{}Node", variable.name),
+                                        None,
+                                    ),
+                                ))?;
+                            }
+                        }
+                    }
+                    buffer.write_fmt(format_args!("      end;\n"))?;
+                    buffer.write_fmt(format_args!("    end;\n"))?;
+                    buffer.write_fmt(format_args!("  end;\n"))?;
                 }
                 _ => {
                     buffer.write_all(
                         Self::generate_standard_type_from_xml(
                             &variable.data_type,
                             &variable.name,
-                            &variable.xml_name,
+                            format!("node.ChildNodes['{}']", variable.xml_name),
                             None,
                         )
                         .as_bytes(),
@@ -365,6 +587,23 @@ impl ClassCodeGenerator {
                         4,
                     )?;
                     buffer.write_fmt(format_args!("  end;\n"))?;
+                }
+                DataType::FixedSizeList(item_type, size) => {
+                    for i in 1..size + 1 {
+                        Self::generate_list_to_xml(
+                            buffer,
+                            item_type,
+                            &(Helper::first_char_uppercase(&variable.name)
+                                + i.to_string().as_str()),
+                            &variable.xml_name,
+                            type_aliases,
+                            2,
+                        )?;
+
+                        if i < *size {
+                            buffer.write_all(b"\n")?;
+                        }
+                    }
                 }
                 _ => {
                     for arg in Self::generate_standard_type_to_xml(
@@ -465,63 +704,64 @@ impl ClassCodeGenerator {
     fn generate_standard_type_from_xml<'a>(
         data_type: &'a DataType,
         variable_name: &'a String,
-        xml_name: &'a String,
+        node: String,
         pattern: Option<String>,
     ) -> String {
         match data_type {
             DataType::Boolean => format!(
-                    "  {} := (node.ChildNodes['{}'].Text = 'true') or (node.ChildNodes['{}'].Text = '1');\n",
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name, xml_name
-                ),
-                DataType::DateTime | DataType::Date if pattern.is_some() => format!(
-                        "  {} := DecodeDateTime(node.ChildNodes['{}'].Text, '{}');\n",
-                        Helper::first_char_uppercase(variable_name),
-                        xml_name,
-                        pattern.unwrap_or_default(),
-                    ),
-                DataType::DateTime | DataType::Date => format!(
-                        "  {} := ISO8601ToDate(node.ChildNodes['{}'].Text);\n",
-                        Helper::first_char_uppercase(variable_name),
-                        xml_name,
-                    ),
-            DataType::Double =>format!(
-                    "  {} := StrToFloat(node.ChildNodes['{}'].Text);\n",
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name
-                ),
+                "  {} := ({}.Text = 'true') or ({}.Text = '1');\n",
+                Helper::first_char_uppercase(variable_name),
+                node,
+                node
+            ),
+            DataType::DateTime | DataType::Date if pattern.is_some() => format!(
+                "  {} := DecodeDateTime({}.Text, '{}');\n",
+                Helper::first_char_uppercase(variable_name),
+                node,
+                pattern.unwrap_or_default(),
+            ),
+            DataType::DateTime | DataType::Date => format!(
+                "  {} := ISO8601ToDate({}.Text);\n",
+                Helper::first_char_uppercase(variable_name),
+                node,
+            ),
+            DataType::Double => format!(
+                "  {} := StrToFloat({}.Text);\n",
+                Helper::first_char_uppercase(variable_name),
+                node
+            ),
             DataType::Binary(BinaryEncoding::Base64) => format!(
-                    "  {} := TNetEncoding.Base64.DecodeStringToBytes(node.ChildNodes['{}'].Text);\n",
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name
-                ),
+                "  {} := TNetEncoding.Base64.DecodeStringToBytes({}.Text);\n",
+                Helper::first_char_uppercase(variable_name),
+                node
+            ),
             DataType::Binary(BinaryEncoding::Hex) => format!(
-                    "  HexToBin(node.ChildNodes['{}'].Text, 0, {}, 0, Length(node.ChildNodes['{}'].Text));\n",
-                    xml_name,
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name,
-                ),
+                "  HexToBin({}.Text, 0, {}, 0, Length({}.Text));\n",
+                node,
+                Helper::first_char_uppercase(variable_name),
+                node,
+            ),
             DataType::Integer => format!(
-                    "  {} := StrToInt(node.ChildNodes['{}'].Text);\n",
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name
-                ),
+                "  {} := StrToInt({}.Text);\n",
+                Helper::first_char_uppercase(variable_name),
+                node
+            ),
             DataType::String => format!(
-                    "  {} := node.ChildNodes['{}'].Text;\n",
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name
-                ),
-                DataType::Time if pattern.is_some() =>format!(
-                            "  {} := TimeOf(DecodeDateTime(node.ChildNodes['{}'].Text, '{}'));\n",
-                            Helper::first_char_uppercase(variable_name),
-                            xml_name,
-                            pattern.unwrap_or_default(),
-                        ),
+                "  {} := {}.Text;\n",
+                Helper::first_char_uppercase(variable_name),
+                node
+            ),
+            DataType::Time if pattern.is_some() => format!(
+                "  {} := TimeOf(DecodeDateTime({}.Text, '{}'));\n",
+                Helper::first_char_uppercase(variable_name),
+                node,
+                pattern.unwrap_or_default(),
+            ),
             DataType::Time => format!(
-                    "  {} := TimeOf(ISO8601ToDate(node.ChildNodes['{}'].Text));\n",
-                    Helper::first_char_uppercase(variable_name),
-                    xml_name
-                ),
+                "  {} := TimeOf(ISO8601ToDate({}.Text));\n",
+                Helper::first_char_uppercase(variable_name),
+                node
+            ),
             _ => String::new(),
         }
     }

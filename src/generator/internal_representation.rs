@@ -108,19 +108,19 @@ impl InternalRepresentation {
 
                                     variables.push(variable);
                                 } else if max_occurs > DEFAULT_OCCURANCE {
-                                    for i in 1..max_occurs + 1 {
-                                        let mut name = child.name.clone();
-                                        name.push_str(i.to_string().as_str());
+                                    let size = usize::try_from(max_occurs).unwrap();
 
-                                        let variable = Variable {
-                                            name,
-                                            xml_name: child.name.clone(),
-                                            data_type: d_type.clone(),
-                                            requires_free: false,
-                                        };
+                                    let variable = Variable {
+                                        name: child.name.clone(),
+                                        xml_name: child.name.clone(),
+                                        data_type: DataType::FixedSizeList(
+                                            Box::new(d_type.clone()),
+                                            size,
+                                        ),
+                                        requires_free: false,
+                                    };
 
-                                        variables.push(variable);
-                                    }
+                                    variables.push(variable);
                                 } else {
                                     let variable = Variable {
                                         name: child.name.clone(),
@@ -171,19 +171,19 @@ impl InternalRepresentation {
 
                                         variables.push(variable);
                                     } else if max_occurs > DEFAULT_OCCURANCE {
-                                        for i in 1..max_occurs + 1 {
-                                            let mut name = child.name.clone();
-                                            name.push_str(i.to_string().as_str());
+                                        let size = usize::try_from(max_occurs).unwrap();
 
-                                            let variable = Variable {
-                                                name,
-                                                xml_name: child.name.clone(),
-                                                data_type: data_type.clone(),
-                                                requires_free,
-                                            };
+                                        let variable = Variable {
+                                            name: child.name.clone(),
+                                            xml_name: child.name.clone(),
+                                            data_type: DataType::FixedSizeList(
+                                                Box::new(data_type.clone()),
+                                                size,
+                                            ),
+                                            requires_free,
+                                        };
 
-                                            variables.push(variable);
-                                        }
+                                        variables.push(variable);
                                     } else {
                                         let variable = Variable {
                                             name: child.name.clone(),
