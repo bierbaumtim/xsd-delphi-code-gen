@@ -277,11 +277,12 @@ impl ClassCodeGenerator {
                         variable.xml_name
                     ))?;
                 }
+                // TODO: REFACTOR ASAP!!!
                 DataType::List(item_type) => {
                     buffer.write_fmt(format_args!(
-                        "  {} = TList<{}>.Create;\n",
+                        "  {} = {}.Create;\n",
                         Helper::first_char_uppercase(&variable.name),
-                        Helper::as_type_name(&variable.name),
+                        Helper::get_datatype_language_representation(&variable.data_type),
                     ))?;
                     buffer.write_all(b"\n")?;
                     buffer.write_fmt(format_args!(
@@ -375,6 +376,7 @@ impl ClassCodeGenerator {
                     buffer.write_fmt(format_args!("  end;\n"))?;
                     buffer.write_all(b"\n")?;
                 }
+                // TODO: REFACTOR ASAP!!!
                 DataType::FixedSizeList(item_type, size) => {
                     for i in 1..size + 1 {
                         buffer.write_fmt(format_args!(
