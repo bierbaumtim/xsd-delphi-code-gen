@@ -70,7 +70,7 @@ impl InternalRepresentation {
 
                                     let type_alias = TypeAlias {
                                         name: st.name.clone(),
-                                        for_type: data_type,
+                                        for_type: DataType::List(Box::new(data_type)),
                                         pattern: None,
                                     };
 
@@ -85,17 +85,52 @@ impl InternalRepresentation {
                     let mut variables = Vec::new();
 
                     for child in &ct.children {
+                        let min_occurs = child
+                            .base_attributes
+                            .min_occurs
+                            .unwrap_or(DEFAULT_OCCURANCE);
+                        let max_occurs = child
+                            .base_attributes
+                            .max_occurs
+                            .unwrap_or(DEFAULT_OCCURANCE);
+
                         match &child.node_type {
                             NodeType::Standard(s) => {
                                 let d_type = Self::node_base_type_to_datatype(s);
 
-                                let variable = Variable {
-                                    name: child.name.clone(),
-                                    data_type: d_type,
-                                    requires_free: false,
-                                };
+                                if min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE {
+                                    let variable = Variable {
+                                        name: child.name.clone(),
+                                        xml_name: child.name.clone(),
+                                        data_type: DataType::List(Box::new(d_type)),
+                                        requires_free: true,
+                                    };
 
-                                variables.push(variable);
+                                    variables.push(variable);
+                                } else if max_occurs > DEFAULT_OCCURANCE {
+                                    for i in 1..max_occurs + 1 {
+                                        let mut name = child.name.clone();
+                                        name.push_str(i.to_string().as_str());
+
+                                        let variable = Variable {
+                                            name,
+                                            xml_name: child.name.clone(),
+                                            data_type: d_type.clone(),
+                                            requires_free: false,
+                                        };
+
+                                        variables.push(variable);
+                                    }
+                                } else {
+                                    let variable = Variable {
+                                        name: child.name.clone(),
+                                        xml_name: child.name.clone(),
+                                        data_type: d_type,
+                                        requires_free: false,
+                                    };
+
+                                    variables.push(variable);
+                                }
                             }
                             NodeType::Custom(c) => {
                                 let c_type = registry.types.get(c);
@@ -112,21 +147,53 @@ impl InternalRepresentation {
                                         {
                                             DataType::Alias(s.name.clone())
                                         }
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.list_type.is_some() =>
+                                        {
+                                            panic!("Nested lists are not supported");
+                                            // return Err();
+                                        }
                                         _ => DataType::Custom(c_type.get_name()),
                                     };
 
-                                    let variable = Variable {
-                                        name: child.name.clone(),
-                                        data_type,
-                                        requires_free: match c_type {
-                                            CustomTypeDefinition::Simple(s) => {
-                                                s.list_type.is_some()
-                                            }
-                                            CustomTypeDefinition::Complex(_) => true,
-                                        },
+                                    let requires_free = match c_type {
+                                        CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                                        CustomTypeDefinition::Complex(_) => true,
                                     };
 
-                                    variables.push(variable);
+                                    if min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE {
+                                        let variable = Variable {
+                                            name: child.name.clone(),
+                                            xml_name: child.name.clone(),
+                                            data_type: DataType::List(Box::new(data_type)),
+                                            requires_free: true,
+                                        };
+
+                                        variables.push(variable);
+                                    } else if max_occurs > DEFAULT_OCCURANCE {
+                                        for i in 1..max_occurs + 1 {
+                                            let mut name = child.name.clone();
+                                            name.push_str(i.to_string().as_str());
+
+                                            let variable = Variable {
+                                                name,
+                                                xml_name: child.name.clone(),
+                                                data_type: data_type.clone(),
+                                                requires_free,
+                                            };
+
+                                            variables.push(variable);
+                                        }
+                                    } else {
+                                        let variable = Variable {
+                                            name: child.name.clone(),
+                                            xml_name: child.name.clone(),
+                                            data_type,
+                                            requires_free,
+                                        };
+
+                                        variables.push(variable);
+                                    }
                                 }
                             }
                         }
@@ -153,6 +220,7 @@ impl InternalRepresentation {
         for node in nodes {
             let variable = Variable {
                 name: node.name.clone(),
+                xml_name: node.name.clone(),
                 data_type: match &node.node_type {
                     NodeType::Standard(s) => Self::node_base_type_to_datatype(s),
                     NodeType::Custom(e) => {

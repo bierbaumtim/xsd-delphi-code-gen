@@ -51,5 +51,6 @@ pub(crate) struct ClassType {
 pub(crate) struct Variable {
     pub(crate) name: String,
     pub(crate) data_type: DataType,
+    pub(crate) xml_name: String,
     pub(crate) requires_free: bool,
 }

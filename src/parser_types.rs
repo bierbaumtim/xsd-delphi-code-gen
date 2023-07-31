@@ -1,6 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 pub(crate) const UNBOUNDED_OCCURANCE: i64 = -1;
+pub(crate) const DEFAULT_OCCURANCE: i64 = 1;
 
 // xs:element
 #[derive(Debug)]

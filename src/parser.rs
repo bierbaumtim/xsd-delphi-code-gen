@@ -360,10 +360,6 @@ impl Parser {
         } else {
             Some(self.as_qualified_name(name.as_str()))
         };
-        let mut name = name;
-        if !enumerations.is_empty() {
-            name.push('s');
-        }
 
         let s_type = CustomTypeDefinition::Simple(SimpleType {
             name: name.clone(),
