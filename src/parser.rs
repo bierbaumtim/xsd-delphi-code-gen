@@ -400,6 +400,18 @@ impl Parser {
             "xs:hexBinary" => Some(NodeType::Standard(NodeBaseType::HexBinary)),
             "xs:string" => Some(NodeType::Standard(NodeBaseType::String)),
             "xs:time" => Some(NodeType::Standard(NodeBaseType::Time)),
+            "xs:byte" => Some(NodeType::Standard(NodeBaseType::Byte)),
+            "xs:short" => Some(NodeType::Standard(NodeBaseType::Short)),
+            "xs:nonNegativeInteger"
+            | "xs:negativeInteger"
+            | "xs:int"
+            | "xs:positiveInteger"
+            | "xs:nonPositiveInteger" => Some(NodeType::Standard(NodeBaseType::Integer)),
+            "xs:long" => Some(NodeType::Standard(NodeBaseType::Long)),
+            "xs:unsignedByte" => Some(NodeType::Standard(NodeBaseType::UnsignedByte)),
+            "xs:unsignedShort" => Some(NodeType::Standard(NodeBaseType::UnsignedShort)),
+            "xs:unsignedInt" => Some(NodeType::Standard(NodeBaseType::UnsignedInteger)),
+            "xs:unsignedLong" => Some(NodeType::Standard(NodeBaseType::UnsignedLong)),
             "" => None,
             _ => Some(NodeType::Custom((*base_type).to_owned())),
         }

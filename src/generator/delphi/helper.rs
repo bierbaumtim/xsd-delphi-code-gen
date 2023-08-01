@@ -41,7 +41,6 @@ impl Helper {
             DataType::Date => String::from("TDate"),
             DataType::Double => String::from("Double"),
             DataType::Binary(_) => String::from("TBytes"),
-            DataType::Integer => String::from("TBytes"),
             DataType::String => String::from("String"),
             DataType::Time => String::from("TTime"),
             DataType::Alias(a) => Self::as_type_name(a),
@@ -56,6 +55,14 @@ impl Helper {
                     _ => format!("TList<{}>", gt),
                 }
             }
+            DataType::ShortInteger => String::from("ShortInt"),
+            DataType::SmallInteger => String::from("SmallInt"),
+            DataType::Integer => String::from("Integer"),
+            DataType::LongInteger => String::from("LongInt"),
+            DataType::UnsignedShortInteger => String::from("Byte"),
+            DataType::UnsignedSmallInteger => String::from("Word"),
+            DataType::UnsignedInteger => String::from("NativeUInt"),
+            DataType::UnsignedLongInteger => String::from("UInt64"),
         }
     }
 }

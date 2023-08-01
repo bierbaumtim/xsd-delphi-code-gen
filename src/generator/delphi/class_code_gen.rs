@@ -702,11 +702,6 @@ impl ClassCodeGenerator {
                 Helper::first_char_uppercase(variable_name),
                 node,
             ),
-            DataType::Integer => format!(
-                "  {} := StrToInt({}.Text);\n",
-                Helper::first_char_uppercase(variable_name),
-                node
-            ),
             DataType::String => format!(
                 "  {} := {}.Text;\n",
                 Helper::first_char_uppercase(variable_name),
@@ -720,6 +715,18 @@ impl ClassCodeGenerator {
             ),
             DataType::Time => format!(
                 "  {} := TimeOf(ISO8601ToDate({}.Text));\n",
+                Helper::first_char_uppercase(variable_name),
+                node
+            ),
+            DataType::SmallInteger
+            | DataType::ShortInteger
+            | DataType::Integer
+            | DataType::LongInteger
+            | DataType::UnsignedSmallInteger
+            | DataType::UnsignedShortInteger
+            | DataType::UnsignedInteger
+            | DataType::UnsignedLongInteger => format!(
+                "  {} := StrToInt({}.Text);\n",
                 Helper::first_char_uppercase(variable_name),
                 node
             ),
@@ -807,18 +814,6 @@ impl ClassCodeGenerator {
                     Helper::first_char_uppercase(variable_name),
                 ),
             ],
-            DataType::Integer => vec![
-                format!(
-                    "{}node := parent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-                format!(
-                    "{}node.Text := IntToStr({});\n",
-                    " ".repeat(indentation),
-                    Helper::first_char_uppercase(variable_name),
-                ),
-            ],
             DataType::String => vec![
                 format!(
                     "{}node := parent.AddChild('{}');\n",
@@ -852,6 +847,25 @@ impl ClassCodeGenerator {
                 ),
                 format!(
                     "{}node.Text := TimeToStr({});\n",
+                    " ".repeat(indentation),
+                    Helper::first_char_uppercase(variable_name),
+                ),
+            ],
+            DataType::SmallInteger
+            | DataType::ShortInteger
+            | DataType::Integer
+            | DataType::LongInteger
+            | DataType::UnsignedSmallInteger
+            | DataType::UnsignedShortInteger
+            | DataType::UnsignedInteger
+            | DataType::UnsignedLongInteger => vec![
+                format!(
+                    "{}node := parent.AddChild('{}');\n",
+                    " ".repeat(indentation),
+                    variable_name,
+                ),
+                format!(
+                    "{}node.Text := IntToStr({});\n",
                     " ".repeat(indentation),
                     Helper::first_char_uppercase(variable_name),
                 ),

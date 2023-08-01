@@ -301,9 +301,16 @@ impl InternalRepresentation {
             NodeBaseType::Decimal | NodeBaseType::Double | NodeBaseType::Float => DataType::Double,
             NodeBaseType::HexBinary => DataType::Binary(BinaryEncoding::Hex),
             NodeBaseType::Base64Binary => DataType::Binary(BinaryEncoding::Base64),
-            NodeBaseType::Integer => DataType::Integer,
             NodeBaseType::String => DataType::String,
             NodeBaseType::Time => DataType::Time,
+            NodeBaseType::Byte => DataType::ShortInteger,
+            NodeBaseType::Short => DataType::SmallInteger,
+            NodeBaseType::Integer => DataType::Integer,
+            NodeBaseType::Long => DataType::LongInteger,
+            NodeBaseType::UnsignedByte => DataType::UnsignedShortInteger,
+            NodeBaseType::UnsignedShort => DataType::UnsignedSmallInteger,
+            NodeBaseType::UnsignedInteger => DataType::UnsignedInteger,
+            NodeBaseType::UnsignedLong => DataType::UnsignedLongInteger,
         }
     }
 }
