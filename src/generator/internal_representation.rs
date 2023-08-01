@@ -112,9 +112,8 @@ impl InternalRepresentation {
                             NodeType::Standard(s) => {
                                 let d_type = Self::node_base_type_to_datatype(s);
 
-                                let d_type = if max_occurs == UNBOUNDED_OCCURANCE {
-                                    DataType::List(Box::new(d_type))
-                                } else if min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE
+                                let d_type = if max_occurs == UNBOUNDED_OCCURANCE
+                                    || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
                                 {
                                     DataType::List(Box::new(d_type))
                                 } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE
@@ -164,10 +163,9 @@ impl InternalRepresentation {
                                         CustomTypeDefinition::Complex(_) => true,
                                     };
 
-                                    let data_type = if max_occurs == UNBOUNDED_OCCURANCE {
-                                        DataType::List(Box::new(data_type))
-                                    } else if min_occurs != max_occurs
-                                        && max_occurs > DEFAULT_OCCURANCE
+                                    let data_type = if max_occurs == UNBOUNDED_OCCURANCE
+                                        || (min_occurs != max_occurs
+                                            && max_occurs > DEFAULT_OCCURANCE)
                                     {
                                         DataType::List(Box::new(data_type))
                                     } else if min_occurs == max_occurs
