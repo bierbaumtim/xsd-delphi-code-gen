@@ -2,16 +2,16 @@ use std::{borrow::Cow, collections::HashMap, fs::File, io::BufReader, path::Path
 
 use quick_xml::{events::BytesStart, events::Event, Reader};
 
-use super::parser_types::*;
+use super::types::*;
 use crate::type_registry::*;
 
 #[derive(Default)]
-pub(crate) struct Parser {
+pub(crate) struct XmlParser {
     current_namespace: Option<String>,
     namespace_aliases: HashMap<String, String>,
 }
 
-impl Parser {
+impl XmlParser {
     pub(crate) fn parse_file<P: AsRef<Path>>(
         &mut self,
         path: P,

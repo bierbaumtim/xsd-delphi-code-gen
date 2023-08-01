@@ -16,7 +16,7 @@ use generator::{
     delphi::code_generator::DelphiCodeGenerator,
     internal_representation::InternalRepresentation,
 };
-use parser::{parser::Parser as XmlParser, parser_types::Node};
+use parser::{types::Node, xml::XmlParser};
 use type_registry::TypeRegistry;
 
 fn main() {
@@ -75,7 +75,7 @@ fn main() {
     match generator.generate() {
         Ok(_) => println!(
             "Completed successfully within {}ms",
-            instant.elapsed().as_millis()
+            instant.elapsed().as_millis(),
         ),
         Err(e) => {
             eprintln!(

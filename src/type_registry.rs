@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::parser::parser_types::*;
+use crate::parser::types::*;
 
 pub(crate) struct TypeRegistry {
     pub(crate) types: HashMap<String, CustomTypeDefinition>,
