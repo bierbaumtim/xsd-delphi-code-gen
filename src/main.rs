@@ -23,7 +23,6 @@ use type_registry::TypeRegistry;
 
 fn main() {
     let args = Args::parse();
-
     let instant = Instant::now();
 
     let output_path = match resolve_output_path(&args.output) {
@@ -74,8 +73,8 @@ fn main() {
         build_code_gen_options(&args),
         internal_representation,
     );
-    let res = generator.generate();
-    match res {
+    
+    match generator.generate() {
         Ok(_) => println!(
             "Completed successfully within {}ms",
             instant.elapsed().as_millis()
