@@ -135,13 +135,10 @@ impl ClassCodeGenerator {
         for variable in &class_type.variables {
             match &variable.data_type {
                 DataType::List(_) => {
-                    let mut variable_name = Helper::first_char_uppercase(&variable.name);
-                    variable_name.push_str(&options.plural_suffix);
-
                     buffer.write_fmt(format_args!(
                         "{}{}: {};\n",
                         " ".repeat(indentation + 2),
-                        variable_name,
+                        Helper::first_char_uppercase(&variable.name),
                         Helper::get_datatype_language_representation(&variable.data_type),
                     ))?;
                 }

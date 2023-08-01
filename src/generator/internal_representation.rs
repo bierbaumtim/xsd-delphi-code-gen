@@ -98,39 +98,28 @@ impl InternalRepresentation {
                             NodeType::Standard(s) => {
                                 let d_type = Self::node_base_type_to_datatype(s);
 
-                                if min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE {
-                                    let variable = Variable {
-                                        name: child.name.clone(),
-                                        xml_name: child.name.clone(),
-                                        data_type: DataType::List(Box::new(d_type)),
-                                        requires_free: true,
-                                    };
-
-                                    variables.push(variable);
-                                } else if max_occurs > DEFAULT_OCCURANCE {
+                                let d_type = if max_occurs == UNBOUNDED_OCCURANCE {
+                                    DataType::List(Box::new(d_type))
+                                } else if min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE
+                                {
+                                    DataType::List(Box::new(d_type))
+                                } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE
+                                {
                                     let size = usize::try_from(max_occurs).unwrap();
 
-                                    let variable = Variable {
-                                        name: child.name.clone(),
-                                        xml_name: child.name.clone(),
-                                        data_type: DataType::FixedSizeList(
-                                            Box::new(d_type.clone()),
-                                            size,
-                                        ),
-                                        requires_free: false,
-                                    };
-
-                                    variables.push(variable);
+                                    DataType::FixedSizeList(Box::new(d_type.clone()), size)
                                 } else {
-                                    let variable = Variable {
-                                        name: child.name.clone(),
-                                        xml_name: child.name.clone(),
-                                        data_type: d_type,
-                                        requires_free: false,
-                                    };
+                                    d_type
+                                };
 
-                                    variables.push(variable);
-                                }
+                                let variable = Variable {
+                                    name: child.name.clone(),
+                                    xml_name: child.name.clone(),
+                                    requires_free: matches!(d_type, DataType::List(_)),
+                                    data_type: d_type,
+                                };
+
+                                variables.push(variable);
                             }
                             NodeType::Custom(c) => {
                                 let c_type = registry.types.get(c);
@@ -161,39 +150,31 @@ impl InternalRepresentation {
                                         CustomTypeDefinition::Complex(_) => true,
                                     };
 
-                                    if min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE {
-                                        let variable = Variable {
-                                            name: child.name.clone(),
-                                            xml_name: child.name.clone(),
-                                            data_type: DataType::List(Box::new(data_type)),
-                                            requires_free: true,
-                                        };
-
-                                        variables.push(variable);
-                                    } else if max_occurs > DEFAULT_OCCURANCE {
+                                    let data_type = if max_occurs == UNBOUNDED_OCCURANCE {
+                                        DataType::List(Box::new(data_type))
+                                    } else if min_occurs != max_occurs
+                                        && max_occurs > DEFAULT_OCCURANCE
+                                    {
+                                        DataType::List(Box::new(data_type))
+                                    } else if min_occurs == max_occurs
+                                        && max_occurs > DEFAULT_OCCURANCE
+                                    {
                                         let size = usize::try_from(max_occurs).unwrap();
 
-                                        let variable = Variable {
-                                            name: child.name.clone(),
-                                            xml_name: child.name.clone(),
-                                            data_type: DataType::FixedSizeList(
-                                                Box::new(data_type.clone()),
-                                                size,
-                                            ),
-                                            requires_free,
-                                        };
-
-                                        variables.push(variable);
+                                        DataType::FixedSizeList(Box::new(data_type), size)
                                     } else {
-                                        let variable = Variable {
-                                            name: child.name.clone(),
-                                            xml_name: child.name.clone(),
-                                            data_type,
-                                            requires_free,
-                                        };
+                                        data_type
+                                    };
 
-                                        variables.push(variable);
-                                    }
+                                    let variable = Variable {
+                                        name: child.name.clone(),
+                                        xml_name: child.name.clone(),
+                                        requires_free: requires_free
+                                            || matches!(data_type, DataType::List(_)),
+                                        data_type,
+                                    };
+
+                                    variables.push(variable);
                                 }
                             }
                         }

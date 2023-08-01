@@ -94,7 +94,6 @@ fn build_code_gen_options(args: &Args) -> CodeGenOptions {
         generate_from_xml: !matches!(&args.mode, CodeGenMode::ToXml),
         generate_to_xml: !matches!(&args.mode, CodeGenMode::FromXml),
         unit_name: args.unit_name.clone(),
-        plural_suffix: args.plural_suffix.clone(),
     }
 }
 
@@ -139,9 +138,6 @@ pub struct Args {
 
     #[arg(long, value_enum, default_value_t)]
     pub(crate) mode: CodeGenMode,
-
-    #[arg(long, default_value("s"))]
-    pub(crate) plural_suffix: String,
 }
 
 #[derive(Clone, Debug, Default, ValueEnum)]

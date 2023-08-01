@@ -443,19 +443,21 @@ impl Parser {
         };
 
         let occurance = match occurance {
-            Some(v) => match v.parse::<i64>() {
-                Ok(m) => Some(m),
-                Err(e) => {
-                    if v == *"unbounded" {
-                        Some(UNBOUNDED_OCCURANCE)
-                    } else {
-                        return Err(ParserError::MalformedAttribute(
-                            name.to_owned(),
-                            Some(format!("{:?}", e)),
-                        ));
+            Some(v) => {
+                if v == *"unbounded" {
+                    Some(UNBOUNDED_OCCURANCE)
+                } else {
+                    match v.parse::<i64>() {
+                        Ok(m) => Some(m),
+                        Err(e) => {
+                            return Err(ParserError::MalformedAttribute(
+                                name.to_owned(),
+                                Some(format!("{:?}", e)),
+                            ));
+                        }
                     }
                 }
-            },
+            }
             None => None,
         };
 
