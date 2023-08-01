@@ -120,11 +120,14 @@ impl ClassCodeGenerator {
                 "{}procedure AppendToXmlRaw(pParent: IXMLNode);\n",
                 " ".repeat(indentation + 2),
             ))?;
-            // TODO: Introduce GeneratorOptions
-            // file.write_fmt(format_args!(
-            //     "{}function ToXml: String;\n",
-            //     " ".repeat(indentation + 2),
-            // ))?;
+
+            if class_type.name == DOCUMENT_NAME {
+                buffer.write_all(b"\n")?;
+                buffer.write_fmt(format_args!(
+                    "{}function ToXml: String;\n",
+                    " ".repeat(indentation + 2),
+                ))?;
+            }
             buffer.write_all(b"\n")?;
         }
 
@@ -192,6 +195,11 @@ impl ClassCodeGenerator {
         if options.generate_to_xml {
             buffer.write_all(b"\n")?;
             Self::generate_to_xml_implementation(buffer, &formated_name, class_type, type_aliases)?;
+
+            if class_type.name == DOCUMENT_NAME {
+                buffer.write_all(b"\n")?;
+                Self::generate_document_to_xml_implementation(buffer, &formated_name)?;
+            }
         }
 
         if needs_destroy {
@@ -323,6 +331,7 @@ impl ClassCodeGenerator {
             "      if __{}Node.LocalName <> '{}' then continue;\n",
             variable.name, variable.xml_name,
         ))?;
+
         match item_type {
             DataType::Enumeration(name) => {
                 buffer.write_fmt(format_args!(
@@ -436,15 +445,16 @@ impl ClassCodeGenerator {
                     if let Some((data_type, pattern)) =
                         Self::get_alias_data_type(name.as_str(), type_aliases)
                     {
-                        buffer.write_all(
+                        buffer.write_fmt(format_args!(
+                            "        {}: {}",
+                            i - 1,
                             Self::generate_standard_type_from_xml(
                                 &data_type,
                                 &variable.name,
                                 format!("__{}Node", variable.name),
                                 pattern,
-                            )
-                            .as_bytes(),
-                        )?;
+                            ),
+                        ))?;
                     }
                 }
                 DataType::Custom(name) => {
@@ -477,6 +487,22 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
+    fn generate_document_to_xml_implementation(
+        buffer: &mut BufWriter<Box<dyn Write>>,
+        formated_name: &String,
+    ) -> Result<(), std::io::Error> {
+        buffer.write_fmt(format_args!("function {}.ToXml: String;\n", formated_name))?;
+        buffer.write_all(b"begin\n")?;
+        buffer.write_all(b"  var vXmlDoc := NewXMLDocument;\n")?;
+        buffer.write_all(b"\n")?;
+        buffer.write_all(b"  AppendToXmlRaw(vXmlDoc);\n")?;
+        buffer.write_all(b"\n")?;
+        buffer.write_all(b"  vXmlDoc.SaveToXML(Result);\n")?;
+        buffer.write_all(b"end;\n")?;
+
+        Ok(())
+    }
+
     fn generate_to_xml_implementation(
         buffer: &mut BufWriter<Box<dyn Write>>,
         formated_name: &String,
@@ -504,26 +530,9 @@ impl ClassCodeGenerator {
                     ))?;
                 }
                 DataType::Alias(name) => {
-                    let type_alias = type_aliases.iter().find(|t| t.name == name.as_str());
-
-                    if let Some(t) = type_alias {
-                        let mut pattern = t.pattern.clone();
-                        let mut data_type = t.for_type.clone();
-
-                        while let DataType::Custom(n) = &data_type {
-                            let type_alias = type_aliases.iter().find(|t| t.name == n.as_str());
-
-                            if let Some(alias) = type_alias {
-                                if pattern.is_none() {
-                                    pattern = alias.pattern.clone();
-                                }
-
-                                data_type = alias.for_type.clone();
-                            } else {
-                                break;
-                            }
-                        }
-
+                    if let Some((data_type, pattern)) =
+                        Self::get_alias_data_type(name.as_str(), type_aliases)
+                    {
                         for arg in Self::generate_standard_type_to_xml(
                             &data_type,
                             &variable.xml_name,
@@ -618,26 +627,9 @@ impl ClassCodeGenerator {
                 ))?;
             }
             DataType::Alias(name) => {
-                let type_alias = type_aliases.iter().find(|t| t.name == name.as_str());
-
-                if let Some(t) = type_alias {
-                    let mut pattern = t.pattern.clone();
-                    let mut data_type = t.for_type.clone();
-
-                    while let DataType::Custom(n) = &data_type {
-                        let type_alias = type_aliases.iter().find(|t| t.name == n.as_str());
-
-                        if let Some(alias) = type_alias {
-                            if pattern.is_none() {
-                                pattern = alias.pattern.clone();
-                            }
-
-                            data_type = alias.for_type.clone();
-                        } else {
-                            break;
-                        }
-                    }
-
+                if let Some((data_type, pattern)) =
+                    Self::get_alias_data_type(name.as_str(), type_aliases)
+                {
                     for arg in Self::generate_standard_type_to_xml(
                         &data_type,
                         &String::from("v"),
@@ -673,9 +665,9 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_standard_type_from_xml<'a>(
-        data_type: &'a DataType,
-        variable_name: &'a String,
+    fn generate_standard_type_from_xml(
+        data_type: &DataType,
+        variable_name: &String,
         node: String,
         pattern: Option<String>,
     ) -> String {
@@ -738,9 +730,9 @@ impl ClassCodeGenerator {
         }
     }
 
-    fn generate_standard_type_to_xml<'a>(
-        data_type: &'a DataType,
-        variable_name: &'a String,
+    fn generate_standard_type_to_xml(
+        data_type: &DataType,
+        variable_name: &String,
         pattern: Option<String>,
         indentation: usize,
     ) -> Vec<String> {
