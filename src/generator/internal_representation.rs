@@ -1,4 +1,4 @@
-use crate::{parser_types::*, type_registry::TypeRegistry};
+use crate::{parser::parser_types::*, type_registry::TypeRegistry};
 
 use super::{dependency_graph::DependencyGraph, types::*};
 

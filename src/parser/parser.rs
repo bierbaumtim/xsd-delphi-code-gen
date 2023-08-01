@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, fs::File, io::BufReader, path::Path
 
 use quick_xml::{events::BytesStart, events::Event, Reader};
 
-use crate::parser_types::*;
+use super::parser_types::*;
 use crate::type_registry::*;
 
 #[derive(Default)]

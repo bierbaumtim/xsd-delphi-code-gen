@@ -9,7 +9,6 @@ use clap::{Parser, ValueEnum};
 
 mod generator;
 mod parser;
-mod parser_types;
 mod type_registry;
 
 use generator::{
@@ -17,8 +16,7 @@ use generator::{
     delphi::code_generator::DelphiCodeGenerator,
     internal_representation::InternalRepresentation,
 };
-use parser::Parser as XmlParser;
-use parser_types::Node;
+use parser::{parser::Parser as XmlParser, parser_types::Node};
 use type_registry::TypeRegistry;
 
 fn main() {
@@ -73,7 +71,7 @@ fn main() {
         build_code_gen_options(&args),
         internal_representation,
     );
-    
+
     match generator.generate() {
         Ok(_) => println!(
             "Completed successfully within {}ms",
