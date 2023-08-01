@@ -174,11 +174,12 @@ impl Parser {
         let mut extends_existing_type = false;
         let mut base_type = None::<String>;
         let mut current_element_name = None::<String>;
+        let mut order = OrderIndicator::Sequence;
 
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(s)) => match s.name().as_ref() {
-                    b"xs:sequence" | b"xs:all" | b"xs:group" => {
+                    b"xs:sequence" | b"xs:all" | b"xs:choice" => {
                         if is_in_compositor {
                             return Err(ParserError::UnexpectedStartOfNode(
                                 std::str::from_utf8(s.name().0)
@@ -188,6 +189,13 @@ impl Parser {
                         }
 
                         is_in_compositor = true;
+
+                        match s.name().as_ref() {
+                            b"xs:all" => order = OrderIndicator::All,
+                            b"xs:choice" => order = OrderIndicator::Choice,
+                            b"xs:sequence" => order = OrderIndicator::Sequence,
+                            _ => (),
+                        }
                     }
                     b"xs:element" => {
                         current_element_name = Some(Self::get_attribute_value(&s, "name")?);
@@ -308,6 +316,7 @@ impl Parser {
             },
             base_type,
             children,
+            order,
         })
     }
 

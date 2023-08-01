@@ -106,6 +106,15 @@ pub(crate) struct ComplexType {
     pub(crate) base_type: Option<String>,
     /// elements of the complex type
     pub(crate) children: Vec<Node>,
+    /// order of elements
+    pub(crate) order: OrderIndicator,
+}
+
+#[derive(Debug)]
+pub(crate) enum OrderIndicator {
+    All,
+    Choice,
+    Sequence,
 }
 
 #[derive(Debug, Clone)]

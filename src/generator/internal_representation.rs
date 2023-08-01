@@ -85,14 +85,28 @@ impl InternalRepresentation {
                     let mut variables = Vec::new();
 
                     for child in &ct.children {
-                        let min_occurs = child
-                            .base_attributes
-                            .min_occurs
-                            .unwrap_or(DEFAULT_OCCURANCE);
-                        let max_occurs = child
-                            .base_attributes
-                            .max_occurs
-                            .unwrap_or(DEFAULT_OCCURANCE);
+                        let min_occurs = match &ct.order {
+                            OrderIndicator::All => child
+                                .base_attributes
+                                .min_occurs
+                                .unwrap_or(DEFAULT_OCCURANCE)
+                                .clamp(0, 1),
+                            _ => child
+                                .base_attributes
+                                .min_occurs
+                                .unwrap_or(DEFAULT_OCCURANCE),
+                        };
+                        let max_occurs = match &ct.order {
+                            OrderIndicator::All => child
+                                .base_attributes
+                                .max_occurs
+                                .unwrap_or(DEFAULT_OCCURANCE)
+                                .clamp(0, 1),
+                            _ => child
+                                .base_attributes
+                                .max_occurs
+                                .unwrap_or(DEFAULT_OCCURANCE),
+                        };
 
                         match &child.node_type {
                             NodeType::Standard(s) => {
