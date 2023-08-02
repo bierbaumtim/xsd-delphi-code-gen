@@ -5,8 +5,8 @@ use crate::generator::code_generator_trait::CodeGenOptions;
 pub(crate) struct HelperCodeGenerator;
 
 impl HelperCodeGenerator {
-    pub(crate) fn write(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    pub(crate) fn write<T: Write>(
+        buffer: &mut BufWriter<T>,
         options: &CodeGenOptions,
         generate_date_time_helper: bool,
         generate_hex_binary_helper: bool,
@@ -33,8 +33,8 @@ impl HelperCodeGenerator {
         Ok(())
     }
 
-    fn write_date_time_helper(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn write_date_time_helper<T: Write>(
+        buffer: &mut BufWriter<T>,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         if options.generate_from_xml {
@@ -44,13 +44,6 @@ impl HelperCodeGenerator {
             buffer.write_all(b"  if pFormat = '' then Exit(ISO8601ToDate(pDateStr));\n")?;
             buffer.write_all(b"\n")?;
             buffer.write_all(b"  Result := ISO8601ToDate(pDateStr);\n")?;
-            buffer.write_all(b"end;\n")?;
-            buffer.write_all(b"\n")?;
-
-            buffer.write_all(
-                b"function EncodeDateTime(const pDate: TDateTime; const pFormat: String = ''): String;\n",
-            )?;
-            buffer.write_all(b"begin\n")?;
             buffer.write_all(b"end;\n")?;
         }
 
@@ -73,8 +66,8 @@ impl HelperCodeGenerator {
         Ok(())
     }
 
-    fn write_hex_binary_helper(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn write_hex_binary_helper<T: Write>(
+        buffer: &mut BufWriter<T>,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         if options.generate_to_xml {
@@ -87,5 +80,156 @@ impl HelperCodeGenerator {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use std::io::BufWriter;
+
+    use crate::generator::code_generator_trait::CodeGenOptions;
+
+    use super::*;
+
+    #[test]
+    fn write_nothing_when_all_flags_false() {
+        let options = CodeGenOptions::default();
+        let mut buffer = BufWriter::new(Vec::new());
+        HelperCodeGenerator::write(&mut buffer, &options, false, false).unwrap();
+
+        let bytes = buffer.into_inner().unwrap();
+        let content = String::from_utf8(bytes).unwrap();
+
+        assert_eq!(content, "", "Content should be empty");
+    }
+
+    #[test]
+    fn write_only_hex_binary_helper_when_from_xml_enabled() {
+        let options = CodeGenOptions {
+            generate_from_xml: false,
+            generate_to_xml: true,
+            unit_name: String::new(),
+        };
+        let mut buffer = BufWriter::new(Vec::new());
+        HelperCodeGenerator::write(&mut buffer, &options, false, true).unwrap();
+
+        let bytes = buffer.into_inner().unwrap();
+        let content = String::from_utf8(bytes).unwrap();
+
+        let expected = indoc! {"
+            {$REGION 'Helper'}
+            function BinToHexStr(const pBin: TBytes): String;
+            begin
+              var vTemp: TBytes;
+              BinToHex(pBin, 0, vTemp, Length(pBin));
+              Result := TEncoding.GetString(vTemp);
+            end;
+            {$ENDREGION}
+            \n"
+        };
+
+        assert_eq!(content, expected);
+    }
+
+    #[test]
+    fn write_only_hex_binary_helper_when_from_xml_disabled() {
+        let options = CodeGenOptions {
+            generate_from_xml: false,
+            generate_to_xml: false,
+            unit_name: String::new(),
+        };
+        let mut buffer = BufWriter::new(Vec::new());
+        HelperCodeGenerator::write(&mut buffer, &options, false, true).unwrap();
+
+        let bytes = buffer.into_inner().unwrap();
+        let content = String::from_utf8(bytes).unwrap();
+
+        let expected = indoc! {"
+            {$REGION 'Helper'}
+            {$ENDREGION}
+            \n"
+        };
+
+        assert_eq!(content, expected);
+    }
+
+    #[test]
+    fn write_date_time_helper_when_all_flags_enabled() {
+        let options = CodeGenOptions {
+            generate_from_xml: true,
+            generate_to_xml: true,
+            unit_name: String::new(),
+        };
+        let mut buffer = BufWriter::new(Vec::new());
+        HelperCodeGenerator::write(&mut buffer, &options, true, false).unwrap();
+
+        let bytes = buffer.into_inner().unwrap();
+        let content = String::from_utf8(bytes).unwrap();
+
+        let expected = indoc! {"
+            {$REGION 'Helper'}
+            function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;
+            begin
+              if pFormat = '' then Exit(ISO8601ToDate(pDateStr));
+
+              Result := ISO8601ToDate(pDateStr);
+            end;
+
+            function EncodeTime(const pTime: TTime; const pFormat: String): String;
+            begin
+              var vFormatSettings := TFormatSettings.Create;
+              vFormatSettings.LongTimeFormat := pFormat;
+
+              Result := TimeToStr(pTime, vFormatSettings);
+            end;
+            {$ENDREGION}
+            \n"
+        };
+
+        assert_eq!(content, expected);
+    }
+
+    #[test]
+    fn write_all_helpers() {
+        let options = CodeGenOptions {
+            generate_from_xml: true,
+            generate_to_xml: true,
+            unit_name: String::new(),
+        };
+        let mut buffer = BufWriter::new(Vec::new());
+        HelperCodeGenerator::write(&mut buffer, &options, true, true).unwrap();
+
+        let bytes = buffer.into_inner().unwrap();
+        let content = String::from_utf8(bytes).unwrap();
+
+        let expected = indoc! {"
+            {$REGION 'Helper'}
+            function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;
+            begin
+              if pFormat = '' then Exit(ISO8601ToDate(pDateStr));
+
+              Result := ISO8601ToDate(pDateStr);
+            end;
+
+            function EncodeTime(const pTime: TTime; const pFormat: String): String;
+            begin
+              var vFormatSettings := TFormatSettings.Create;
+              vFormatSettings.LongTimeFormat := pFormat;
+
+              Result := TimeToStr(pTime, vFormatSettings);
+            end;
+
+            function BinToHexStr(const pBin: TBytes): String;
+            begin
+              var vTemp: TBytes;
+              BinToHex(pBin, 0, vTemp, Length(pBin));
+              Result := TEncoding.GetString(vTemp);
+            end;
+            {$ENDREGION}
+            \n"
+        };
+
+        assert_eq!(content, expected);
     }
 }

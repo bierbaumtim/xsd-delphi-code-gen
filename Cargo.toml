@@ -11,3 +11,4 @@ clap = { version = "4.3.14", features = ["derive"] }
 quick-xml = "0.30.0"
 unicode-segmentation = "1.10.1"
 # ratatui = { version = "0.21.0", features = ["all-widgets"] }
+indoc = "2"

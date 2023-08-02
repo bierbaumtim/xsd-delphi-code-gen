@@ -12,6 +12,7 @@ pub(crate) trait CodeGenerator<'a> {
     fn generate(&mut self) -> Result<(), std::io::Error>;
 }
 
+#[derive(Debug, Default)]
 pub(crate) struct CodeGenOptions {
     pub(crate) generate_from_xml: bool,
     pub(crate) generate_to_xml: bool,
