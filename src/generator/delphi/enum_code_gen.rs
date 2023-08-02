@@ -13,14 +13,20 @@ impl EnumCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
-        buffer.write_all(b"  {$REGION 'Enumerations'}\n")?;
+        buffer.write_fmt(format_args!(
+            "{}{{$REGION 'Enumerations'}}\n",
+            " ".repeat(indentation),
+        ))?;
         for enumeration in enumerations {
             Self::generate_declaration(buffer, enumeration, indentation)?;
         }
-        buffer.write_all(b"  {$ENDREGION}\n")?;
+        buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
 
         buffer.write_all(b"\n")?;
-        buffer.write_all(b"  {$REGION 'Enumerations Helper'}\n")?;
+        buffer.write_fmt(format_args!(
+            "{}{{$REGION 'Enumerations Helper'}}\n",
+            " ".repeat(indentation),
+        ))?;
         for (i, enumeration) in enumerations.iter().enumerate() {
             Self::generate_helper_declaration(buffer, enumeration, options, indentation)?;
 
@@ -28,7 +34,7 @@ impl EnumCodeGenerator {
                 buffer.write_all(b"\n")?;
             }
         }
-        buffer.write_all(b"  {$ENDREGION}\n")?;
+        buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
 
         Ok(())
     }
@@ -191,4 +197,11 @@ impl EnumCodeGenerator {
         buffer.write_all(b"end;\n")?;
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+
+    // TODO: Write Test
 }

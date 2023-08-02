@@ -900,3 +900,10 @@ impl ClassCodeGenerator {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+
+    // TODO: Write Test
+}

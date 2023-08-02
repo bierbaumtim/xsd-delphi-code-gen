@@ -197,3 +197,10 @@ impl<'a> CodeGenerator<'a> for DelphiCodeGenerator<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+
+    // TODO: Write Test
+}
