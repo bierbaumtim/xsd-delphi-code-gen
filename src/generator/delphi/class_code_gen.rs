@@ -11,8 +11,8 @@ use super::helper::Helper;
 pub(crate) struct ClassCodeGenerator;
 
 impl ClassCodeGenerator {
-    pub(crate) fn write_forward_declerations(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    pub(crate) fn write_forward_declerations<T: Write>(
+        buffer: &mut BufWriter<T>,
         classes: &Vec<ClassType>,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
@@ -33,8 +33,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_declarations(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    pub(crate) fn write_declarations<T: Write>(
+        buffer: &mut BufWriter<T>,
         classes: &Vec<ClassType>,
         document: &ClassType,
         options: &CodeGenOptions,
@@ -56,8 +56,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_implementations(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    pub(crate) fn write_implementations<T: Write>(
+        buffer: &mut BufWriter<T>,
         classes: &Vec<ClassType>,
         document: &ClassType,
         type_aliases: &[TypeAlias],
@@ -81,8 +81,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_class_declaration(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_class_declaration<T: Write>(
+        buffer: &mut BufWriter<T>,
         class_type: &ClassType,
         options: &CodeGenOptions,
         indentation: usize,
@@ -169,8 +169,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_class_implementation(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_class_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
@@ -220,8 +220,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_from_xml_implementation(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_from_xml_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
         formated_name: &String,
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
@@ -294,8 +294,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_list_from_xml(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_list_from_xml<T: Write>(
+        buffer: &mut BufWriter<T>,
         type_aliases: &[TypeAlias],
         variable: &Variable,
         item_type: &DataType,
@@ -388,8 +388,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_fixed_size_list_from_xml(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_fixed_size_list_from_xml<T: Write>(
+        buffer: &mut BufWriter<T>,
         type_aliases: &[TypeAlias],
         variable: &Variable,
         item_type: &DataType,
@@ -484,8 +484,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_document_to_xml_implementation(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_document_to_xml_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
         formated_name: &String,
     ) -> Result<(), std::io::Error> {
         buffer.write_fmt(format_args!("function {}.ToXml: String;\n", formated_name))?;
@@ -500,8 +500,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_to_xml_implementation(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_to_xml_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
         formated_name: &String,
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
@@ -603,8 +603,8 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
-    fn generate_list_to_xml(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_list_to_xml<T: Write>(
+        buffer: &mut BufWriter<T>,
         data_type: &DataType,
         variable_name: &String,
         xml_name: &String,

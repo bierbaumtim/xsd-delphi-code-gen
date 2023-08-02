@@ -7,8 +7,8 @@ use super::helper::Helper;
 pub(crate) struct EnumCodeGenerator;
 
 impl EnumCodeGenerator {
-    pub(crate) fn write_declarations(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    pub(crate) fn write_declarations<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
         indentation: usize,
@@ -43,8 +43,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_implementation(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    pub(crate) fn write_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
@@ -61,8 +61,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_declaration(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_declaration<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
@@ -79,8 +79,8 @@ impl EnumCodeGenerator {
         ))
     }
 
-    fn generate_helper_declaration(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_helper_declaration<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         options: &CodeGenOptions,
         indentation: usize,
@@ -114,8 +114,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_implementation(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_helper_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
@@ -136,8 +136,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_from_xml(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_helper_from_xml<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         formatted_enum_name: &String,
     ) -> Result<(), std::io::Error> {
@@ -168,8 +168,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_to_xml(
-        buffer: &mut BufWriter<Box<dyn Write>>,
+    fn generate_helper_to_xml<T: Write>(
+        buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         formatted_enum_name: String,
     ) -> Result<(), std::io::Error> {
