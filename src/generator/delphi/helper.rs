@@ -27,6 +27,10 @@ impl Helper {
 
     #[inline]
     pub(crate) fn as_type_name(name: &String) -> String {
+        if name.is_empty() {
+            return String::new();
+        }
+
         let mut result = String::with_capacity(name.len() + 1);
         result.push('T');
         result.push_str(&Self::first_char_uppercase(name));
@@ -64,5 +68,114 @@ impl Helper {
             DataType::UnsignedInteger => String::from("NativeUInt"),
             DataType::UnsignedLongInteger => String::from("UInt64"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::generator::types::BinaryEncoding;
+
+    use super::*;
+
+    #[test]
+    fn first_char_uppercase_with_empty_string() {
+        let res = Helper::first_char_uppercase(&String::new());
+
+        assert_eq!(res, "");
+    }
+
+    #[test]
+    fn first_char_uppercase_with_nonempty_string() {
+        let res = Helper::first_char_uppercase(&String::from("test"));
+
+        assert_eq!(res, "Test");
+    }
+
+    #[test]
+    fn first_char_lowercase_with_empty_string() {
+        let res = Helper::first_char_lowercase(&String::new());
+
+        assert_eq!(res, "");
+    }
+
+    #[test]
+    fn first_char_lowercase_with_nonempty_string() {
+        let res = Helper::first_char_lowercase(&String::from("TEST"));
+
+        assert_eq!(res, "tEST");
+    }
+
+    #[test]
+    fn as_type_name_with_empty_string() {
+        let res = Helper::as_type_name(&String::new());
+
+        assert_eq!(res, "");
+    }
+
+    #[test]
+    fn as_type_name_with_nonempty_string() {
+        let res = Helper::as_type_name(&String::from("SozialDaten"));
+
+        assert_eq!(res, "TSozialDaten");
+    }
+
+    #[test]
+    fn get_datatype_language_representation() {
+        let types = vec![
+            DataType::Boolean,
+            DataType::DateTime,
+            DataType::Date,
+            DataType::Double,
+            DataType::Binary(BinaryEncoding::Base64),
+            DataType::Binary(BinaryEncoding::Hex),
+            DataType::String,
+            DataType::Time,
+            DataType::Alias(String::from("CustomAlias")),
+            DataType::Enumeration(String::from("CustomEnum")),
+            DataType::Custom(String::from("CustomClass")),
+            DataType::FixedSizeList(Box::new(DataType::String), 1),
+            DataType::List(Box::new(DataType::Integer)),
+            DataType::List(Box::new(DataType::Custom(String::from("CustomListType")))),
+            DataType::ShortInteger,
+            DataType::SmallInteger,
+            DataType::Integer,
+            DataType::LongInteger,
+            DataType::UnsignedShortInteger,
+            DataType::UnsignedSmallInteger,
+            DataType::UnsignedInteger,
+            DataType::UnsignedLongInteger,
+        ];
+
+        let lr = types
+            .into_iter()
+            .map(|dt| Helper::get_datatype_language_representation(&dt))
+            .collect::<Vec<String>>();
+
+        let expected = vec![
+            String::from("Boolean"),
+            String::from("TDateTime"),
+            String::from("TDate"),
+            String::from("Double"),
+            String::from("TBytes"),
+            String::from("TBytes"),
+            String::from("String"),
+            String::from("TTime"),
+            String::from("TCustomAlias"),
+            String::from("TCustomEnum"),
+            String::from("TCustomClass"),
+            String::from("String"),
+            String::from("TList<Integer>"),
+            String::from("TObjectList<TCustomListType>"),
+            String::from("ShortInt"),
+            String::from("SmallInt"),
+            String::from("Integer"),
+            String::from("LongInt"),
+            String::from("Byte"),
+            String::from("Word"),
+            String::from("NativeUInt"),
+            String::from("UInt64"),
+        ];
+
+        assert_eq!(lr, expected);
     }
 }
