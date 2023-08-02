@@ -14,15 +14,18 @@ use super::{
 // TODO: build IR(Intermediate Representation) with more informations about DataType, Inheritance
 // TODO: Sort class Declarations by occurance in document, then by inheritance and dependency
 
-pub(crate) struct DelphiCodeGenerator<'a> {
-    buffer: &'a mut BufWriter<Box<dyn Write>>,
+pub(crate) struct DelphiCodeGenerator<'a, T: Write> {
+    buffer: &'a mut BufWriter<T>,
     options: CodeGenOptions,
     internal_representation: InternalRepresentation,
     generate_date_time_helper: bool,
     generate_hex_binary_helper: bool,
 }
 
-impl<'a> DelphiCodeGenerator<'a> {
+impl<'a, T> DelphiCodeGenerator<'a, T>
+where
+    T: Write,
+{
     #[inline]
     fn write_unit(&mut self) -> Result<(), std::io::Error> {
         self.buffer
@@ -146,9 +149,12 @@ impl<'a> DelphiCodeGenerator<'a> {
     }
 }
 
-impl<'a> CodeGenerator<'a> for DelphiCodeGenerator<'a> {
+impl<'a, T> CodeGenerator<'a, T> for DelphiCodeGenerator<'a, T>
+where
+    T: Write,
+{
     fn new(
-        buffer: &'a mut BufWriter<Box<dyn Write>>,
+        buffer: &'a mut BufWriter<T>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self {

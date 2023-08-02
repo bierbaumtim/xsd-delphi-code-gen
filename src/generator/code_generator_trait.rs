@@ -2,9 +2,9 @@ use std::io::{BufWriter, Write};
 
 use super::internal_representation::InternalRepresentation;
 
-pub(crate) trait CodeGenerator<'a> {
+pub(crate) trait CodeGenerator<'a, T: Write> {
     fn new(
-        buffer: &'a mut BufWriter<Box<dyn Write>>,
+        buffer: &'a mut BufWriter<T>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self;
