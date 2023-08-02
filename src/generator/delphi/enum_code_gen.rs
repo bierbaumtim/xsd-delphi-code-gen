@@ -13,6 +13,10 @@ impl EnumCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
+        if enumerations.is_empty() {
+            return Ok(());
+        }
+
         buffer.write_fmt(format_args!(
             "{}{{$REGION 'Enumerations'}}\n",
             " ".repeat(indentation),

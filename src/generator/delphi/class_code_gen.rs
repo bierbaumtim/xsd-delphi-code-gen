@@ -513,7 +513,7 @@ impl ClassCodeGenerator {
         buffer.write_all(b"begin\n")?;
         buffer.write_all(b"  var node: IXMLNode;\n")?;
         buffer.write_all(b"\n")?;
-        for variable in &class_type.variables {
+        for (index, variable) in class_type.variables.iter().enumerate() {
             match &variable.data_type {
                 DataType::Enumeration(_) => {
                     buffer.write_fmt(format_args!(
@@ -595,7 +595,9 @@ impl ClassCodeGenerator {
                 }
             }
 
-            buffer.write_all(b"\n")?;
+            if index < class_type.variables.len() - 1 {
+                buffer.write_all(b"\n")?;
+            }
         }
         buffer.write_all(b"end;\n")?;
         Ok(())
