@@ -418,32 +418,23 @@ impl XmlParser {
     }
 
     fn get_attribute_value(node: &BytesStart, name: &str) -> Result<String, ParserError> {
-        match node
-            .attributes()
+        node.attributes()
             .find(|a| a.as_ref().is_ok_and(|v| v.key.0 == name.as_bytes()))
-        {
-            Some(r) => match r {
-                Ok(a) => match a.value {
-                    Cow::Borrowed(v) => String::from_utf8(v.to_vec()).map_err(|e| {
-                        ParserError::MalformedAttribute(
-                            String::from(name),
-                            Some(format!("{:?}", e)),
-                        )
-                    }),
-                    Cow::Owned(v) => String::from_utf8(v).map_err(|e| {
-                        ParserError::MalformedAttribute(
-                            String::from(name),
-                            Some(format!("{:?}", e)),
-                        )
-                    }),
-                },
-                Err(e) => Err(ParserError::MalformedAttribute(
-                    String::from(name),
-                    Some(format!("{:?}", e)),
-                )),
-            },
-            None => Err(ParserError::MissingAttribute(String::from(name))),
-        }
+            .ok_or(ParserError::MissingAttribute(String::from(name)))
+            .and_then(|r| {
+                r.map_err(|e| {
+                    ParserError::MalformedAttribute(String::from(name), Some(format!("{:?}", e)))
+                })
+            })
+            .map(|a| match a.value {
+                Cow::Borrowed(v) => String::from_utf8(v.to_vec()).map_err(|e| {
+                    ParserError::MalformedAttribute(String::from(name), Some(format!("{:?}", e)))
+                }),
+                Cow::Owned(v) => String::from_utf8(v).map_err(|e| {
+                    ParserError::MalformedAttribute(String::from(name), Some(format!("{:?}", e)))
+                }),
+            })
+            .and_then(|r| r)
     }
 
     fn get_base_attributes(node: &BytesStart) -> Result<BaseAttributes, ParserError> {
@@ -457,43 +448,37 @@ impl XmlParser {
     }
 
     fn get_occurance_value(node: &BytesStart, name: &str) -> Result<Option<i64>, ParserError> {
-        let occurance = match Self::get_attribute_value(node, name) {
-            Ok(v) => Some(v),
-            Err(ParserError::MissingAttribute(_)) => None,
-            Err(e) => return Err(e),
-        };
+        let value = Self::get_attribute_value(node, name)
+            .map(|v| {
+                v.parse::<i64>()
+                    .map_err(|e| ParserError::MalformedAttribute(v, Some(format!("{:?}", e))))
+            })
+            .map(|v| v.ok());
 
-        let occurance = match occurance {
-            Some(v) => {
-                if v == *"unbounded" {
-                    Some(UNBOUNDED_OCCURANCE)
-                } else {
-                    match v.parse::<i64>() {
-                        Ok(m) => Some(m),
-                        Err(e) => {
-                            return Err(ParserError::MalformedAttribute(
-                                name.to_owned(),
-                                Some(format!("{:?}", e)),
-                            ));
-                        }
-                    }
-                }
-            }
-            None => None,
-        };
-
-        Ok(occurance)
+        match value {
+            Ok(v) => Ok(v),
+            Err(ParserError::MissingAttribute(_)) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
+    #[inline]
     fn lookup_namespace(&self, alias: &String) -> Option<&String> {
         self.namespace_aliases.get(alias)
     }
 
+    #[inline]
     fn as_qualified_name(&self, name: &str) -> String {
-        let mut qualified_name = self.current_namespace.clone().unwrap_or_default();
-        if !qualified_name.ends_with('/') {
-            qualified_name.push('/');
-        }
+        let mut qualified_name = match self.current_namespace.clone() {
+            Some(mut current_namespace) => {
+                if !current_namespace.ends_with('/') {
+                    current_namespace.push('/');
+                }
+
+                current_namespace
+            }
+            None => String::new(),
+        };
         qualified_name.push_str(name);
 
         qualified_name
@@ -504,9 +489,7 @@ impl XmlParser {
             return Ok(b_type);
         }
 
-        let colon_position = b_type.find(':');
-
-        match colon_position {
+        match b_type.find(':') {
             Some(position) => {
                 let alias = b_type[..position].to_string();
 
@@ -524,7 +507,7 @@ impl XmlParser {
 
         for attr in s.attributes().filter(|a| {
             a.as_ref()
-                .is_ok_and(|a| a.key.0.starts_with(prefix) && a.key.0 != b"xmlns:xs")
+                .is_ok_and(|a| a.key.0.starts_with(prefix) && a.key.0 != prefix)
         }) {
             match attr {
                 Ok(a) => {
