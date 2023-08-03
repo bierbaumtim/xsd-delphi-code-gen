@@ -104,11 +104,13 @@ where
     }
 
     pub(crate) fn get_sorted_elements(&self) -> Vec<T> {
-        let mut elements = Vec::new();
-
-        for leaf in self.dependencies.values().filter(|i| i.children.is_empty()) {
-            elements.extend(self.get_node_creation_order(leaf));
-        }
+        let mut elements = self
+            .dependencies
+            .values()
+            .filter(|i| i.children.is_empty())
+            .map(|node| self.get_node_creation_order(node))
+            .flatten()
+            .collect::<Vec<T>>();
 
         elements.dedup_by_key(|i| (self.keys_fn)(i).0);
 
@@ -116,18 +118,13 @@ where
     }
 
     fn get_node_creation_order(&self, node: &Node<K, T>) -> Vec<T> {
-        let mut elements = Vec::new();
-
-        for parent_key in &node.parents {
-            let parent = self.dependencies.get(parent_key);
-
-            if let Some(parent) = parent {
-                elements.extend(self.get_node_creation_order(parent));
-            }
-        }
-
-        elements.push(node.item.clone());
-
-        elements
+        node.parents
+            .iter()
+            .map(|i| self.dependencies.get(i))
+            .map(|v| v.map(|i| self.get_node_creation_order(i)))
+            .map(|v| v.unwrap_or(Vec::new()))
+            .flatten()
+            .chain(vec![node.item.clone()])
+            .collect::<Vec<T>>()
     }
 }
