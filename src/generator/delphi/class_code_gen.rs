@@ -14,6 +14,7 @@ impl ClassCodeGenerator {
     pub(crate) fn write_forward_declerations<T: Write>(
         buffer: &mut BufWriter<T>,
         classes: &Vec<ClassType>,
+        options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
         buffer.write_all(b"  {$REGION 'Forward Declarations}\n")?;
@@ -25,7 +26,7 @@ impl ClassCodeGenerator {
             buffer.write_fmt(format_args!(
                 "{}{} = class;\n",
                 " ".repeat(indentation),
-                Helper::as_type_name(&class_type.name),
+                Helper::as_type_name(&class_type.name, &options.type_prefix),
             ))?;
         }
         buffer.write_all(b"  {$ENDREGION}\n")?;
@@ -94,10 +95,10 @@ impl ClassCodeGenerator {
         buffer.write_fmt(format_args!(
             "{}{} = class{}",
             " ".repeat(indentation),
-            Helper::as_type_name(&class_type.name),
+            Helper::as_type_name(&class_type.name, &options.type_prefix),
             class_type.super_type.as_ref().map_or_else(
                 || "(TObject)".to_owned(),
-                |v| format!("({})", Helper::as_type_name(v))
+                |v| format!("({})", Helper::as_type_name(v, &options.type_prefix))
             )
         ))?;
         buffer.write_all(b"\n")?;
@@ -111,7 +112,10 @@ impl ClassCodeGenerator {
                         "{}{}: {};\n",
                         " ".repeat(indentation + 2),
                         Helper::as_variable_name(&variable.name),
-                        Helper::get_datatype_language_representation(&variable.data_type),
+                        Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix
+                        ),
                     ))?;
                 }
                 DataType::FixedSizeList(item_type, size) => {
@@ -121,7 +125,10 @@ impl ClassCodeGenerator {
                             " ".repeat(indentation + 2),
                             Helper::as_variable_name(&variable.name),
                             i,
-                            Helper::get_datatype_language_representation(item_type),
+                            Helper::get_datatype_language_representation(
+                                item_type,
+                                &options.type_prefix
+                            ),
                         ))?;
                     }
                 }
@@ -130,7 +137,10 @@ impl ClassCodeGenerator {
                         "{}{}: {};\n",
                         " ".repeat(indentation + 2),
                         Helper::as_variable_name(&variable.name),
-                        Helper::get_datatype_language_representation(&variable.data_type),
+                        Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix
+                        ),
                     ))?;
                 }
             }
@@ -180,7 +190,7 @@ impl ClassCodeGenerator {
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
-        let formated_name = Helper::as_type_name(&class_type.name);
+        let formated_name = Helper::as_type_name(&class_type.name, &options.type_prefix);
         let needs_destroy = class_type.variables.iter().any(|v| v.requires_free);
 
         buffer.write_fmt(format_args!("{{ {} }}\n", formated_name))?;
@@ -191,6 +201,7 @@ impl ClassCodeGenerator {
                 &formated_name,
                 class_type,
                 type_aliases,
+                options,
             )?;
         }
 
@@ -243,6 +254,7 @@ impl ClassCodeGenerator {
         formated_name: &String,
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         buffer.write_fmt(format_args!(
             "constructor {}.FromXml(node: IXMLNode);\n",
@@ -256,7 +268,7 @@ impl ClassCodeGenerator {
                     buffer.write_fmt(format_args!(
                         "  {} := {}.FromXmlValue(node.ChildNodes['{}'].Text);\n",
                         Helper::as_variable_name(&variable.name),
-                        Helper::as_type_name(name),
+                        Helper::as_type_name(name, &options.type_prefix),
                         variable.xml_name
                     ))?;
                 }
@@ -279,17 +291,24 @@ impl ClassCodeGenerator {
                     buffer.write_fmt(format_args!(
                         "  {} := {}.FromXml(node.ChildNodes['{}']);\n",
                         Helper::as_variable_name(&variable.name),
-                        Helper::as_type_name(name),
+                        Helper::as_type_name(name, &options.type_prefix),
                         variable.xml_name
                     ))?;
                 }
                 DataType::List(item_type) => {
-                    Self::generate_list_from_xml(buffer, type_aliases, variable, item_type)?;
+                    Self::generate_list_from_xml(
+                        buffer,
+                        type_aliases,
+                        options,
+                        variable,
+                        item_type,
+                    )?;
                 }
                 DataType::FixedSizeList(item_type, size) => {
                     Self::generate_fixed_size_list_from_xml(
                         buffer,
                         type_aliases,
+                        options,
                         variable,
                         item_type,
                         size,
@@ -315,6 +334,7 @@ impl ClassCodeGenerator {
     fn generate_list_from_xml<T: Write>(
         buffer: &mut BufWriter<T>,
         type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
         variable: &Variable,
         item_type: &DataType,
     ) -> Result<(), std::io::Error> {
@@ -323,7 +343,7 @@ impl ClassCodeGenerator {
         buffer.write_fmt(format_args!(
             "  {} := {}.Create;\n",
             formatted_variable_name,
-            Helper::get_datatype_language_representation(&variable.data_type),
+            Helper::get_datatype_language_representation(&variable.data_type, &options.type_prefix),
         ))?;
         buffer.write_all(b"\n")?;
         buffer.write_fmt(format_args!(
@@ -352,7 +372,7 @@ impl ClassCodeGenerator {
                 buffer.write_fmt(format_args!(
                     "      {}.Add({}.FromXmlValue(__{}Node.Text));\n",
                     formatted_variable_name,
-                    Helper::as_type_name(name),
+                    Helper::as_type_name(name, &options.type_prefix),
                     variable.name,
                 ))?;
             }
@@ -379,7 +399,7 @@ impl ClassCodeGenerator {
                 buffer.write_fmt(format_args!(
                     "      {}.Add({}.FromXml(__{}Node));\n",
                     formatted_variable_name,
-                    Helper::as_type_name(name),
+                    Helper::as_type_name(name, &options.type_prefix),
                     variable.name,
                 ))?;
             }
@@ -409,6 +429,7 @@ impl ClassCodeGenerator {
     fn generate_fixed_size_list_from_xml<T: Write>(
         buffer: &mut BufWriter<T>,
         type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
         variable: &Variable,
         item_type: &DataType,
         size: &usize,
@@ -418,7 +439,7 @@ impl ClassCodeGenerator {
                 "  {}{} := Default({});\n",
                 Helper::as_variable_name(&variable.name),
                 i,
-                Helper::get_datatype_language_representation(item_type),
+                Helper::get_datatype_language_representation(item_type, &options.type_prefix),
             ))?;
         }
         buffer.write_all(b"\n")?;
@@ -452,7 +473,7 @@ impl ClassCodeGenerator {
                         i - 1,
                         Helper::as_variable_name(&variable.name),
                         i,
-                        Helper::as_type_name(name),
+                        Helper::as_type_name(name, &options.type_prefix),
                         variable.name,
                     ))?;
                 }
@@ -478,7 +499,7 @@ impl ClassCodeGenerator {
                         i - 1,
                         Helper::as_variable_name(&variable.name),
                         i,
-                        Helper::as_type_name(name),
+                        Helper::as_type_name(name, &options.type_prefix),
                         variable.name,
                     ))?;
                 }

@@ -22,7 +22,7 @@ impl EnumCodeGenerator {
             " ".repeat(indentation),
         ))?;
         for enumeration in enumerations {
-            Self::generate_declaration(buffer, enumeration, indentation)?;
+            Self::generate_declaration(buffer, enumeration, options, indentation)?;
         }
         buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
 
@@ -64,6 +64,7 @@ impl EnumCodeGenerator {
     fn generate_declaration<T: Write>(
         buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
+        options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
         let prefix = Self::get_variant_prefix(&enumeration.name);
@@ -71,7 +72,7 @@ impl EnumCodeGenerator {
         buffer.write_fmt(format_args!(
             "{}{} = ({});\n",
             " ".repeat(indentation),
-            Helper::as_type_name(&enumeration.name),
+            Helper::as_type_name(&enumeration.name, &options.type_prefix),
             enumeration
                 .values
                 .iter()
@@ -87,7 +88,7 @@ impl EnumCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
-        let formatted_enum_name = Helper::as_type_name(&enumeration.name);
+        let formatted_enum_name = Helper::as_type_name(&enumeration.name, &options.type_prefix);
 
         buffer.write_fmt(format_args!(
             "{}{}Helper = record helper for {}\n",
@@ -121,7 +122,7 @@ impl EnumCodeGenerator {
         enumeration: &Enumeration,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
-        let formatted_enum_name = Helper::as_type_name(&enumeration.name);
+        let formatted_enum_name = Helper::as_type_name(&enumeration.name, &options.type_prefix);
 
         if options.generate_from_xml {
             Self::generate_helper_from_xml(buffer, enumeration, &formatted_enum_name)?;

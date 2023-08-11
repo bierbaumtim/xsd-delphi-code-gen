@@ -110,6 +110,7 @@ mod tests {
             generate_from_xml: false,
             generate_to_xml: true,
             unit_name: String::new(),
+            type_prefix: None,
         };
         let mut buffer = BufWriter::new(Vec::new());
         HelperCodeGenerator::write(&mut buffer, &options, false, true).unwrap();
@@ -138,6 +139,7 @@ mod tests {
             generate_from_xml: false,
             generate_to_xml: false,
             unit_name: String::new(),
+            type_prefix: None,
         };
         let mut buffer = BufWriter::new(Vec::new());
         HelperCodeGenerator::write(&mut buffer, &options, false, true).unwrap();
@@ -160,6 +162,7 @@ mod tests {
             generate_from_xml: true,
             generate_to_xml: true,
             unit_name: String::new(),
+            type_prefix: None,
         };
         let mut buffer = BufWriter::new(Vec::new());
         HelperCodeGenerator::write(&mut buffer, &options, true, false).unwrap();
@@ -196,6 +199,7 @@ mod tests {
             generate_from_xml: true,
             generate_to_xml: true,
             unit_name: String::new(),
+            type_prefix: None,
         };
         let mut buffer = BufWriter::new(Vec::new());
         HelperCodeGenerator::write(&mut buffer, &options, true, true).unwrap();

@@ -1,6 +1,9 @@
 use std::io::{BufWriter, Write};
 
-use crate::generator::types::{DataType, TypeAlias};
+use crate::generator::{
+    code_generator_trait::CodeGenOptions,
+    types::{DataType, TypeAlias},
+};
 
 use super::helper::Helper;
 
@@ -10,6 +13,7 @@ impl TypeAliasCodeGenerator {
     pub(crate) fn write_declarations<T: Write>(
         buffer: &mut BufWriter<T>,
         type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
         if type_aliases.is_empty() {
@@ -28,8 +32,11 @@ impl TypeAliasCodeGenerator {
             buffer.write_fmt(format_args!(
                 "{}{} = {};\n",
                 " ".repeat(indentation),
-                Helper::as_type_name(&type_alias.name),
-                Helper::get_datatype_language_representation(&type_alias.for_type),
+                Helper::as_type_name(&type_alias.name, &options.type_prefix),
+                Helper::get_datatype_language_representation(
+                    &type_alias.for_type,
+                    &options.type_prefix
+                ),
             ))?;
         }
         buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
@@ -50,8 +57,10 @@ mod tests {
     #[test]
     fn write_nothing_when_no_alias_available() {
         let type_aliases = vec![];
+        let options = CodeGenOptions::default();
         let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, 0).unwrap();
+        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+            .unwrap();
 
         let bytes = buffer.into_inner().unwrap();
         let content = String::from_utf8(bytes).unwrap();
@@ -66,8 +75,10 @@ mod tests {
             name: String::from("CustomString"),
             for_type: DataType::String,
         }];
+        let options = CodeGenOptions::default();
         let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, 0).unwrap();
+        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+            .unwrap();
 
         let bytes = buffer.into_inner().unwrap();
         let content = String::from_utf8(bytes).unwrap();
@@ -89,8 +100,10 @@ mod tests {
             name: String::from("CustomString"),
             for_type: DataType::String,
         }];
+        let options = CodeGenOptions::default();
         let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, 0).unwrap();
+        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+            .unwrap();
 
         let bytes = buffer.into_inner().unwrap();
         let content = String::from_utf8(bytes).unwrap();
@@ -204,8 +217,10 @@ mod tests {
                 for_type: DataType::FixedSizeList(Box::new(DataType::Integer), 5),
             },
         ];
+        let options = CodeGenOptions::default();
         let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, 0).unwrap();
+        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+            .unwrap();
 
         let bytes = buffer.into_inner().unwrap();
         let content = String::from_utf8(bytes).unwrap();

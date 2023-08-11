@@ -96,13 +96,17 @@ impl Helper {
     }
 
     #[inline]
-    pub(crate) fn as_type_name(name: &String) -> String {
+    pub(crate) fn as_type_name(name: &String, prefix: &Option<String>) -> String {
         if name.is_empty() {
             return String::new();
         }
 
-        let mut result = String::with_capacity(name.len() + 1);
+        let mut result =
+            String::with_capacity(name.len() + prefix.as_ref().map_or(0, |p| p.len()) + 1);
         result.push('T');
+        if let Some(prefix) = prefix {
+            result.push_str(prefix.as_str());
+        }
         result.push_str(&Self::first_char_uppercase(name));
 
         result
@@ -134,7 +138,10 @@ impl Helper {
         }
     }
 
-    pub(crate) fn get_datatype_language_representation(datatype: &DataType) -> String {
+    pub(crate) fn get_datatype_language_representation(
+        datatype: &DataType,
+        prefix: &Option<String>,
+    ) -> String {
         match datatype {
             DataType::Boolean => String::from("Boolean"),
             DataType::DateTime => String::from("TDateTime"),
@@ -143,12 +150,12 @@ impl Helper {
             DataType::Binary(_) => String::from("TBytes"),
             DataType::String => String::from("String"),
             DataType::Time => String::from("TTime"),
-            DataType::Alias(a) => Self::as_type_name(a),
-            DataType::Enumeration(e) => Self::as_type_name(e),
-            DataType::Custom(c) => Self::as_type_name(c),
-            DataType::FixedSizeList(t, _) => Self::get_datatype_language_representation(t),
+            DataType::Alias(a) => Self::as_type_name(a, prefix),
+            DataType::Enumeration(e) => Self::as_type_name(e, prefix),
+            DataType::Custom(c) => Self::as_type_name(c, prefix),
+            DataType::FixedSizeList(t, _) => Self::get_datatype_language_representation(t, prefix),
             DataType::List(s) => {
-                let gt = Self::get_datatype_language_representation(s);
+                let gt = Self::get_datatype_language_representation(s, prefix);
 
                 match **s {
                     DataType::Custom(_) => format!("TObjectList<{}>", gt),
@@ -203,14 +210,14 @@ mod tests {
 
     #[test]
     fn as_type_name_with_empty_string() {
-        let res = Helper::as_type_name(&String::new());
+        let res = Helper::as_type_name(&String::new(), &None);
 
         assert_eq!(res, "");
     }
 
     #[test]
     fn as_type_name_with_nonempty_string() {
-        let res = Helper::as_type_name(&String::from("SozialDaten"));
+        let res = Helper::as_type_name(&String::from("SozialDaten"), &None);
 
         assert_eq!(res, "TSozialDaten");
     }
@@ -265,7 +272,7 @@ mod tests {
 
         let lr = types
             .into_iter()
-            .map(|dt| Helper::get_datatype_language_representation(&dt))
+            .map(|dt| Helper::get_datatype_language_representation(&dt, &None))
             .collect::<Vec<String>>();
 
         let expected = vec![

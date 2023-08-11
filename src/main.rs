@@ -91,6 +91,7 @@ fn build_code_gen_options(args: &Args) -> CodeGenOptions {
         generate_from_xml: !matches!(&args.mode, CodeGenMode::ToXml),
         generate_to_xml: !matches!(&args.mode, CodeGenMode::FromXml),
         unit_name: args.unit_name.clone(),
+        type_prefix: args.type_prefix.clone(),
     }
 }
 

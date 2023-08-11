@@ -75,6 +75,7 @@ where
             ClassCodeGenerator::write_forward_declerations(
                 self.buffer,
                 &self.internal_representation.classes,
+                &self.options,
                 2,
             )?;
             self.newline()?;
@@ -84,6 +85,7 @@ where
             TypeAliasCodeGenerator::write_declarations(
                 self.buffer,
                 &self.internal_representation.types_aliases,
+                &self.options,
                 2,
             )?;
             self.newline()?;

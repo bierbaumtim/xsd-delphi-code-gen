@@ -17,4 +17,5 @@ pub(crate) struct CodeGenOptions {
     pub(crate) generate_from_xml: bool,
     pub(crate) generate_to_xml: bool,
     pub(crate) unit_name: String,
+    pub(crate) type_prefix: Option<String>,
 }
