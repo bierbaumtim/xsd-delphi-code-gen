@@ -125,4 +125,72 @@ where
     }
 }
 
-// TODO: Add test
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct GraphItem {
+        key: String,
+        dep: Option<String>,
+    }
+
+    #[test]
+    fn get_sorted_elements_with_empty_graph() {
+        let graph = DependencyGraph::<i64, i64, _>::new(|i| (*i, None));
+
+        let items = graph.get_sorted_elements();
+
+        assert_eq!(items, vec![]);
+    }
+
+    #[test]
+    fn get_sorted_elements_with_duplicates() {
+        let mut graph =
+            DependencyGraph::<String, GraphItem, _>::new(|i| (i.key.clone(), i.dep.clone()));
+
+        graph.push(GraphItem {
+            key: "Alias3".to_owned(),
+            dep: Some("CustomNumber".to_owned()),
+        });
+        graph.push(GraphItem {
+            key: "Alias4".to_owned(),
+            dep: Some("Alias1".to_owned()),
+        });
+        graph.push(GraphItem {
+            key: "Alias2".to_owned(),
+            dep: Some("CustomNumber".to_owned()),
+        });
+        graph.push(GraphItem {
+            key: "Alias6".to_owned(),
+            dep: None,
+        });
+        graph.push(GraphItem {
+            key: "Alias1".to_owned(),
+            dep: Some("Alias2".to_owned()),
+        });
+        graph.push(GraphItem {
+            key: "Alias5".to_owned(),
+            dep: Some("Alias1".to_owned()),
+        });
+        graph.push(GraphItem {
+            key: "CustomNumber".to_owned(),
+            dep: None,
+        });
+
+        let items = graph.get_sorted_elements();
+
+        let cni = items.iter().position(|i| i.key == "CustomNumber").unwrap();
+        let a3i = items.iter().position(|i| i.key == "Alias3").unwrap();
+        let a2i = items.iter().position(|i| i.key == "Alias2").unwrap();
+        let a1i = items.iter().position(|i| i.key == "Alias1").unwrap();
+        let a4i = items.iter().position(|i| i.key == "Alias4").unwrap();
+        let a5i = items.iter().position(|i| i.key == "Alias5").unwrap();
+
+        assert!(cni < a3i);
+        assert!(cni < a2i);
+        assert!(a2i < a1i);
+        assert!(a1i < a4i);
+        assert!(a1i < a5i);
+    }
+}
