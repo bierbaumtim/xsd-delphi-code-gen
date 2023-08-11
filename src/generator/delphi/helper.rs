@@ -110,6 +110,10 @@ impl Helper {
 
     #[inline]
     pub(crate) fn as_variable_name(name: &str) -> String {
+        if name.is_empty() {
+            return String::new();
+        }
+
         let name = Self::sanitize_name(name);
 
         Self::first_char_uppercase(&name)
@@ -209,6 +213,27 @@ mod tests {
         let res = Helper::as_type_name(&String::from("SozialDaten"));
 
         assert_eq!(res, "TSozialDaten");
+    }
+
+    #[test]
+    fn as_variable_name_with_empty_string() {
+        let res = Helper::as_variable_name(&String::new());
+
+        assert_eq!(res, "");
+    }
+
+    #[test]
+    fn as_variable_name_with_nonempty_string() {
+        let res = Helper::as_variable_name(&"vorname".to_owned());
+
+        assert_eq!(res, "Vorname");
+    }
+
+    #[test]
+    fn as_variable_name_with_reserved_word() {
+        let res = Helper::as_variable_name(&"label".to_owned());
+
+        assert_eq!(res, "Label_");
     }
 
     #[test]
