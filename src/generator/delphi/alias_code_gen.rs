@@ -26,9 +26,9 @@ impl TypeAliasCodeGenerator {
             }
 
             buffer.write_fmt(format_args!(
-                "{}T{} = {};\n",
+                "{}{} = {};\n",
                 " ".repeat(indentation),
-                type_alias.name,
+                Helper::as_type_name(&type_alias.name),
                 Helper::get_datatype_language_representation(&type_alias.for_type),
             ))?;
         }
