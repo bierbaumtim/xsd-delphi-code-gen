@@ -1,7 +1,7 @@
 use core::hash::Hash;
 use std::{
     cmp::{Eq, PartialEq},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{Debug, Display},
 };
 
@@ -104,17 +104,15 @@ where
     }
 
     pub(crate) fn get_sorted_elements(&self) -> Vec<T> {
-        let mut elements = self
-            .dependencies
+        let mut unique = HashSet::new();
+
+        self.dependencies
             .values()
             .filter(|i| i.children.is_empty())
             .map(|node| self.get_node_creation_order(node))
             .flatten()
-            .collect::<Vec<T>>();
-
-        elements.dedup_by_key(|i| (self.keys_fn)(i).0);
-
-        elements
+            .filter(|i| unique.insert((self.keys_fn)(i).0))
+            .collect::<Vec<T>>()
     }
 
     fn get_node_creation_order(&self, node: &Node<K, T>) -> Vec<T> {
@@ -128,3 +126,5 @@ where
             .collect::<Vec<T>>()
     }
 }
+
+// TODO: Add test
