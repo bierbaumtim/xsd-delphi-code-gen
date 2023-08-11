@@ -40,7 +40,10 @@ where
         self.buffer
             .write_all(b"     System.Generics.Collections,\n")?;
         self.buffer.write_all(b"     System.Types,\n")?;
-        self.buffer.write_all(b"     System.Xml;")?;
+        self.buffer.write_all(b"     System.StrUtils,\n")?;
+        self.buffer.write_all(b"     System.SysUtils,\n")?;
+        self.buffer.write_all(b"     Xml.XMLDoc,\n")?;
+        self.buffer.write_all(b"     Xml.XMLIntf;")?;
         self.newline()?;
         self.newline()
     }
@@ -54,7 +57,7 @@ where
 
     #[inline]
     fn write_forward_declerations(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write_all(b"types")?;
+        self.buffer.write_all(b"type")?;
         self.newline()?;
         self.newline()?;
 
@@ -68,19 +71,19 @@ where
             self.newline()?;
         }
 
-        if !self.internal_representation.types_aliases.is_empty() {
-            TypeAliasCodeGenerator::write_declarations(
+        if !self.internal_representation.classes.is_empty() {
+            ClassCodeGenerator::write_forward_declerations(
                 self.buffer,
-                &self.internal_representation.types_aliases,
+                &self.internal_representation.classes,
                 2,
             )?;
             self.newline()?;
         }
 
-        if !self.internal_representation.classes.is_empty() {
-            ClassCodeGenerator::write_forward_declerations(
+        if !self.internal_representation.types_aliases.is_empty() {
+            TypeAliasCodeGenerator::write_declarations(
                 self.buffer,
-                &self.internal_representation.classes,
+                &self.internal_representation.types_aliases,
                 2,
             )?;
             self.newline()?;
