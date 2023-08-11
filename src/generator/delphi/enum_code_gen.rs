@@ -66,14 +66,16 @@ impl EnumCodeGenerator {
         enumeration: &Enumeration,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
+        let prefix = Self::get_variant_prefix(&enumeration.name);
+
         buffer.write_fmt(format_args!(
-            "{}T{} = ({});\n",
+            "{}{} = ({});\n",
             " ".repeat(indentation),
-            Helper::first_char_uppercase(&enumeration.name),
+            Helper::as_type_name(&enumeration.name),
             enumeration
                 .values
                 .iter()
-                .map(|v| Helper::first_char_lowercase(&v.variant_name))
+                .map(|v| prefix.clone() + v.variant_name.to_ascii_uppercase().as_str())
                 .collect::<Vec<String>>()
                 .join(", ")
         ))
@@ -85,10 +87,10 @@ impl EnumCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
-        let formatted_enum_name = Helper::first_char_uppercase(&enumeration.name);
+        let formatted_enum_name = Helper::as_type_name(&enumeration.name);
 
         buffer.write_fmt(format_args!(
-            "{}T{}Helper = record helper for T{}\n",
+            "{}{}Helper = record helper for {}\n",
             " ".repeat(indentation),
             formatted_enum_name,
             formatted_enum_name,
@@ -96,7 +98,7 @@ impl EnumCodeGenerator {
 
         if options.generate_from_xml {
             buffer.write_fmt(format_args!(
-                "{}class function FromXmlValue(const pXmlValue: String): T{}; static;\n",
+                "{}class function FromXmlValue(const pXmlValue: String): {}; static;\n",
                 " ".repeat(indentation + 2),
                 formatted_enum_name,
             ))?;
@@ -141,29 +143,40 @@ impl EnumCodeGenerator {
         enumeration: &Enumeration,
         formatted_enum_name: &String,
     ) -> Result<(), std::io::Error> {
-        let max_xml_value_len = enumeration
-            .values
-            .iter()
-            .map(|v| v.xml_value.len() + 1)
-            .max()
-            .unwrap_or(4);
-
         buffer.write_fmt(format_args!(
             "class function {}Helper.FromXmlValue(const pXmlValue: String): {};\n",
             formatted_enum_name, formatted_enum_name,
         ))?;
         buffer.write_all(b"begin\n")?;
-        buffer.write_all(b"  case pXmlValue of\n")?;
-        for value in &enumeration.values {
+        let prefix = Self::get_variant_prefix(&enumeration.name);
+
+        for (i, value) in enumeration.values.iter().enumerate() {
             buffer.write_fmt(format_args!(
-                "    '{}':{}Result := {}.{};\n",
+                "{}if pXmlValue = '{}' then begin\n",
+                " ".repeat(if i == 0 { 2 } else { 0 }),
                 value.xml_value,
-                " ".repeat(max_xml_value_len - value.xml_value.len()),
-                formatted_enum_name,
-                Helper::first_char_lowercase(&value.variant_name),
             ))?;
+            buffer.write_fmt(format_args!(
+                "{}Result := {}.{}{}\n",
+                " ".repeat(4),
+                formatted_enum_name,
+                prefix,
+                value.variant_name.to_ascii_uppercase(),
+            ))?;
+            buffer.write_fmt(format_args!("{}end", " ".repeat(2)))?;
+
+            if i < enumeration.values.len() - 1 {
+                buffer.write_fmt(format_args!(" else "))?;
+            }
         }
-        buffer.write_all(b"  end;\n")?;
+
+        buffer.write_all(b" else begin\n")?;
+        buffer.write_fmt(format_args!(
+            "{}raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {}');\n",
+            " ".repeat(4),
+            formatted_enum_name,
+        ))?;
+        buffer.write_fmt(format_args!("{}end;\n", " ".repeat(2)))?;
         buffer.write_all(b"end;\n")?;
         Ok(())
     }
@@ -187,19 +200,30 @@ impl EnumCodeGenerator {
         buffer.write_all(b"begin\n")?;
         buffer.write_all(b"  case Self of\n")?;
         for value in &enumeration.values {
-            let formatted_variant_name = Helper::first_char_lowercase(&value.variant_name);
-
             buffer.write_fmt(format_args!(
-                "    {}:{}Result := '{}';\n",
-                formatted_variant_name,
+                "    {}.{}{}:{}Result := '{}';\n",
+                formatted_enum_name,
+                Self::get_variant_prefix(&enumeration.name),
+                value.variant_name.to_ascii_uppercase(),
                 " ".repeat(max_variant_len - value.variant_name.len()),
-                formatted_variant_name
+                value.xml_value,
             ))?;
         }
-        buffer.write_all(b"    else Result := '';\n")?;
+        // buffer.write_all(b"    else Result := '';\n")?;
         buffer.write_all(b"  end;\n")?;
         buffer.write_all(b"end;\n")?;
         Ok(())
+    }
+
+    fn get_variant_prefix(name: &String) -> String {
+        let prefix = name
+            .chars()
+            .enumerate()
+            .filter(|(i, c)| i == &0 || c.is_uppercase())
+            .map(|(_, c)| c.to_ascii_lowercase())
+            .collect::<Vec<char>>();
+
+        String::from_iter(prefix)
     }
 }
 
