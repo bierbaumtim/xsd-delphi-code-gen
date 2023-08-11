@@ -5,6 +5,75 @@ use crate::generator::types::DataType;
 pub(crate) struct Helper;
 
 impl Helper {
+    const DELPHI_KEYWORDS: [&'static str; 66] = [
+        "and",
+        "array",
+        "as",
+        "asm",
+        "automated",
+        "begin",
+        "case",
+        "class",
+        "const",
+        "constructor",
+        "destructor",
+        "dispinterface",
+        "div",
+        "do",
+        "downto",
+        "else",
+        "end",
+        "except",
+        "exports",
+        "file",
+        "finalization",
+        "finally",
+        "for",
+        "function",
+        "goto",
+        "if",
+        "implementation",
+        "in",
+        "inherited",
+        "initialization",
+        "inline",
+        "interface",
+        "is",
+        "label",
+        "library",
+        "mod",
+        "nil",
+        "not",
+        "object",
+        "of",
+        "or",
+        "out",
+        "packed",
+        "procedure",
+        "program",
+        "property",
+        "raise",
+        "record",
+        "repeat",
+        "resourcestring",
+        "set",
+        "shl",
+        "shr",
+        "string",
+        "then",
+        "threadvar",
+        "to",
+        "try",
+        "type",
+        "unit",
+        "until",
+        "uses",
+        "var",
+        "while",
+        "with",
+        "xor",
+    ];
+
     #[inline]
     pub(crate) fn first_char_uppercase(name: &String) -> String {
         let mut graphemes = name.graphemes(true);
@@ -15,6 +84,7 @@ impl Helper {
         }
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn first_char_lowercase(name: &String) -> String {
         let mut graphemes = name.graphemes(true);
@@ -36,6 +106,28 @@ impl Helper {
         result.push_str(&Self::first_char_uppercase(name));
 
         result
+    }
+
+    #[inline]
+    pub(crate) fn as_variable_name(name: &String) -> String {
+        let name = Self::sanitize_name(name);
+
+        Self::first_char_uppercase(&name)
+    }
+
+    pub fn sanitize_name(name: &String) -> String {
+        if Self::DELPHI_KEYWORDS
+            .binary_search(&name.to_lowercase().as_str())
+            .is_ok()
+        {
+            let mut name = name.clone();
+
+            name.push('_');
+
+            name
+        } else {
+            name.clone()
+        }
     }
 
     pub(crate) fn get_datatype_language_representation(datatype: &DataType) -> String {
