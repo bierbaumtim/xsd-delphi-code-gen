@@ -109,8 +109,7 @@ where
         self.dependencies
             .values()
             .filter(|i| i.children.is_empty())
-            .map(|node| self.get_node_creation_order(node))
-            .flatten()
+            .flat_map(|node| self.get_node_creation_order(node))
             .filter(|i| unique.insert((self.keys_fn)(i).0))
             .collect::<Vec<T>>()
     }
@@ -120,8 +119,7 @@ where
             .iter()
             .map(|i| self.dependencies.get(i))
             .map(|v| v.map(|i| self.get_node_creation_order(i)))
-            .map(|v| v.unwrap_or(Vec::new()))
-            .flatten()
+            .flat_map(|v| v.unwrap_or(Vec::new()))
             .chain(vec![node.item.clone()])
             .collect::<Vec<T>>()
     }

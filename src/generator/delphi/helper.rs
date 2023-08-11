@@ -109,24 +109,24 @@ impl Helper {
     }
 
     #[inline]
-    pub(crate) fn as_variable_name(name: &String) -> String {
+    pub(crate) fn as_variable_name(name: &str) -> String {
         let name = Self::sanitize_name(name);
 
         Self::first_char_uppercase(&name)
     }
 
-    pub fn sanitize_name(name: &String) -> String {
+    pub fn sanitize_name(name: &str) -> String {
         if Self::DELPHI_KEYWORDS
             .binary_search(&name.to_lowercase().as_str())
             .is_ok()
         {
-            let mut name = name.clone();
+            let mut name = name.to_owned();
 
             name.push('_');
 
             name
         } else {
-            name.clone()
+            name.to_owned()
         }
     }
 

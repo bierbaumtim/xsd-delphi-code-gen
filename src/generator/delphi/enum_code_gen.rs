@@ -215,7 +215,7 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn get_variant_prefix(name: &String) -> String {
+    fn get_variant_prefix(name: &str) -> String {
         let prefix = name
             .chars()
             .enumerate()
