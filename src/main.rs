@@ -119,18 +119,22 @@ fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
     }
 }
 
+/// XSD2DelphiCodeGen generates Types from XSD-Files
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
+    /// One or multiple paths to xsd files. Paths can be relative or absolut.
     #[arg(short, long, value_hint = clap::ValueHint::DirPath, num_args(1..))]
     pub(crate) input: Vec<std::path::PathBuf>,
 
+    /// Path to output file. Path can be relative or absolut. File will be created or truncated before write.
     #[arg(short, long, required(true))]
     pub(crate) output: std::path::PathBuf,
 
     #[arg(long, required(true))]
     pub(crate) unit_name: String,
 
+    /// Optional prefix for type names
     #[arg(long, num_args(0..=1))]
     pub(crate) type_prefix: Option<String>,
 
