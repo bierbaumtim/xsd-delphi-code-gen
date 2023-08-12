@@ -97,25 +97,19 @@ fn build_code_gen_options(args: &Args) -> CodeGenOptions {
 
 fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
     if path.is_relative() {
-        let dir = match std::env::current_dir() {
-            Ok(d) => d,
-            Err(e) => {
-                return Err(format!(
-                    "Relative path not supported due to following error: \"{:?}\"",
-                    e
-                ));
-            }
-        };
-
-        Ok(dir.join(path))
+        std::env::current_dir().map(|d| d.join(path)).map_err(|e| {
+            format!(
+                "Relative path not supported due to following error: \"{:?}\"",
+                e
+            )
+        })
     } else {
-        match path.canonicalize() {
-            Ok(p) => Ok(p),
-            Err(e) => Err(format!(
+        path.canonicalize().map_err(|e| {
+            format!(
                 "Could not resolve output path due to following error: \"{:?}\"",
                 e
-            )),
-        }
+            )
+        })
     }
 }
 
