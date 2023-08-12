@@ -148,21 +148,24 @@ impl ClassCodeGenerator {
 
         buffer.write_all(b"\n")?;
 
+        let fn_decorator = class_type
+            .super_type
+            .as_ref()
+            .map_or("virtual", |_| "override");
+
         // constructors and destructors
         if options.generate_to_xml {
             buffer.write_fmt(format_args!(
                 "{}constructor Create; {};\n",
                 " ".repeat(indentation + 2),
-                class_type
-                    .super_type
-                    .as_ref()
-                    .map_or("virtual", |_| "override"),
+                fn_decorator,
             ))?;
         }
         if options.generate_from_xml {
             buffer.write_fmt(format_args!(
-                "{}constructor FromXml(node: IXMLNode);\n",
+                "{}constructor FromXml(node: IXMLNode); {};\n",
                 " ".repeat(indentation + 2),
+                fn_decorator,
             ))?;
         }
 
@@ -176,8 +179,9 @@ impl ClassCodeGenerator {
         if options.generate_to_xml {
             buffer.write_all(b"\n")?;
             buffer.write_fmt(format_args!(
-                "{}procedure AppendToXmlRaw(pParent: IXMLNode);\n",
+                "{}procedure AppendToXmlRaw(pParent: IXMLNode); {};\n",
                 " ".repeat(indentation + 2),
+                fn_decorator,
             ))?;
 
             if class_type.name == DOCUMENT_NAME {
@@ -384,6 +388,10 @@ impl ClassCodeGenerator {
             formated_name,
         ))?;
         buffer.write_all(b"begin\n")?;
+
+        if class_type.super_type.is_some() {
+            buffer.write_all(b"  inherited;\n\n")?;
+        }
 
         for variable in &class_type.variables {
             match &variable.data_type {
@@ -674,6 +682,11 @@ impl ClassCodeGenerator {
             formated_name
         ))?;
         buffer.write_all(b"begin\n")?;
+
+        if class_type.super_type.is_some() {
+            buffer.write_all(b"  inherited;\n\n")?;
+        }
+
         buffer.write_all(b"  var node: IXMLNode;\n")?;
         buffer.write_all(b"\n")?;
         for (index, variable) in class_type.variables.iter().enumerate() {
@@ -842,7 +855,7 @@ impl ClassCodeGenerator {
     ) -> String {
         match data_type {
             DataType::Boolean => format!(
-                "  {} := ({}.Text = 'true') or ({}.Text = '1');\n",
+                "  {} := ({}.Text = cnXmlTrueValue) or ({}.Text = '1');\n",
                 variable_name, node, node
             ),
             DataType::DateTime | DataType::Date if pattern.is_some() => format!(
@@ -903,7 +916,7 @@ impl ClassCodeGenerator {
                     xml_name
                 ),
                 format!(
-                    "{}node.Text := IfThen({}, 'true', 'false');\n",
+                    "{}node.Text := IfThen({}, cnXmlTrueValue, cnXmlFalseValue);\n",
                     " ".repeat(indentation),
                     variable_name,
                 ),

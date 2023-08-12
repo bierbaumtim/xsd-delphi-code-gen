@@ -12,6 +12,7 @@ quick-xml = "0.30.0"
 unicode-segmentation = "1.10.1"
 # ratatui = { version = "0.22.0", features = ["all-widgets"] }
 indoc = "2"
+chrono = "0.4.26"
 
 [profile.release]
 lto = true
