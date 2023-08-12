@@ -163,7 +163,7 @@ impl EnumCodeGenerator {
                 value.xml_value,
             ))?;
             buffer.write_fmt(format_args!(
-                "{}Result := {}.{}{}\n",
+                "{}Result := {}.{}{};\n",
                 " ".repeat(4),
                 formatted_enum_name,
                 prefix,
@@ -195,9 +195,9 @@ impl EnumCodeGenerator {
         let max_variant_len = enumeration
             .values
             .iter()
-            .map(|v| v.variant_name.len() + 1)
+            .map(|v| v.variant_name.len())
             .max()
-            .unwrap_or(4);
+            .unwrap_or(1);
 
         buffer.write_fmt(format_args!(
             "function {}Helper.ToXmlValue: String;\n",
@@ -207,11 +207,11 @@ impl EnumCodeGenerator {
         buffer.write_all(b"  case Self of\n")?;
         for value in &enumeration.values {
             buffer.write_fmt(format_args!(
-                "    {}.{}{}:{}Result := '{}';\n",
+                "    {}.{}{}{}: Result := '{}';\n",
                 formatted_enum_name,
                 Self::get_variant_prefix(&enumeration.name),
                 value.variant_name.to_ascii_uppercase(),
-                " ".repeat(max_variant_len - value.variant_name.len()),
+                " ".repeat(max_variant_len - value.variant_name.len() + 1),
                 value.xml_value,
             ))?;
         }
