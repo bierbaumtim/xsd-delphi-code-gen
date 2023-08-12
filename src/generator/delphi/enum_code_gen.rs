@@ -1,6 +1,9 @@
 use std::io::{BufWriter, Write};
 
-use crate::generator::{code_generator_trait::CodeGenOptions, types::Enumeration};
+use crate::generator::{
+    code_generator_trait::{CodeGenError, CodeGenOptions},
+    types::Enumeration,
+};
 
 use super::helper::Helper;
 
@@ -12,7 +15,7 @@ impl EnumCodeGenerator {
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
         indentation: usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         if enumerations.is_empty() {
             return Ok(());
         }
@@ -47,7 +50,7 @@ impl EnumCodeGenerator {
         buffer: &mut BufWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_all(b"{$REGION 'Enumerations Helper'}\n")?;
         for (i, enumeration) in enumerations.iter().enumerate() {
             Self::generate_helper_implementation(buffer, enumeration, options)?;
@@ -66,7 +69,7 @@ impl EnumCodeGenerator {
         enumeration: &Enumeration,
         options: &CodeGenOptions,
         indentation: usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         let prefix = Self::get_variant_prefix(&enumeration.name);
 
         buffer.write_fmt(format_args!(
@@ -79,7 +82,9 @@ impl EnumCodeGenerator {
                 .map(|v| prefix.clone() + v.variant_name.to_ascii_uppercase().as_str())
                 .collect::<Vec<String>>()
                 .join(", ")
-        ))
+        ))?;
+
+        Ok(())
     }
 
     fn generate_helper_declaration<T: Write>(
@@ -87,7 +92,7 @@ impl EnumCodeGenerator {
         enumeration: &Enumeration,
         options: &CodeGenOptions,
         indentation: usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         let formatted_enum_name = Helper::as_type_name(&enumeration.name, &options.type_prefix);
 
         buffer.write_fmt(format_args!(
@@ -121,7 +126,7 @@ impl EnumCodeGenerator {
         buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         options: &CodeGenOptions,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         let formatted_enum_name = Helper::as_type_name(&enumeration.name, &options.type_prefix);
 
         if options.generate_from_xml {
@@ -143,7 +148,7 @@ impl EnumCodeGenerator {
         buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         formatted_enum_name: &String,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_fmt(format_args!(
             "class function {}Helper.FromXmlValue(const pXmlValue: String): {};\n",
             formatted_enum_name, formatted_enum_name,
@@ -186,7 +191,7 @@ impl EnumCodeGenerator {
         buffer: &mut BufWriter<T>,
         enumeration: &Enumeration,
         formatted_enum_name: String,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         let max_variant_len = enumeration
             .values
             .iter()

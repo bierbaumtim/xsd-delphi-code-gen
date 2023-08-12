@@ -1,7 +1,7 @@
 use std::io::{BufWriter, Write};
 
 use crate::generator::{
-    code_generator_trait::CodeGenOptions,
+    code_generator_trait::{CodeGenError, CodeGenOptions},
     internal_representation::DOCUMENT_NAME,
     types::{BinaryEncoding, ClassType, DataType, TypeAlias, Variable},
 };
@@ -40,7 +40,7 @@ impl ClassCodeGenerator {
         document: &ClassType,
         options: &CodeGenOptions,
         indentation: usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_all(b"  {$REGION 'Declarations}\n")?;
 
         Self::generate_class_declaration(buffer, document, options, indentation)?;
@@ -63,7 +63,7 @@ impl ClassCodeGenerator {
         document: &ClassType,
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_all(b"{$REGION 'Classes'}\n")?;
 
         Self::generate_class_implementation(buffer, document, type_aliases, options)?;
@@ -91,7 +91,7 @@ impl ClassCodeGenerator {
         class_type: &ClassType,
         options: &CodeGenOptions,
         indentation: usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_fmt(format_args!(
             "{}{} = class{}",
             " ".repeat(indentation),
@@ -149,6 +149,16 @@ impl ClassCodeGenerator {
         buffer.write_all(b"\n")?;
 
         // constructors and destructors
+        if options.generate_to_xml {
+            buffer.write_fmt(format_args!(
+                "{}constructor Create; {};\n",
+                " ".repeat(indentation + 2),
+                class_type
+                    .super_type
+                    .as_ref()
+                    .map_or("virtual", |_| "override"),
+            ))?;
+        }
         if options.generate_from_xml {
             buffer.write_fmt(format_args!(
                 "{}constructor FromXml(node: IXMLNode);\n",
@@ -189,13 +199,21 @@ impl ClassCodeGenerator {
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         let formated_name = Helper::as_type_name(&class_type.name, &options.type_prefix);
         let needs_destroy = class_type.variables.iter().any(|v| v.requires_free);
 
         buffer.write_fmt(format_args!("{{ {} }}\n", formated_name))?;
 
+        if options.generate_to_xml {
+            Self::generate_constructor_implementation(buffer, &formated_name, class_type, options)?;
+        }
+
         if options.generate_from_xml {
+            if options.generate_to_xml {
+                buffer.write_all(b"\n")?;
+            }
+
             Self::generate_from_xml_implementation(
                 buffer,
                 &formated_name,
@@ -249,13 +267,118 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
+    fn generate_constructor_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
+        formated_name: &String,
+        class_type: &ClassType,
+        options: &CodeGenOptions,
+    ) -> Result<(), CodeGenError> {
+        buffer.write_fmt(format_args!("constructor {}.Create;\n", formated_name,))?;
+        buffer.write_all(b"begin\n")?;
+
+        if class_type.super_type.is_some() {
+            buffer.write_all(b"  inherited;\n\n")?;
+        }
+
+        for variable in &class_type.variables {
+            match &variable.data_type {
+                DataType::Alias(name) => buffer.write_fmt(format_args!(
+                    "  {} := Default({});\n",
+                    Helper::as_variable_name(&variable.name),
+                    Helper::as_type_name(name, &options.type_prefix),
+                ))?,
+                DataType::Enumeration(name) => buffer.write_fmt(format_args!(
+                    "  {} := Default({});\n",
+                    Helper::as_variable_name(&variable.name),
+                    Helper::as_type_name(name, &options.type_prefix),
+                ))?,
+                DataType::Custom(name) => {
+                    buffer.write_fmt(format_args!(
+                        "  {} := {}.Create;\n",
+                        Helper::as_variable_name(&variable.name),
+                        Helper::as_type_name(name, &options.type_prefix),
+                    ))?;
+                }
+                DataType::List(_) => {
+                    buffer.write_fmt(format_args!(
+                        "  {} := {}.Create;\n",
+                        Helper::as_variable_name(&variable.name),
+                        Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix
+                        ),
+                    ))?;
+                }
+                DataType::FixedSizeList(item_type, size) => {
+                    let rhs = match item_type.as_ref() {
+                        DataType::Alias(name) => format!(
+                            "Default({})",
+                            Helper::as_type_name(name, &options.type_prefix)
+                        ),
+                        DataType::Enumeration(name) => format!(
+                            "Default({})",
+                            Helper::as_type_name(name, &options.type_prefix)
+                        ),
+                        DataType::Custom(name) => {
+                            format!(
+                                "{}.Create",
+                                Helper::as_type_name(name, &options.type_prefix)
+                            )
+                        }
+                        DataType::List(_) => {
+                            return Err(CodeGenError::NestedListInFixedSizeList(
+                                class_type.name.clone(),
+                                variable.name.clone(),
+                            ))
+                        }
+                        DataType::FixedSizeList(_, _) => {
+                            return Err(CodeGenError::NestedFixedSizeList(
+                                class_type.name.clone(),
+                                variable.name.clone(),
+                            ))
+                        }
+                        _ => format!(
+                            "Default({})",
+                            Helper::get_datatype_language_representation(
+                                item_type.as_ref(),
+                                &options.type_prefix
+                            )
+                        ),
+                    };
+                    for i in 1..size + 1 {
+                        buffer.write_fmt(format_args!(
+                            "  {}{} := {};\n",
+                            Helper::as_variable_name(&variable.name),
+                            i,
+                            rhs,
+                        ))?;
+                    }
+                }
+                _ => {
+                    buffer.write_fmt(format_args!(
+                        "  {} := Default({});\n",
+                        Helper::as_variable_name(&variable.name),
+                        Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix
+                        ),
+                    ))?;
+                }
+            }
+        }
+
+        buffer.write_all(b"end;\n")?;
+
+        Ok(())
+    }
+
     fn generate_from_xml_implementation<T: Write>(
         buffer: &mut BufWriter<T>,
         formated_name: &String,
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_fmt(format_args!(
             "constructor {}.FromXml(node: IXMLNode);\n",
             formated_name,
@@ -328,6 +451,7 @@ impl ClassCodeGenerator {
             }
         }
         buffer.write_all(b"end;\n")?;
+
         Ok(())
     }
 
@@ -337,7 +461,7 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
         variable: &Variable,
         item_type: &DataType,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         let formatted_variable_name = Helper::as_variable_name(&variable.name);
 
         buffer.write_fmt(format_args!(
@@ -433,7 +557,7 @@ impl ClassCodeGenerator {
         variable: &Variable,
         item_type: &DataType,
         size: &usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         for i in 1..size + 1 {
             buffer.write_fmt(format_args!(
                 "  {}{} := Default({});\n",
@@ -544,7 +668,7 @@ impl ClassCodeGenerator {
         formated_name: &String,
         class_type: &ClassType,
         type_aliases: &[TypeAlias],
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         buffer.write_fmt(format_args!(
             "procedure {}.AppendToXmlRaw(pParent: IXMLNode);\n",
             formated_name
@@ -651,7 +775,7 @@ impl ClassCodeGenerator {
         xml_name: &String,
         type_aliases: &[TypeAlias],
         indentation: usize,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<(), CodeGenError> {
         match data_type {
             DataType::Enumeration(_) => {
                 buffer.write_fmt(format_args!(
@@ -670,11 +794,10 @@ impl ClassCodeGenerator {
                 if let Some((data_type, pattern)) =
                     Self::get_alias_data_type(name.as_str(), type_aliases)
                 {
-                    // TODO: Fix this
                     for arg in Self::generate_standard_type_to_xml(
                         &data_type,
-                        &String::new(),
-                        &String::from("v"),
+                        variable_name,
+                        xml_name,
                         pattern,
                         indentation,
                     ) {

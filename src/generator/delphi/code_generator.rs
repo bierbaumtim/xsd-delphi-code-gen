@@ -1,7 +1,7 @@
 use std::io::{BufWriter, Write};
 
 use crate::generator::{
-    code_generator_trait::{CodeGenOptions, CodeGenerator},
+    code_generator_trait::{CodeGenError, CodeGenOptions, CodeGenerator},
     internal_representation::InternalRepresentation,
     types::*,
 };
@@ -10,9 +10,6 @@ use super::{
     alias_code_gen::TypeAliasCodeGenerator, class_code_gen::ClassCodeGenerator,
     enum_code_gen::EnumCodeGenerator, helper_code_gen::HelperCodeGenerator,
 };
-
-// TODO: build IR(Intermediate Representation) with more informations about DataType, Inheritance
-// TODO: Sort class Declarations by occurance in document, then by inheritance and dependency
 
 pub(crate) struct DelphiCodeGenerator<'a, T: Write> {
     buffer: &'a mut BufWriter<T>,
@@ -56,7 +53,7 @@ where
     }
 
     #[inline]
-    fn write_forward_declerations(&mut self) -> Result<(), std::io::Error> {
+    fn write_forward_declerations(&mut self) -> Result<(), CodeGenError> {
         self.buffer.write_all(b"type")?;
         self.newline()?;
         self.newline()?;
@@ -95,7 +92,7 @@ where
     }
 
     #[inline]
-    fn write_declarations(&mut self) -> Result<(), std::io::Error> {
+    fn write_declarations(&mut self) -> Result<(), CodeGenError> {
         ClassCodeGenerator::write_declarations(
             self.buffer,
             &self.internal_representation.classes,
@@ -115,7 +112,7 @@ where
     }
 
     #[inline]
-    fn write_implementation(&mut self) -> Result<(), std::io::Error> {
+    fn write_implementation(&mut self) -> Result<(), CodeGenError> {
         EnumCodeGenerator::write_implementation(
             self.buffer,
             &self.internal_representation.enumerations,
@@ -193,7 +190,7 @@ where
         }
     }
 
-    fn generate(&mut self) -> Result<(), std::io::Error> {
+    fn generate(&mut self) -> Result<(), CodeGenError> {
         self.write_unit()?;
         self.write_interface_start()?;
         self.write_uses()?;
