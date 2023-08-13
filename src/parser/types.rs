@@ -21,7 +21,7 @@ impl Node {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum NodeType {
     Standard(NodeBaseType),
     /// Contains qualified name of the type
@@ -29,7 +29,7 @@ pub(crate) enum NodeType {
 }
 
 /// base="" or type=""
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum NodeBaseType {
     Boolean,
     DateTime,
@@ -93,8 +93,28 @@ impl CustomTypeDefinition {
     }
 }
 
+impl From<SimpleType> for CustomTypeDefinition {
+    fn from(value: SimpleType) -> Self {
+        CustomTypeDefinition::Simple(value)
+    }
+}
+
+impl From<ComplexType> for CustomTypeDefinition {
+    fn from(value: ComplexType) -> Self {
+        CustomTypeDefinition::Complex(value)
+    }
+}
+
+/// types in xs:union
+#[derive(Debug, Clone)]
+pub(crate) enum UnionVariant {
+  Standard(NodeBaseType),
+  Named(String),
+  Simple(SimpleType),
+}
+
 /// xs:simpleType
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct SimpleType {
     /// name-attribute
     pub(crate) name: String,
@@ -108,6 +128,8 @@ pub(crate) struct SimpleType {
     pub(crate) list_type: Option<NodeType>,
     /// type of items in a list
     pub(crate) pattern: Option<String>,
+    /// variants of union type
+    pub(crate) variants: Option<Vec<UnionVariant>>,
 }
 
 /// xs:complexType

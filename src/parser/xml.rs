@@ -105,9 +105,9 @@ impl XmlParser {
                         b"xs:simpleType" => {
                             if let Some(name) = &current_element_name {
                                 let (s_type, type_name) =
-                                    self.parse_simple_type(reader, name.clone(), true)?;
+                                    self.parse_simple_type(reader, registry, name.clone(), true)?;
 
-                                registry.register_type(s_type);
+                                registry.register_type(s_type.into());
 
                                 let base_attributes = Self::get_base_attributes(&s)?;
 
@@ -122,9 +122,10 @@ impl XmlParser {
                                     .ok()
                                     .unwrap_or_else(|| registry.generate_type_name());
 
-                                let (s_type, _) = self.parse_simple_type(reader, name, false)?;
+                                let (s_type, _) =
+                                    self.parse_simple_type(reader, registry, name, false)?;
 
-                                registry.register_type(s_type);
+                                registry.register_type(s_type.into());
                             }
                         }
                         _ => (),
@@ -226,9 +227,9 @@ impl XmlParser {
                     b"xs:simpleType" => {
                         if let Some(name) = &current_element_name {
                             let (s_type, type_name) =
-                                self.parse_simple_type(reader, name.clone(), true)?;
+                                self.parse_simple_type(reader, registry, name.clone(), true)?;
 
-                            registry.register_type(s_type);
+                            registry.register_type(s_type.into());
 
                             let base_attributes = Self::get_base_attributes(&s)?;
 
@@ -243,9 +244,10 @@ impl XmlParser {
                                 .ok()
                                 .unwrap_or_else(|| registry.generate_type_name());
 
-                            let (s_type, _) = self.parse_simple_type(reader, name, true)?;
+                            let (s_type, _) =
+                                self.parse_simple_type(reader, registry, name, true)?;
 
-                            registry.register_type(s_type);
+                            registry.register_type(s_type.into());
                         }
                     }
                     b"xs:complexType" => {
@@ -323,22 +325,31 @@ impl XmlParser {
     fn parse_simple_type(
         &self,
         reader: &mut Reader<BufReader<File>>,
+        registry: &mut TypeRegistry,
         name: String,
         is_local: bool,
-    ) -> Result<(CustomTypeDefinition, String), ParserError> {
+    ) -> Result<(SimpleType, String), ParserError> {
         let mut base_type = String::new();
         let mut list_type = String::new();
         let mut enumerations = Vec::new();
         let mut pattern = None::<String>;
+        let mut variants = None::<Vec<UnionVariant>>;
         let mut buf = Vec::new();
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(s)) => {
-                    if let b"xs:restriction" = s.name().as_ref() {
-                        base_type = Self::get_attribute_value(&s, "base")?
+                Ok(Event::Start(s)) => match s.name().as_ref() {
+                    b"xs:restriction" => base_type = Self::get_attribute_value(&s, "base")?,
+                    b"xs:union" => {
+                        if variants.is_some() {
+                            return Err(ParserError::UnexpectedStartOfNode("xs:union".to_owned()));
+                        }
+
+                        let types = self.parse_union_local_variants(&s, reader, registry, &name)?;
+                        variants = Some(types);
                     }
-                }
+                    _ => (),
+                },
                 Ok(Event::Empty(e)) => match e.name().as_ref() {
                     b"xs:enumeration" => {
                         let value = Self::get_attribute_value(&e, "value")?;
@@ -351,6 +362,14 @@ impl XmlParser {
                     b"xs:pattern" => {
                         let value = Self::get_attribute_value(&e, "value")?;
                         pattern = Some(value);
+                    }
+                    b"xs:union" => {
+                        if variants.is_some() {
+                            return Err(ParserError::UnexpectedStartOfNode("xs:union".to_owned()));
+                        }
+
+                        let types = Self::get_union_member_types(&e)?;
+                        variants = Some(types);
                     }
                     _ => (),
                 },
@@ -370,7 +389,7 @@ impl XmlParser {
             Some(self.as_qualified_name(name.as_str()))
         };
 
-        let s_type = CustomTypeDefinition::Simple(SimpleType {
+        let s_type = SimpleType {
             name: name.clone(),
             qualified_name,
             base_type: Self::base_type_str_to_node_type(base_type.as_str()),
@@ -381,11 +400,52 @@ impl XmlParser {
             },
             list_type: Self::base_type_str_to_node_type(list_type.as_str()),
             pattern,
-        });
+            variants,
+        };
 
         buf.clear();
 
         Ok((s_type, name))
+    }
+
+    fn parse_union_local_variants(
+        &self,
+        node: &BytesStart,
+        reader: &mut Reader<BufReader<File>>,
+        registry: &mut TypeRegistry,
+        name: &String,
+    ) -> Result<Vec<UnionVariant>, ParserError> {
+        let mut types = Self::get_union_member_types(&node)?;
+        let mut variant_count: usize = types.len() + 1;
+        let mut buf = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(s)) => {
+                    if s.name().as_ref() == b"xs:simpleType" {
+                        let variant_name = format!("{}Variant{}", name, variant_count);
+
+                        let (s_type, _) =
+                            Self::parse_simple_type(&self, reader, registry, variant_name, true)?;
+
+                        registry.register_type(s_type.clone().into());
+
+                        types.push(UnionVariant::Simple(s_type));
+
+                        variant_count += 1;
+                    }
+                }
+                Ok(Event::End(e)) => {
+                    if e.name().as_ref() == b"xs:union" {
+                        break;
+                    }
+                }
+                Ok(_) => (),
+                Err(_) => return Err(ParserError::UnexpectedError),
+            }
+        }
+
+        Ok(types)
     }
 
     fn base_type_str_to_node_type(base_type: &str) -> Option<NodeType> {
@@ -460,6 +520,23 @@ impl XmlParser {
             Err(ParserError::MissingAttribute(_)) => Ok(None),
             Err(e) => Err(e),
         }
+    }
+
+    fn get_union_member_types(node: &BytesStart) -> Result<Vec<UnionVariant>, ParserError> {
+        let member_types = Self::get_attribute_value(&node, "memberTypes")?;
+
+        let types = member_types
+            .split(' ')
+            .map(|p| Self::base_type_str_to_node_type(p))
+            .filter(|p| p.is_some())
+            .map(|p| p.unwrap())
+            .map(|t| match t {
+                NodeType::Standard(t) => UnionVariant::Standard(t),
+                NodeType::Custom(n) => UnionVariant::Named(n),
+            })
+            .collect::<Vec<UnionVariant>>();
+
+        Ok(types)
     }
 
     #[inline]
