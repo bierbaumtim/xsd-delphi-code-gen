@@ -181,6 +181,12 @@ where
             self.generate_hex_binary_helper,
         )?;
 
+        UnionTypeCodeGenerator::write_implementations(
+            self.buffer,
+            &self.internal_representation.union_types,
+            &self.options,
+        )?;
+
         ClassCodeGenerator::write_implementations(
             self.buffer,
             &self.internal_representation.classes,

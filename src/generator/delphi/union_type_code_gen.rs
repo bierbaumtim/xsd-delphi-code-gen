@@ -56,6 +56,43 @@ impl UnionTypeCodeGenerator {
             }
         }
         buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
+
+        buffer.write_all(b"\n")?;
+        buffer.write_fmt(format_args!(
+            "{}{{$REGION 'Union Types Helper'}}\n",
+            " ".repeat(indentation),
+        ))?;
+        for (i, union_type) in union_types.iter().enumerate() {
+            Self::generate_helper_declaration(buffer, union_type, options, indentation)?;
+
+            if i < union_types.len() - 1 {
+                buffer.write_all(b"\n")?;
+            }
+        }
+        buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
+
+        Ok(())
+    }
+
+    pub(crate) fn write_implementations<T: Write>(
+        buffer: &mut BufWriter<T>,
+        union_types: &[UnionType],
+        options: &CodeGenOptions,
+    ) -> Result<(), CodeGenError> {
+        if union_types.is_empty() {
+            return Ok(());
+        }
+
+        buffer.write_all(b"{$REGION 'Union Types Helper'}\n")?;
+        for (i, union_type) in union_types.iter().enumerate() {
+            Self::generate_helper_implementation(buffer, union_type, options)?;
+
+            if i < union_types.len() - 1 {
+                buffer.write_all(b"\n")?;
+            }
+        }
+        buffer.write_all(b"{$ENDREGION}\n\n")?;
+
         Ok(())
     }
 
@@ -95,9 +132,76 @@ impl UnionTypeCodeGenerator {
             ))?;
         }
 
-        // buffer.write_fmt(format_args!("{}end;\n", " ".repeat(indentation + 2)))?;
-
         buffer.write_fmt(format_args!("{}end;\n", " ".repeat(indentation)))?;
+
+        Ok(())
+    }
+
+    fn generate_helper_declaration<T: Write>(
+        buffer: &mut BufWriter<T>,
+        union_type: &UnionType,
+        options: &CodeGenOptions,
+        indentation: usize,
+    ) -> Result<(), CodeGenError> {
+        buffer.write_fmt(format_args!(
+            "{}{}Helper = record helper for {}\n",
+            " ".repeat(indentation),
+            Helper::as_type_name(&union_type.name, &options.type_prefix),
+            Helper::as_type_name(&union_type.name, &options.type_prefix),
+        ))?;
+
+        if options.generate_from_xml {
+            buffer.write_fmt(format_args!(
+                "{}class function FromXml(node: IXMLNode): {}; static;\n",
+                " ".repeat(indentation + 2),
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+            ))?;
+        }
+
+        if options.generate_from_xml && options.generate_to_xml {
+            buffer.write_all(b"\n")?;
+        }
+
+        if options.generate_to_xml {
+            buffer.write_fmt(format_args!(
+                "{}procedure AppendToXmlRaw(pParent: IXMLNode);\n",
+                " ".repeat(indentation + 2),
+            ))?;
+        }
+        buffer.write_fmt(format_args!("{}end;\n", " ".repeat(indentation)))?;
+
+        Ok(())
+    }
+
+    fn generate_helper_implementation<T: Write>(
+        buffer: &mut BufWriter<T>,
+        union_type: &UnionType,
+        options: &CodeGenOptions,
+    ) -> Result<(), CodeGenError> {
+        if options.generate_from_xml {
+            buffer.write_fmt(format_args!(
+                "class function {}Helper.FromXml(node: IXMLNode): {};\n",
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+            ))?;
+            buffer.write_all(b"begin\n")?;
+            buffer.write_all(b"  // TODO: Add implementation\n")?;
+            buffer.write_all(b"end;\n")?;
+        }
+
+        if options.generate_from_xml && options.generate_to_xml {
+            buffer.write_all(b"\n")?;
+        }
+
+        if options.generate_to_xml {
+            buffer.write_fmt(format_args!(
+                "procedure {}Helper.AppendToXmlRaw(pParent: IXMLNode);\n",
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+            ))?;
+            buffer.write_all(b"begin\n")?;
+            buffer.write_all(b"  // TODO: Add implementation\n")?;
+            buffer.write_all(b"end;\n")?;
+        }
 
         Ok(())
     }
