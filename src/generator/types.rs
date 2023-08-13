@@ -24,10 +24,11 @@ pub(crate) enum DataType {
     String,
     Time,
     Alias(String),
-    Enumeration(String),
     Custom(String),
+    Enumeration(String),
     List(Box<DataType>),
     FixedSizeList(Box<DataType>, usize),
+    Union(String),
 }
 
 #[derive(Clone, Debug)]
@@ -69,4 +70,16 @@ pub(crate) struct Variable {
     pub(crate) data_type: DataType,
     pub(crate) xml_name: String,
     pub(crate) requires_free: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct UnionVariant {
+    pub(crate) name: String,
+    pub(crate) data_type: DataType,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct UnionType {
+    pub(crate) name: String,
+    pub(crate) variants: Vec<UnionVariant>,
 }

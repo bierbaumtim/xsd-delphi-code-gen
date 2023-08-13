@@ -34,7 +34,7 @@ where
     K: Display,
     T: Clone,
     T: Debug,
-    F: Fn(&T) -> (K, Option<K>),
+    F: Fn(&T) -> (K, Option<Vec<K>>),
 {
     dependencies: HashMap<K, Node<K, T>>,
     keys_fn: F,
@@ -68,7 +68,7 @@ where
     K: Display,
     T: Clone,
     T: Debug,
-    F: Fn(&T) -> (K, Option<K>),
+    F: Fn(&T) -> (K, Option<Vec<K>>),
 {
     pub(crate) fn new(key: F) -> Self {
         DependencyGraph {
@@ -82,15 +82,17 @@ where
 
         let mut node = Node::empty(item);
 
-        if let Some(dep_key) = dep_key {
-            if let Some(dependency) = self.dependencies.get_mut(&dep_key) {
-                dependency.children.push(item_key.clone());
-            }
+        if let Some(dep_keys) = dep_key {
+            for dep_key in dep_keys {
+                if let Some(dependency) = self.dependencies.get_mut(&dep_key) {
+                    dependency.children.push(item_key.clone());
+                }
 
-            node.parents.push(dep_key.clone());
+                node.parents.push(dep_key.clone());
+            }
         }
 
-        for value in self.dependencies.values_mut() {
+        for value in self.dependencies.values() {
             if value.parents.contains(&item_key) {
                 let (value_key, _) = (self.keys_fn)(&value.item);
 
@@ -146,8 +148,9 @@ mod tests {
 
     #[test]
     fn get_sorted_elements_with_duplicates() {
-        let mut graph =
-            DependencyGraph::<String, GraphItem, _>::new(|i| (i.key.clone(), i.dep.clone()));
+        let mut graph = DependencyGraph::<String, GraphItem, _>::new(|i| {
+            (i.key.clone(), i.dep.clone().map(|d| vec![d]))
+        });
 
         graph.push(GraphItem {
             key: "Alias3".to_owned(),

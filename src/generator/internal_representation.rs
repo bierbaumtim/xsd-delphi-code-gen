@@ -9,18 +9,37 @@ pub(crate) struct InternalRepresentation {
     pub(crate) classes: Vec<ClassType>,
     pub(crate) types_aliases: Vec<TypeAlias>,
     pub(crate) enumerations: Vec<Enumeration>,
+    pub(crate) union_types: Vec<UnionType>,
 }
 
 impl InternalRepresentation {
     pub(crate) fn build(nodes: &Vec<Node>, registry: &TypeRegistry) -> InternalRepresentation {
         let mut classes_dep_graph = DependencyGraph::<String, ClassType, _>::new(|c| {
-            (c.name.clone(), c.super_type.as_ref().cloned())
+            (
+                c.name.clone(),
+                c.super_type.as_ref().cloned().map(|s| vec![s]),
+            )
         });
         let mut aliases_dep_graph =
             DependencyGraph::<String, TypeAlias, _>::new(|a| match &a.for_type {
-                DataType::Custom(name) => (a.name.clone(), Some(name.clone())),
+                DataType::Custom(name) => (a.name.clone(), Some(vec![name.clone()])),
                 _ => (a.name.clone(), None),
             });
+        let mut union_types_dep_graph = DependencyGraph::<String, UnionType, _>::new(|u| {
+            (
+                u.name.clone(),
+                Some(
+                    u.variants
+                        .iter()
+                        .map(|v| match &v.data_type {
+                            DataType::Union(n) => n.clone(),
+                            _ => String::new(),
+                        })
+                        .filter(|d| !d.is_empty())
+                        .collect::<Vec<String>>(),
+                ),
+            )
+        });
 
         let mut enumerations = Vec::new();
 
@@ -38,47 +57,60 @@ impl InternalRepresentation {
                 }
                 CustomTypeDefinition::Simple(st) if st.list_type.is_some() => {
                     if let Some(lt) = &st.list_type {
-                        match lt {
-                            NodeType::Standard(s) => {
-                                let d_type = Self::node_base_type_to_datatype(s);
+                        if let Some(d_type) = Self::list_type_to_data_type(lt, registry) {
+                            let type_alias = TypeAlias {
+                                name: st.name.clone(),
+                                for_type: DataType::List(Box::new(d_type)),
+                                pattern: None,
+                            };
 
-                                let type_alias = TypeAlias {
-                                    name: st.name.clone(),
-                                    for_type: DataType::List(Box::new(d_type)),
-                                    pattern: None,
-                                };
-
-                                aliases_dep_graph.push(type_alias);
-                            }
-                            NodeType::Custom(c) => {
-                                let c_type = registry.types.get(c);
-
-                                if let Some(c_type) = c_type {
-                                    let data_type = match c_type {
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.enumeration.is_some() =>
-                                        {
-                                            DataType::Enumeration(s.name.clone())
-                                        }
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.base_type.is_some() =>
-                                        {
-                                            DataType::Alias(s.name.clone())
-                                        }
-                                        _ => DataType::Custom(c_type.get_name()),
-                                    };
-
-                                    let type_alias = TypeAlias {
-                                        name: st.name.clone(),
-                                        for_type: DataType::List(Box::new(data_type)),
-                                        pattern: None,
-                                    };
-
-                                    aliases_dep_graph.push(type_alias);
-                                }
-                            }
+                            aliases_dep_graph.push(type_alias);
                         }
                     }
+                }
+                CustomTypeDefinition::Simple(st) if st.variants.is_some() => {
+                    let Some(variants) = &st.variants  else {
+                        continue;
+                    };
+
+                    let union_type = UnionType {
+                        name: st.name.clone(),
+                        variants: variants
+                            .iter()
+                            .enumerate()
+                            .map(|(i, v)| {
+                                let d_type = match v {
+                                    crate::parser::types::UnionVariant::Named(n) => {
+                                        Some((DataType::Custom(n.clone()), n.clone()))
+                                    }
+                                    crate::parser::types::UnionVariant::Simple(st) => {
+                                        if let Some(lt) = &st.list_type {
+                                            Self::list_type_to_data_type(lt, registry)
+                                                .map(|d| (d, st.name.clone()))
+                                        } else {
+                                            Some((
+                                                DataType::Custom(st.name.clone()),
+                                                st.name.clone(),
+                                            ))
+                                        }
+                                    }
+                                    crate::parser::types::UnionVariant::Standard(t) => Some((
+                                        Self::node_base_type_to_datatype(t),
+                                        format!("Variant{}", i),
+                                    )),
+                                };
+
+                                d_type.map(|(dt, name)| super::types::UnionVariant {
+                                    name,
+                                    data_type: dt,
+                                })
+                            })
+                            .filter(|v| v.is_some())
+                            .map(|v| v.unwrap())
+                            .collect::<Vec<super::types::UnionVariant>>(),
+                    };
+
+                    union_types_dep_graph.push(union_type);
                 }
                 CustomTypeDefinition::Simple(_) => (),
                 CustomTypeDefinition::Complex(ct) => {
@@ -154,6 +186,9 @@ impl InternalRepresentation {
                                         {
                                             panic!("Nested lists are not supported");
                                             // return Err();
+                                        }
+                                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                                            DataType::Union(s.name.clone())
                                         }
                                         _ => DataType::Custom(c_type.get_name()),
                                     };
@@ -256,6 +291,7 @@ impl InternalRepresentation {
             document: document_type,
             classes: classes_dep_graph.get_sorted_elements(),
             types_aliases: aliases_dep_graph.get_sorted_elements(),
+            union_types: union_types_dep_graph.get_sorted_elements(),
             enumerations,
         }
     }
@@ -288,6 +324,29 @@ impl InternalRepresentation {
             name: st.name.clone(),
             pattern: st.pattern.clone(),
             for_type,
+        }
+    }
+
+    fn list_type_to_data_type(list_type: &NodeType, registry: &TypeRegistry) -> Option<DataType> {
+        match list_type {
+            NodeType::Standard(s) => Some(Self::node_base_type_to_datatype(s)),
+            NodeType::Custom(c) => {
+                let c_type = registry.types.get(c);
+
+                if let Some(c_type) = c_type {
+                    return match c_type {
+                        CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
+                            Some(DataType::Enumeration(s.name.clone()))
+                        }
+                        CustomTypeDefinition::Simple(s) if s.base_type.is_some() => {
+                            Some(DataType::Alias(s.name.clone()))
+                        }
+                        _ => Some(DataType::Custom(c_type.get_name())),
+                    };
+                }
+
+                None
+            }
         }
     }
 

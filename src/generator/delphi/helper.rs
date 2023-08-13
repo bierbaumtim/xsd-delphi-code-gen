@@ -78,6 +78,17 @@ impl Helper {
         }
     }
 
+    pub fn get_enum_variant_prefix(name: &str) -> String {
+        let prefix = name
+            .chars()
+            .enumerate()
+            .filter(|(i, c)| i == &0 || c.is_uppercase())
+            .map(|(_, c)| c.to_ascii_lowercase())
+            .collect::<Vec<char>>();
+
+        String::from_iter(prefix)
+    }
+
     pub(crate) fn get_datatype_language_representation(
         datatype: &DataType,
         prefix: &Option<String>,
@@ -94,6 +105,7 @@ impl Helper {
             DataType::Enumeration(e) => Self::as_type_name(e, prefix),
             DataType::Custom(c) => Self::as_type_name(c, prefix),
             DataType::FixedSizeList(t, _) => Self::get_datatype_language_representation(t, prefix),
+            DataType::Union(u) => Self::as_type_name(u, prefix),
             DataType::List(s) => {
                 let gt = Self::get_datatype_language_representation(s, prefix);
 

@@ -70,7 +70,7 @@ impl EnumCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
-        let prefix = Self::get_variant_prefix(&enumeration.name);
+        let prefix = Helper::get_enum_variant_prefix(&enumeration.name);
 
         buffer.write_fmt(format_args!(
             "{}{} = ({});\n",
@@ -154,7 +154,7 @@ impl EnumCodeGenerator {
             formatted_enum_name, formatted_enum_name,
         ))?;
         buffer.write_all(b"begin\n")?;
-        let prefix = Self::get_variant_prefix(&enumeration.name);
+        let prefix = Helper::get_enum_variant_prefix(&enumeration.name);
 
         for (i, value) in enumeration.values.iter().enumerate() {
             buffer.write_fmt(format_args!(
@@ -209,7 +209,7 @@ impl EnumCodeGenerator {
             buffer.write_fmt(format_args!(
                 "    {}.{}{}{}: Result := '{}';\n",
                 formatted_enum_name,
-                Self::get_variant_prefix(&enumeration.name),
+                Helper::get_enum_variant_prefix(&enumeration.name),
                 value.variant_name.to_ascii_uppercase(),
                 " ".repeat(max_variant_len - value.variant_name.len() + 1),
                 value.xml_value,
@@ -219,17 +219,6 @@ impl EnumCodeGenerator {
         buffer.write_all(b"  end;\n")?;
         buffer.write_all(b"end;\n")?;
         Ok(())
-    }
-
-    fn get_variant_prefix(name: &str) -> String {
-        let prefix = name
-            .chars()
-            .enumerate()
-            .filter(|(i, c)| i == &0 || c.is_uppercase())
-            .map(|(_, c)| c.to_ascii_lowercase())
-            .collect::<Vec<char>>();
-
-        String::from_iter(prefix)
     }
 }
 

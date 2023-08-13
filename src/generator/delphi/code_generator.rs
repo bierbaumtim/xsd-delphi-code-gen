@@ -10,7 +10,7 @@ use crate::generator::{
 use super::{
     alias_code_gen::TypeAliasCodeGenerator, class_code_gen::ClassCodeGenerator,
     const_code_gen::ConstCodeGenerator, enum_code_gen::EnumCodeGenerator,
-    helper_code_gen::HelperCodeGenerator,
+    helper_code_gen::HelperCodeGenerator, union_type_code_gen::UnionTypeCodeGenerator,
 };
 
 pub(crate) struct DelphiCodeGenerator<'a, T: Write> {
@@ -123,6 +123,16 @@ where
             TypeAliasCodeGenerator::write_declarations(
                 self.buffer,
                 &self.internal_representation.types_aliases,
+                &self.options,
+                2,
+            )?;
+            self.newline()?;
+        }
+
+        if !self.internal_representation.union_types.is_empty() {
+            UnionTypeCodeGenerator::write_declarations(
+                self.buffer,
+                &self.internal_representation.union_types,
                 &self.options,
                 2,
             )?;
