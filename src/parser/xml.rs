@@ -368,7 +368,7 @@ impl XmlParser {
                             return Err(ParserError::UnexpectedStartOfNode("xs:union".to_owned()));
                         }
 
-                        let types = Self::get_union_member_types(&e)?;
+                        let types = self.get_union_member_types(&e)?;
                         variants = Some(types);
                     }
                     _ => (),
@@ -415,7 +415,7 @@ impl XmlParser {
         registry: &mut TypeRegistry,
         name: &String,
     ) -> Result<Vec<UnionVariant>, ParserError> {
-        let mut types = Self::get_union_member_types(node)?;
+        let mut types = self.get_union_member_types(node)?;
         let mut variant_count: usize = types.len() + 1;
         let mut buf = Vec::new();
 
@@ -522,19 +522,19 @@ impl XmlParser {
         }
     }
 
-    fn get_union_member_types(node: &BytesStart) -> Result<Vec<UnionVariant>, ParserError> {
+    fn get_union_member_types(&self, node: &BytesStart) -> Result<Vec<UnionVariant>, ParserError> {
         let member_types = Self::get_attribute_value(node, "memberTypes")?;
 
-        let types = member_types
+        member_types
             .split(' ')
             .filter_map(Self::base_type_str_to_node_type)
             .map(|t| match t {
-                NodeType::Standard(t) => UnionVariant::Standard(t),
-                NodeType::Custom(n) => UnionVariant::Named(n),
+                NodeType::Standard(t) => Ok(UnionVariant::Standard(t)),
+                NodeType::Custom(n) => Ok(UnionVariant::Named(self.resolve_namespace(n)?)),
             })
-            .collect::<Vec<UnionVariant>>();
-
-        Ok(types)
+            .collect::<Vec<Result<UnionVariant, ParserError>>>()
+            .into_iter()
+            .collect()
     }
 
     #[inline]
