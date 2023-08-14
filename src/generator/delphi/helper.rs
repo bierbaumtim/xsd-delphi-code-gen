@@ -1,6 +1,6 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::generator::types::DataType;
+use crate::generator::types::{BinaryEncoding, DataType, TypeAlias};
 
 pub(crate) struct Helper;
 
@@ -123,6 +123,71 @@ impl Helper {
             DataType::UnsignedInteger => String::from("NativeUInt"),
             DataType::UnsignedLongInteger => String::from("UInt64"),
         }
+    }
+
+    pub(crate) fn get_variable_value_as_string(
+        data_type: &DataType,
+        variable_name: &String,
+        pattern: Option<String>,
+    ) -> String {
+        match data_type {
+            DataType::Boolean => {
+                format!("IfThen({}, cnXmlTrueValue, cnXmlFalseValue)", variable_name)
+            }
+            DataType::DateTime | DataType::Date if pattern.is_some() => format!(
+                "FormatDateTime('{}', {})",
+                pattern.unwrap_or_default(),
+                variable_name,
+            ),
+            DataType::DateTime | DataType::Date => format!("DateToISO8601({})", variable_name),
+            DataType::Double => format!("FloatToStr({})", variable_name,),
+            DataType::Binary(BinaryEncoding::Base64) => {
+                format!("TNetEncoding.Base64.EncodeStringToBytes({})", variable_name,)
+            }
+            DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({})", variable_name,),
+            DataType::String => format!("{}", variable_name),
+            DataType::Time if pattern.is_some() => format!(
+                "EncodeTime({}, '{}')",
+                variable_name,
+                pattern.unwrap_or_default(),
+            ),
+            DataType::Time => format!("TimeToStr({})", variable_name,),
+            DataType::SmallInteger
+            | DataType::ShortInteger
+            | DataType::Integer
+            | DataType::LongInteger
+            | DataType::UnsignedSmallInteger
+            | DataType::UnsignedShortInteger
+            | DataType::UnsignedInteger
+            | DataType::UnsignedLongInteger => format!("IntToStr({})", variable_name),
+            _ => "\"\"".to_owned(),
+        }
+    }
+
+    pub(crate) fn get_alias_data_type(
+        alias: &str,
+        type_aliases: &[TypeAlias],
+    ) -> Option<(DataType, Option<String>)> {
+        if let Some(t) = type_aliases.iter().find(|t| t.name == alias) {
+            let mut pattern = t.pattern.clone();
+            let mut data_type = t.for_type.clone();
+
+            while let DataType::Custom(n) = &data_type {
+                if let Some(alias) = type_aliases.iter().find(|t| t.name == n.as_str()) {
+                    if pattern.is_none() {
+                        pattern = alias.pattern.clone();
+                    }
+
+                    data_type = alias.for_type.clone();
+                } else {
+                    break;
+                }
+            }
+
+            return Some((data_type, pattern));
+        }
+
+        None
     }
 }
 

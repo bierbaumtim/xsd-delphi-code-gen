@@ -25,6 +25,8 @@ pub(crate) struct CodeGenOptions {
 
 pub(crate) enum CodeGenError {
     IOError(std::io::Error),
+    ComplexTypeInSimpleTypeNotAllowed(String, String),
+    MissingDataType(String, String),
     NestedFixedSizeList(String, String),
     NestedListInFixedSizeList(String, String),
 }
@@ -39,6 +41,16 @@ impl fmt::Debug for CodeGenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IOError(arg0) => f.debug_tuple("IOError").field(arg0).finish(),
+            Self::MissingDataType(type_name, variable)  => write!(
+                f,
+                "Required DataType is missing. Class: {}, Variable: {}",
+                type_name, variable
+            ),
+            Self::ComplexTypeInSimpleTypeNotAllowed(union_type, variant) => write!(
+                f,
+                "A complex type inside a union type is not supported. Class: {}, Variable: {}",
+                union_type, variant
+            ),
             Self::NestedFixedSizeList(class, variable) => write!(
                 f,
                 "Fixed size list inside of a fixed size list is not supported. Class: {}, Variable: {}",

@@ -36,10 +36,7 @@ where
             "Version: {}",
             option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
         );
-        let timestamp = format!(
-            "Timestamp: {}",
-            Local::now().format("%d.%m.%Y %H:%M:%S")
-        );
+        let timestamp = format!("Timestamp: {}", Local::now().format("%d.%m.%Y %H:%M:%S"));
 
         self.buffer
             .write_fmt(format_args!("// {} //\n", "=".repeat(BORDER_LENGTH)))?;
@@ -184,6 +181,7 @@ where
         UnionTypeCodeGenerator::write_implementations(
             self.buffer,
             &self.internal_representation.union_types,
+            &self.internal_representation.types_aliases,
             &self.options,
         )?;
 

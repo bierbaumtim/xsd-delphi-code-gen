@@ -405,7 +405,7 @@ impl ClassCodeGenerator {
                 }
                 DataType::Alias(name) => {
                     if let Some((data_type, pattern)) =
-                        Self::get_alias_data_type(name.as_str(), type_aliases)
+                        Helper::get_alias_data_type(name.as_str(), type_aliases)
                     {
                         buffer.write_all(
                             Self::generate_standard_type_from_xml(
@@ -510,7 +510,7 @@ impl ClassCodeGenerator {
             }
             DataType::Alias(name) => {
                 if let Some((data_type, pattern)) =
-                    Self::get_alias_data_type(name.as_str(), type_aliases)
+                    Helper::get_alias_data_type(name.as_str(), type_aliases)
                 {
                     buffer.write_fmt(format_args!(
                         "      var {}",
@@ -611,7 +611,7 @@ impl ClassCodeGenerator {
                 }
                 DataType::Alias(name) => {
                     if let Some((data_type, pattern)) =
-                        Self::get_alias_data_type(name.as_str(), type_aliases)
+                        Helper::get_alias_data_type(name.as_str(), type_aliases)
                     {
                         buffer.write_fmt(format_args!(
                             "        {}: {}",
@@ -704,7 +704,7 @@ impl ClassCodeGenerator {
                 }
                 DataType::Alias(name) => {
                     if let Some((data_type, pattern)) =
-                        Self::get_alias_data_type(name.as_str(), type_aliases)
+                        Helper::get_alias_data_type(name.as_str(), type_aliases)
                     {
                         for arg in Self::generate_standard_type_to_xml(
                             &data_type,
@@ -805,7 +805,7 @@ impl ClassCodeGenerator {
             }
             DataType::Alias(name) => {
                 if let Some((data_type, pattern)) =
-                    Self::get_alias_data_type(name.as_str(), type_aliases)
+                    Helper::get_alias_data_type(name.as_str(), type_aliases)
                 {
                     for arg in Self::generate_standard_type_to_xml(
                         &data_type,
@@ -909,163 +909,25 @@ impl ClassCodeGenerator {
         indentation: usize,
     ) -> Vec<String> {
         match data_type {
-            DataType::Boolean => vec![
+            DataType::Alias(_)
+            | DataType::Custom(_)
+            | DataType::Enumeration(_)
+            | DataType::List(_)
+            | DataType::FixedSizeList(_, _)
+            | DataType::Union(_) => vec![],
+            _ => vec![
                 format!(
                     "{}node := pParent.AddChild('{}');\n",
                     " ".repeat(indentation),
                     xml_name
-                ),
-                format!(
-                    "{}node.Text := IfThen({}, cnXmlTrueValue, cnXmlFalseValue);\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            DataType::DateTime | DataType::Date if pattern.is_some() => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name
-                ),
-                format!(
-                    "{}node.Text := FormatDateTime('{}', {});\n",
-                    " ".repeat(indentation),
-                    pattern.unwrap_or_default(),
-                    variable_name,
-                ),
-            ],
-            DataType::DateTime | DataType::Date => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := DateToISO8601({});\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            DataType::Double => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := FloatToStr({});\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            DataType::Binary(BinaryEncoding::Base64) => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := TNetEncoding.Base64.EncodeStringToBytes({});\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            DataType::Binary(BinaryEncoding::Hex) => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := BinToHexStr({});\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            DataType::String => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
                 ),
                 format!(
                     "{}node.Text := {};\n",
                     " ".repeat(indentation),
-                    variable_name,
+                    Helper::get_variable_value_as_string(data_type, variable_name, pattern),
                 ),
             ],
-            DataType::Time if pattern.is_some() => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := EncodeTime({}, '{}');\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                    pattern.unwrap_or_default(),
-                ),
-            ],
-            DataType::Time => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := TimeToStr({});\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            DataType::SmallInteger
-            | DataType::ShortInteger
-            | DataType::Integer
-            | DataType::LongInteger
-            | DataType::UnsignedSmallInteger
-            | DataType::UnsignedShortInteger
-            | DataType::UnsignedInteger
-            | DataType::UnsignedLongInteger => vec![
-                format!(
-                    "{}node := pParent.AddChild('{}');\n",
-                    " ".repeat(indentation),
-                    xml_name,
-                ),
-                format!(
-                    "{}node.Text := IntToStr({});\n",
-                    " ".repeat(indentation),
-                    variable_name,
-                ),
-            ],
-            _ => vec![],
         }
-    }
-
-    fn get_alias_data_type(
-        alias: &str,
-        type_aliases: &[TypeAlias],
-    ) -> Option<(DataType, Option<String>)> {
-        if let Some(t) = type_aliases.iter().find(|t| t.name == alias) {
-            let mut pattern = t.pattern.clone();
-            let mut data_type = t.for_type.clone();
-
-            while let DataType::Custom(n) = &data_type {
-                if let Some(alias) = type_aliases.iter().find(|t| t.name == n.as_str()) {
-                    if pattern.is_none() {
-                        pattern = alias.pattern.clone();
-                    }
-
-                    data_type = alias.for_type.clone();
-                } else {
-                    break;
-                }
-            }
-
-            return Some((data_type, pattern));
-        }
-
-        None
     }
 }
 
