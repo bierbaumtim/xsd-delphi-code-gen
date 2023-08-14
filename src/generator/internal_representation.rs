@@ -69,44 +69,7 @@ impl InternalRepresentation {
                     }
                 }
                 CustomTypeDefinition::Simple(st) if st.variants.is_some() => {
-                    let Some(variants) = &st.variants  else {
-                        continue;
-                    };
-
-                    let union_type = UnionType {
-                        name: st.name.clone(),
-                        variants: variants
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(i, v)| {
-                                let d_type = match v {
-                                    crate::parser::types::UnionVariant::Named(n) => {
-                                        Some((DataType::Custom(n.clone()), n.clone()))
-                                    }
-                                    crate::parser::types::UnionVariant::Simple(st) => {
-                                        if let Some(lt) = &st.list_type {
-                                            Self::list_type_to_data_type(lt, registry)
-                                                .map(|d| (d, st.name.clone()))
-                                        } else {
-                                            Some((
-                                                DataType::Custom(st.name.clone()),
-                                                st.name.clone(),
-                                            ))
-                                        }
-                                    }
-                                    crate::parser::types::UnionVariant::Standard(t) => Some((
-                                        Self::node_base_type_to_datatype(t),
-                                        format!("Variant{}", i),
-                                    )),
-                                };
-
-                                d_type.map(|(dt, name)| super::types::UnionVariant {
-                                    name,
-                                    data_type: dt,
-                                })
-                            })
-                            .collect::<Vec<super::types::UnionVariant>>(),
-                    };
+                    let union_type = Self::build_union_type(st, registry);
 
                     union_types_dep_graph.push(union_type);
                 }
@@ -322,6 +285,65 @@ impl InternalRepresentation {
             name: st.name.clone(),
             pattern: st.pattern.clone(),
             for_type,
+        }
+    }
+
+    fn build_union_type(st: &SimpleType, registry: &TypeRegistry) -> UnionType {
+        UnionType {
+            name: st.name.clone(),
+            variants: st.variants.as_ref().unwrap()
+                .iter()
+                .enumerate()
+                .filter_map(|(i, v)| {
+                    let d_type = match v {
+                        crate::parser::types::UnionVariant::Named(n) => {
+                            let Some(CustomTypeDefinition::Simple(st)) = registry.types.get(n) else {
+                                return None;
+                            };
+
+                            if let Some(lt) = &st.list_type {
+                                Self::list_type_to_data_type(lt, registry)
+                                    .map(|d| (d, st.name.clone()))
+                            } else if st.enumeration.is_some() {
+                                Some((
+                                    DataType::Enumeration(st.name.clone()),
+                                    st.name.clone(),
+                                ))
+                            } else {
+                                Some((
+                                    DataType::Alias(st.name.clone()),
+                                    st.name.clone(),
+                                ))
+                            }
+                        }
+                        crate::parser::types::UnionVariant::Simple(st) => {
+                            if let Some(lt) = &st.list_type {
+                                Self::list_type_to_data_type(lt, registry)
+                                    .map(|d| (d, st.name.clone()))
+                            } else if st.enumeration.is_some() {
+                                Some((
+                                    DataType::Enumeration(st.name.clone()),
+                                    st.name.clone(),
+                                ))
+                            } else {
+                                Some((
+                                    DataType::Alias(st.name.clone()),
+                                    st.name.clone(),
+                                ))
+                            }
+                        }
+                        crate::parser::types::UnionVariant::Standard(t) => Some((
+                            Self::node_base_type_to_datatype(t),
+                            format!("Variant{}", i),
+                        )),
+                    };
+
+                    d_type.map(|(dt, name)| super::types::UnionVariant {
+                        name,
+                        data_type: dt,
+                    })
+                })
+                .collect::<Vec<super::types::UnionVariant>>(),
         }
     }
 
