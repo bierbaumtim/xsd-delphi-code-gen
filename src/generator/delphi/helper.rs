@@ -145,7 +145,7 @@ impl Helper {
                 format!("TNetEncoding.Base64.EncodeStringToBytes({})", variable_name,)
             }
             DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({})", variable_name,),
-            DataType::String => format!("{}", variable_name),
+            DataType::String => variable_name.to_string(),
             DataType::Time if pattern.is_some() => format!(
                 "EncodeTime({}, '{}')",
                 variable_name,
