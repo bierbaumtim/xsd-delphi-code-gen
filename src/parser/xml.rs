@@ -415,7 +415,7 @@ impl XmlParser {
         registry: &mut TypeRegistry,
         name: &String,
     ) -> Result<Vec<UnionVariant>, ParserError> {
-        let mut types = Self::get_union_member_types(&node)?;
+        let mut types = Self::get_union_member_types(node)?;
         let mut variant_count: usize = types.len() + 1;
         let mut buf = Vec::new();
 
@@ -426,7 +426,7 @@ impl XmlParser {
                         let variant_name = format!("{}Variant{}", name, variant_count);
 
                         let (s_type, _) =
-                            Self::parse_simple_type(&self, reader, registry, variant_name, true)?;
+                            Self::parse_simple_type(self, reader, registry, variant_name, true)?;
 
                         registry.register_type(s_type.clone().into());
 
@@ -523,13 +523,11 @@ impl XmlParser {
     }
 
     fn get_union_member_types(node: &BytesStart) -> Result<Vec<UnionVariant>, ParserError> {
-        let member_types = Self::get_attribute_value(&node, "memberTypes")?;
+        let member_types = Self::get_attribute_value(node, "memberTypes")?;
 
         let types = member_types
             .split(' ')
-            .map(|p| Self::base_type_str_to_node_type(p))
-            .filter(|p| p.is_some())
-            .map(|p| p.unwrap())
+            .filter_map(Self::base_type_str_to_node_type)
             .map(|t| match t {
                 NodeType::Standard(t) => UnionVariant::Standard(t),
                 NodeType::Custom(n) => UnionVariant::Named(n),
