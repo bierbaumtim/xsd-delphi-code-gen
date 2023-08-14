@@ -10,6 +10,8 @@ use super::helper::Helper;
 pub(crate) struct UnionTypeCodeGenerator {}
 
 impl UnionTypeCodeGenerator {
+    const ENUM_NAME: &str = "Variants";
+
     pub(crate) fn write_declarations<T: Write>(
         buffer: &mut BufWriter<T>,
         union_types: &[UnionType],
@@ -19,29 +21,6 @@ impl UnionTypeCodeGenerator {
         if union_types.is_empty() {
             return Ok(());
         }
-
-        buffer.write_fmt(format_args!(
-            "{}{{$REGION 'Union Variants'}}\n",
-            " ".repeat(indentation),
-        ))?;
-        for union_type in union_types {
-            let enum_type_name = Self::get_variant_enum_type_name(&union_type.name, options);
-            let variant_prefix = Helper::get_enum_variant_prefix(enum_type_name.as_str());
-
-            buffer.write_fmt(format_args!(
-                "{}{} = ({});\n",
-                " ".repeat(indentation),
-                enum_type_name,
-                union_type
-                    .variants
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| Self::get_variant_enum_variant_name(&variant_prefix, i))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ))?;
-        }
-        buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
 
         buffer.write_all(b"\n")?;
         buffer.write_fmt(format_args!(
@@ -103,8 +82,7 @@ impl UnionTypeCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
-        let enum_type_name = Self::get_variant_enum_type_name(&union_type.name, options);
-        let variant_prefix = Helper::get_enum_variant_prefix(enum_type_name.as_str());
+        let variant_prefix = Self::get_enum_variant_prefix(&union_type.name, options);
 
         buffer.write_fmt(format_args!(
             "{}{} = record",
@@ -112,19 +90,31 @@ impl UnionTypeCodeGenerator {
             Helper::as_type_name(&union_type.name, &options.type_prefix),
         ))?;
         buffer.write_all(b"\n")?;
+        buffer.write_fmt(format_args!(
+            "{}type {} = ({});\n\n",
+            " ".repeat(indentation + 2),
+            Self::ENUM_NAME,
+            union_type
+                .variants
+                .iter()
+                .enumerate()
+                .map(|(i, u)| Self::get_variant_enum_variant_name(&variant_prefix, &u.name, i))
+                .collect::<Vec<String>>()
+                .join(", ")
+        ))?;
 
         buffer.write_fmt(format_args!(
             "{}case Variant: {} of\n",
             " ".repeat(indentation + 2),
-            enum_type_name,
+            Self::ENUM_NAME,
         ))?;
 
         for (i, variant) in union_type.variants.iter().enumerate() {
             buffer.write_fmt(format_args!(
                 "{}{}.{}: ({}: {});\n",
                 " ".repeat(indentation + 4),
-                enum_type_name,
-                Self::get_variant_enum_variant_name(&variant_prefix, i),
+                Self::ENUM_NAME,
+                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                 Helper::as_variable_name(variant.name.as_str()),
                 Helper::get_datatype_language_representation(
                     &variant.data_type,
@@ -187,7 +177,7 @@ impl UnionTypeCodeGenerator {
                 Helper::as_type_name(&union_type.name, &options.type_prefix),
             ))?;
             buffer.write_all(b"begin\n")?;
-            buffer.write_all(b"  // TODO: Add implementation\n")?;
+            buffer.write_all(b"  // TODO: CodeGen for this is currently not supported. Manual implementation required\n")?;
             buffer.write_all(b"end;\n")?;
         }
 
@@ -196,8 +186,7 @@ impl UnionTypeCodeGenerator {
         }
 
         if options.generate_to_xml {
-            let enum_type_name = Self::get_variant_enum_type_name(&union_type.name, options);
-            let variant_prefix = Helper::get_enum_variant_prefix(enum_type_name.as_str());
+            let variant_prefix = Self::get_enum_variant_prefix(&union_type.name, options);
 
             buffer.write_fmt(format_args!(
                 "function {}Helper.ToXmlValue: String;\n",
@@ -217,8 +206,8 @@ impl UnionTypeCodeGenerator {
                         buffer.write_fmt(format_args!(
                             "{}{}.{}: Result := {};\n",
                             " ".repeat(4),
-                            enum_type_name,
-                            Self::get_variant_enum_variant_name(&variant_prefix, i),
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                             Helper::get_variable_value_as_string(&dt, &variable_name, pattern,),
                         ))?;
                     }
@@ -232,19 +221,41 @@ impl UnionTypeCodeGenerator {
                         buffer.write_fmt(format_args!(
                             "{}{}.{}: Result := {}.ToXmlValue;\n",
                             " ".repeat(4),
-                            enum_type_name,
-                            Self::get_variant_enum_variant_name(&variant_prefix, i),
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                             variable_name,
                         ))?
                     }
-                    crate::generator::types::DataType::List(_) => todo!(),
-                    crate::generator::types::DataType::FixedSizeList(_, _) => todo!(),
-                    crate::generator::types::DataType::Union(_) => todo!(),
+                    crate::generator::types::DataType::List(_) => {
+                        buffer.write_fmt(format_args!(
+                            "{}{}.{}: Result := \"\"; // TODO: CodeGen for this type is currently not supported. Manual implementation required\n",
+                            " ".repeat(4),
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                        ))?
+                    }
+                    crate::generator::types::DataType::FixedSizeList(_, _) => {
+                        buffer.write_fmt(format_args!(
+                            "{}{}.{}: Result := \"\"; // TODO: CodeGen for this type is currently not supported. Manual implementation required\n",
+                            " ".repeat(4),
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                        ))?
+                    }
+                    crate::generator::types::DataType::Union(n) => {
+                        buffer.write_fmt(format_args!(
+                            "{}{}.{}: Result := {}.ToXmlValue;\n",
+                            " ".repeat(4),
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                            Helper::as_type_name(n, &options.type_prefix),
+                        ))?
+                    }
                     _ => buffer.write_fmt(format_args!(
                         "{}{}.{}: Result := {};\n",
                         " ".repeat(4),
-                        enum_type_name,
-                        Self::get_variant_enum_variant_name(&variant_prefix, i),
+                        Self::ENUM_NAME,
+                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                         Helper::get_variable_value_as_string(
                             &variant.data_type,
                             &variable_name,
@@ -261,14 +272,20 @@ impl UnionTypeCodeGenerator {
         Ok(())
     }
 
-    fn get_variant_enum_type_name(name: &String, options: &CodeGenOptions) -> String {
-        format!(
+    fn get_enum_variant_prefix(name: &String, options: &CodeGenOptions) -> String {
+        let enum_type_name = format!(
             "{}Variants",
             Helper::as_type_name(name, &options.type_prefix)
-        )
+        );
+
+        Helper::get_enum_variant_prefix(enum_type_name.as_str())
     }
 
-    fn get_variant_enum_variant_name(prefix: &String, index: usize) -> String {
-        format!("{}Variant{}", prefix, index + 1)
+    fn get_variant_enum_variant_name(prefix: &String, name: &String, index: usize) -> String {
+        if name.is_empty() {
+            format!("{}{}", prefix, index + 1)
+        } else {
+            format!("{}{}", prefix, Helper::first_char_uppercase(name))
+        }
     }
 }
