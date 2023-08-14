@@ -78,7 +78,7 @@ impl InternalRepresentation {
                         variants: variants
                             .iter()
                             .enumerate()
-                            .map(|(i, v)| {
+                            .filter_map(|(i, v)| {
                                 let d_type = match v {
                                     crate::parser::types::UnionVariant::Named(n) => {
                                         Some((DataType::Custom(n.clone()), n.clone()))
@@ -105,8 +105,6 @@ impl InternalRepresentation {
                                     data_type: dt,
                                 })
                             })
-                            .filter(|v| v.is_some())
-                            .map(|v| v.unwrap())
                             .collect::<Vec<super::types::UnionVariant>>(),
                     };
 
