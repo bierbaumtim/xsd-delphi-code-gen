@@ -9,12 +9,12 @@ use crate::generator::{
 
 use super::{
     alias_code_gen::TypeAliasCodeGenerator, class_code_gen::ClassCodeGenerator,
-    const_code_gen::ConstCodeGenerator, enum_code_gen::EnumCodeGenerator,
+    code_writer::CodeWriter, const_code_gen::ConstCodeGenerator, enum_code_gen::EnumCodeGenerator,
     helper_code_gen::HelperCodeGenerator, union_type_code_gen::UnionTypeCodeGenerator,
 };
 
 pub(crate) struct DelphiCodeGenerator<'a, T: Write> {
-    buffer: &'a mut BufWriter<T>,
+    writer: CodeWriter<'a, T>,
     options: CodeGenOptions,
     internal_representation: InternalRepresentation,
     generate_date_time_helper: bool,
@@ -64,76 +64,72 @@ where
 
     #[inline]
     fn write_unit(&mut self) -> Result<(), std::io::Error> {
-        self.buffer
-            .write_fmt(format_args!("unit {};", self.options.unit_name))?;
-        self.newline()?;
-        self.newline()
+        self.writer
+            .writeln(format!("unit {};", self.options.unit_name).as_str(), None)?;
+        self.writer.newline()
     }
 
     #[inline]
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write_all(b"uses System.DateUtils,\n")?;
-        self.buffer
-            .write_all(b"     System.Generics.Collections,\n")?;
-        self.buffer.write_all(b"     System.Types,\n")?;
-        self.buffer.write_all(b"     System.StrUtils,\n")?;
-        self.buffer.write_all(b"     System.SysUtils,\n")?;
-        self.buffer.write_all(b"     Xml.XMLDoc,\n")?;
-        self.buffer.write_all(b"     Xml.XMLIntf;")?;
-        self.newline()?;
-        self.newline()
+        self.writer.writeln("uses System.DateUtils,", None)?;
+        self.writer
+            .writeln("System.Generics.Collections,\n", Some(5))?;
+        self.writer.writeln("     System.Types,\n", Some(5))?;
+        self.writer.writeln("     System.StrUtils,\n", Some(5))?;
+        self.writer.writeln("     System.SysUtils,\n", Some(5))?;
+        self.writer.writeln("     Xml.XMLDoc,\n", Some(5))?;
+        self.writer.writeln("     Xml.XMLIntf;", Some(5))?;
+        self.writer.newline()
     }
 
     #[inline]
     fn write_interface_start(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write_all(b"interface")?;
-        self.newline()?;
-        self.newline()
+        self.writer.writeln("interface", None)?;
+        self.writer.newline()
     }
 
     #[inline]
     fn write_forward_declerations(&mut self) -> Result<(), CodeGenError> {
-        self.buffer.write_all(b"type")?;
-        self.newline()?;
+        self.writer.writeln("type", None)?;
 
         if !self.internal_representation.enumerations.is_empty() {
             EnumCodeGenerator::write_declarations(
-                self.buffer,
+                &mut self.writer,
                 &self.internal_representation.enumerations,
                 &self.options,
                 2,
             )?;
-            self.newline()?;
+            self.writer.newline()?;
         }
 
         if !self.internal_representation.classes.is_empty() {
             ClassCodeGenerator::write_forward_declerations(
-                self.buffer,
+                &mut self.writer,
                 &self.internal_representation.classes,
                 &self.options,
                 2,
             )?;
-            self.newline()?;
+            self.writer.newline()?;
         }
 
         if !self.internal_representation.types_aliases.is_empty() {
             TypeAliasCodeGenerator::write_declarations(
-                self.buffer,
+                &mut self.writer,
                 &self.internal_representation.types_aliases,
                 &self.options,
                 2,
             )?;
-            self.newline()?;
+            self.writer.newline()?;
         }
 
         if !self.internal_representation.union_types.is_empty() {
             UnionTypeCodeGenerator::write_declarations(
-                self.buffer,
+                &mut self.writer,
                 &self.internal_representation.union_types,
                 &self.options,
                 2,
             )?;
-            self.newline()?;
+            self.writer.newline()?;
         }
 
         Ok(())
@@ -142,7 +138,7 @@ where
     #[inline]
     fn write_declarations(&mut self) -> Result<(), CodeGenError> {
         ClassCodeGenerator::write_declarations(
-            self.buffer,
+            &mut self.writer,
             &self.internal_representation.classes,
             &self.internal_representation.document,
             &self.options,
@@ -154,58 +150,53 @@ where
 
     #[inline]
     fn write_implementation_start(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write_all(b"implementation")?;
-        self.newline()?;
-        self.newline()
+        self.writer.write("implementation", None)?;
+        self.writer.newline()?;
+        self.writer.newline()
     }
 
     #[inline]
     fn write_implementation(&mut self) -> Result<(), CodeGenError> {
-        ConstCodeGenerator::generate(self.buffer, &self.internal_representation.classes)?;
-        self.newline()?;
+        ConstCodeGenerator::generate(&mut self.writer, &self.internal_representation.classes)?;
+        self.writer.newline()?;
 
         EnumCodeGenerator::write_implementation(
-            self.buffer,
+            &mut self.writer,
             &self.internal_representation.enumerations,
             &self.options,
         )?;
-        self.newline()?;
+        self.writer.newline()?;
 
         HelperCodeGenerator::write(
-            self.buffer,
+            &mut self.writer,
             &self.options,
             self.generate_date_time_helper,
             self.generate_hex_binary_helper,
         )?;
 
         UnionTypeCodeGenerator::write_implementations(
-            self.buffer,
+            &mut self.writer,
             &self.internal_representation.union_types,
             &self.internal_representation.types_aliases,
             &self.options,
         )?;
 
         ClassCodeGenerator::write_implementations(
-            self.buffer,
+            &mut self.writer,
             &self.internal_representation.classes,
             &self.internal_representation.document,
             &self.internal_representation.types_aliases,
             &self.options,
         )?;
 
-        self.newline()?;
+        self.writer.newline()?;
 
         Ok(())
     }
 
     #[inline]
     fn write_file_end(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write_all(b"end.")
-    }
-
-    #[inline]
-    fn newline(&mut self) -> Result<(), std::io::Error> {
-        self.buffer.write_all(b"\n")
+        self.writer.write("end.", None)
     }
 }
 
@@ -219,7 +210,7 @@ where
         internal_representation: InternalRepresentation,
     ) -> Self {
         DelphiCodeGenerator {
-            buffer,
+            writer: CodeWriter { buffer },
             options,
             generate_date_time_helper: internal_representation.classes.iter().any(|c| {
                 c.variables.iter().any(|v| {
