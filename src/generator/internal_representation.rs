@@ -60,6 +60,7 @@ impl InternalRepresentation {
                         if let Some(d_type) = Self::list_type_to_data_type(lt, registry) {
                             let type_alias = TypeAlias {
                                 name: st.name.clone(),
+                                qualified_name: st.qualified_name.clone().unwrap_or_default(),
                                 for_type: DataType::List(Box::new(d_type)),
                                 pattern: None,
                             };
@@ -69,7 +70,7 @@ impl InternalRepresentation {
                     }
                 }
                 CustomTypeDefinition::Simple(st) if st.variants.is_some() => {
-                    let union_type = Self::build_union_type(st, registry);
+                    let union_type = Self::build_union_type_ir(st, registry);
 
                     union_types_dep_graph.push(union_type);
                 }
@@ -195,6 +196,7 @@ impl InternalRepresentation {
 
                     let class_type = ClassType {
                         name: ct.name.clone(),
+                        qualified_name: ct.qualified_name.clone().unwrap_or_default(),
                         super_type,
                         variables,
                     };
@@ -243,6 +245,7 @@ impl InternalRepresentation {
         let document_type = ClassType {
             super_type: None,
             name: String::from(DOCUMENT_NAME),
+            qualified_name: String::from(DOCUMENT_NAME),
             variables: document_variables,
         };
 
@@ -271,6 +274,7 @@ impl InternalRepresentation {
 
         Enumeration {
             name: st.name.clone(),
+            qualified_name: st.qualified_name.clone().unwrap_or_default(),
             values,
         }
     }
@@ -278,19 +282,25 @@ impl InternalRepresentation {
     fn build_type_alias_ir(st: &SimpleType) -> TypeAlias {
         let for_type = match st.base_type.as_ref().unwrap() {
             NodeType::Standard(t) => Self::node_base_type_to_datatype(t),
-            NodeType::Custom(n) => DataType::Custom(n.clone()),
+            NodeType::Custom(n) => {
+                let name = n.split('/').last().unwrap_or(n.as_str());
+
+                DataType::Custom(name.to_owned())
+            }
         };
 
         TypeAlias {
             name: st.name.clone(),
+            qualified_name: st.qualified_name.clone().unwrap_or_default(),
             pattern: st.pattern.clone(),
             for_type,
         }
     }
 
-    fn build_union_type(st: &SimpleType, registry: &TypeRegistry) -> UnionType {
+    fn build_union_type_ir(st: &SimpleType, registry: &TypeRegistry) -> UnionType {
         UnionType {
             name: st.name.clone(),
+            qualified_name: st.qualified_name.clone().unwrap_or_default(),
             variants: st.variants.as_ref().unwrap()
                 .iter()
                 .enumerate()

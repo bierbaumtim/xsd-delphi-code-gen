@@ -70,6 +70,10 @@ impl EnumCodeGenerator {
     ) -> Result<(), CodeGenError> {
         let prefix = Helper::get_enum_variant_prefix(&enumeration.name);
 
+        writer.writeln_fmt(
+            format_args!("// XML Qualified Name: {}", enumeration.qualified_name),
+            Some(indentation),
+        )?;
         writer.writeln(
             format!(
                 "{} = ({});",

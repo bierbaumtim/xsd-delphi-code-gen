@@ -39,6 +39,7 @@ pub(crate) enum BinaryEncoding {
 
 pub(crate) struct Enumeration {
     pub(crate) name: String,
+    pub(crate) qualified_name: String,
     pub(crate) values: Vec<EnumerationValue>,
 }
 
@@ -50,6 +51,7 @@ pub(crate) struct EnumerationValue {
 #[derive(Clone, Debug)]
 pub(crate) struct TypeAlias {
     pub(crate) name: String,
+    pub(crate) qualified_name: String,
     pub(crate) for_type: DataType,
     pub(crate) pattern: Option<String>,
 }
@@ -57,6 +59,7 @@ pub(crate) struct TypeAlias {
 #[derive(Clone, Debug)]
 pub(crate) struct ClassType {
     pub(crate) name: String,
+    pub(crate) qualified_name: String,
     pub(crate) super_type: Option<String>,
     pub(crate) variables: Vec<Variable>,
     // local_types: Vec<ClassType>,
@@ -73,13 +76,14 @@ pub(crate) struct Variable {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct UnionVariant {
+pub(crate) struct UnionType {
     pub(crate) name: String,
-    pub(crate) data_type: DataType,
+    pub(crate) qualified_name: String,
+    pub(crate) variants: Vec<UnionVariant>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct UnionType {
+pub(crate) struct UnionVariant {
     pub(crate) name: String,
-    pub(crate) variants: Vec<UnionVariant>,
+    pub(crate) data_type: DataType,
 }

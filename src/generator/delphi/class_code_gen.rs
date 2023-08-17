@@ -28,7 +28,7 @@ impl ClassCodeGenerator {
                     "{} = class;",
                     Helper::as_type_name(&class_type.name, &options.type_prefix),
                 ),
-                Some(indentation + 2),
+                Some(indentation),
             )?;
         }
         writer.writeln("{$ENDREGION}", Some(indentation))?;
@@ -94,6 +94,10 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
+        writer.writeln_fmt(
+            format_args!("// XML Qualified Name: {}", class_type.qualified_name),
+            Some(indentation),
+        )?;
         writer.writeln_fmt(
             format_args!(
                 "{} = class{}",
