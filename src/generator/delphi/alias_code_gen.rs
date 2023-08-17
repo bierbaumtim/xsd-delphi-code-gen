@@ -1,17 +1,17 @@
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use crate::generator::{
     code_generator_trait::CodeGenOptions,
     types::{DataType, TypeAlias},
 };
 
-use super::helper::Helper;
+use super::{code_writer::CodeWriter, helper::Helper};
 
 pub(crate) struct TypeAliasCodeGenerator;
 
 impl TypeAliasCodeGenerator {
     pub(crate) fn write_declarations<T: Write>(
-        buffer: &mut BufWriter<T>,
+        writer: &mut CodeWriter<T>,
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
         indentation: usize,
@@ -20,26 +20,25 @@ impl TypeAliasCodeGenerator {
             return Ok(());
         }
 
-        buffer.write_fmt(format_args!(
-            "{}{{$REGION 'Aliases'}}\n",
-            " ".repeat(indentation),
-        ))?;
+        writer.writeln("{$REGION 'Aliases'}", Some(indentation))?;
         for type_alias in type_aliases {
             if matches!(&type_alias.for_type, DataType::FixedSizeList(_, _)) {
                 continue;
             }
 
-            buffer.write_fmt(format_args!(
-                "{}{} = {};\n",
-                " ".repeat(indentation),
-                Helper::as_type_name(&type_alias.name, &options.type_prefix),
-                Helper::get_datatype_language_representation(
-                    &type_alias.for_type,
-                    &options.type_prefix
+            writer.writeln_fmt(
+                format_args!(
+                    "{} = {};",
+                    Helper::as_type_name(&type_alias.name, &options.type_prefix),
+                    Helper::get_datatype_language_representation(
+                        &type_alias.for_type,
+                        &options.type_prefix
+                    ),
                 ),
-            ))?;
+                Some(indentation),
+            )?;
         }
-        buffer.write_fmt(format_args!("{}{{$ENDREGION}}\n", " ".repeat(indentation)))?;
+        writer.writeln("{$ENDREGION}", Some(indentation))?;
 
         Ok(())
     }
@@ -58,11 +57,12 @@ mod tests {
     fn write_nothing_when_no_alias_available() {
         let type_aliases = vec![];
         let options = CodeGenOptions::default();
-        let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        TypeAliasCodeGenerator::write_declarations(&mut writer, &type_aliases, &options, 0)
             .unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         assert_eq!(content, "");
@@ -76,11 +76,12 @@ mod tests {
             for_type: DataType::String,
         }];
         let options = CodeGenOptions::default();
-        let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        TypeAliasCodeGenerator::write_declarations(&mut writer, &type_aliases, &options, 0)
             .unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"
@@ -101,11 +102,12 @@ mod tests {
             for_type: DataType::String,
         }];
         let options = CodeGenOptions::default();
-        let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        TypeAliasCodeGenerator::write_declarations(&mut writer, &type_aliases, &options, 0)
             .unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"
@@ -218,11 +220,12 @@ mod tests {
             },
         ];
         let options = CodeGenOptions::default();
-        let mut buffer = BufWriter::new(Vec::new());
-        TypeAliasCodeGenerator::write_declarations(&mut buffer, &type_aliases, &options, 0)
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        TypeAliasCodeGenerator::write_declarations(&mut writer, &type_aliases, &options, 0)
             .unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"

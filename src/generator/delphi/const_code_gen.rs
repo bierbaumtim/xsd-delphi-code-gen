@@ -1,15 +1,17 @@
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use crate::generator::{
     code_generator_trait::CodeGenError,
     types::{ClassType, DataType},
 };
 
+use super::code_writer::CodeWriter;
+
 pub(crate) struct ConstCodeGenerator;
 
 impl ConstCodeGenerator {
     pub(crate) fn generate<T: Write>(
-        buffer: &mut BufWriter<T>,
+        writer: &mut CodeWriter<T>,
         classes: &[ClassType],
     ) -> Result<(), CodeGenError> {
         let gen_bool_consts = classes.iter().any(|c| {
@@ -19,12 +21,12 @@ impl ConstCodeGenerator {
         });
 
         if gen_bool_consts {
-            buffer.write_all(b"const\n")?;
+            writer.writeln("const", None)?;
         }
 
         if gen_bool_consts {
-            buffer.write_all(b"  cnXmlTrueValue: string = 'true';\n")?;
-            buffer.write_all(b"  cnXmlFalseValue: string = 'false';\n")?;
+            writer.writeln("cnXmlTrueValue: string = 'true';", Some(2))?;
+            writer.writeln("cnXmlFalseValue: string = 'false';", Some(2))?;
         }
 
         Ok(())

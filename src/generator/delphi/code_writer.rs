@@ -1,10 +1,10 @@
 use std::io::{BufWriter, Write};
 
-pub(crate) struct CodeWriter<'a, T: Write> {
-    buffer: &'a mut BufWriter<T>,
+pub(crate) struct CodeWriter<T: Write> {
+    pub(crate) buffer: BufWriter<T>,
 }
 
-impl<'a, T: Write> CodeWriter<'a, T> {
+impl<T: Write> CodeWriter<T> {
     #[inline]
     pub(crate) fn newline(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"\n")
@@ -17,7 +17,7 @@ impl<'a, T: Write> CodeWriter<'a, T> {
         indentation: Option<usize>,
     ) -> Result<(), std::io::Error> {
         self.buffer.write_fmt(format_args!(
-            "{}{}\n",
+            "{}{}",
             " ".repeat(indentation.unwrap_or(0)),
             content
         ))
@@ -30,5 +30,26 @@ impl<'a, T: Write> CodeWriter<'a, T> {
     ) -> Result<(), std::io::Error> {
         self.write(content, indentation)?;
         self.newline()
+    }
+
+    pub(crate) fn writeln_fmt(
+        &mut self,
+        content: std::fmt::Arguments<'_>,
+        indentation: Option<usize>,
+    ) -> Result<(), std::io::Error> {
+        if let Some(indentation) = indentation {
+            self.buffer.write_all(" ".repeat(indentation).as_bytes())?;
+        }
+        self.buffer.write_fmt(content)?;
+        self.newline()
+    }
+}
+
+#[cfg(test)]
+impl<T: Write> CodeWriter<T> {
+    pub(crate) fn get_writer(&mut self) -> Result<&T, std::io::Error> {
+        self.buffer.flush()?;
+
+        Ok(self.buffer.get_ref())
     }
 }

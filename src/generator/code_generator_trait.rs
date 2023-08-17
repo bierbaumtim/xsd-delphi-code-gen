@@ -5,9 +5,9 @@ use std::{
 
 use super::internal_representation::InternalRepresentation;
 
-pub(crate) trait CodeGenerator<'a, T: Write> {
+pub(crate) trait CodeGenerator<T: Write> {
     fn new(
-        buffer: &'a mut BufWriter<T>,
+        buffer: BufWriter<T>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self;

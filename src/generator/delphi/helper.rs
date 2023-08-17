@@ -160,7 +160,7 @@ impl Helper {
             | DataType::UnsignedShortInteger
             | DataType::UnsignedInteger
             | DataType::UnsignedLongInteger => format!("IntToStr({})", variable_name),
-            _ => "\"\"".to_owned(),
+            _ => "''".to_owned(),
         }
     }
 

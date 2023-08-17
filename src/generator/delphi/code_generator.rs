@@ -13,18 +13,15 @@ use super::{
     helper_code_gen::HelperCodeGenerator, union_type_code_gen::UnionTypeCodeGenerator,
 };
 
-pub(crate) struct DelphiCodeGenerator<'a, T: Write> {
-    writer: CodeWriter<'a, T>,
+pub(crate) struct DelphiCodeGenerator<T: Write> {
+    writer: CodeWriter<T>,
     options: CodeGenOptions,
     internal_representation: InternalRepresentation,
     generate_date_time_helper: bool,
     generate_hex_binary_helper: bool,
 }
 
-impl<'a, T> DelphiCodeGenerator<'a, T>
-where
-    T: Write,
-{
+impl<T: Write> DelphiCodeGenerator<T> {
     #[inline]
     fn write_header_comment(&mut self) -> Result<(), std::io::Error> {
         const MAX_LENGTH: usize = 80;
@@ -38,26 +35,36 @@ where
         );
         let timestamp = format!("Timestamp: {}", Local::now().format("%d.%m.%Y %H:%M:%S"));
 
-        self.buffer
-            .write_fmt(format_args!("// {} //\n", "=".repeat(BORDER_LENGTH)))?;
-        self.buffer.write_fmt(format_args!(
-            "// {}{} //\n",
-            GENERATED_CONTENT,
-            " ".repeat(BORDER_LENGTH - GENERATED_CONTENT.len())
-        ))?;
-        self.buffer.write_fmt(format_args!(
-            "// {}{} //\n",
-            version_content,
-            " ".repeat(BORDER_LENGTH - version_content.len())
-        ))?;
-        self.buffer.write_fmt(format_args!(
-            "// {}{} //\n",
-            timestamp,
-            " ".repeat(BORDER_LENGTH - timestamp.len())
-        ))?;
-        self.buffer
-            .write_fmt(format_args!("// {} //\n", "=".repeat(BORDER_LENGTH)))?;
-        self.newline()?;
+        // TODO: GenerateCommentBlock(line_length: usize, lines: Vec<String>)
+        self.writer
+            .writeln_fmt(format_args!("// {} //", "=".repeat(BORDER_LENGTH)), None)?;
+        self.writer.writeln_fmt(
+            format_args!(
+                "// {}{} //",
+                GENERATED_CONTENT,
+                " ".repeat(BORDER_LENGTH - GENERATED_CONTENT.len())
+            ),
+            None,
+        )?;
+        self.writer.writeln_fmt(
+            format_args!(
+                "// {}{} //",
+                version_content,
+                " ".repeat(BORDER_LENGTH - version_content.len())
+            ),
+            None,
+        )?;
+        self.writer.writeln_fmt(
+            format_args!(
+                "// {}{} //",
+                timestamp,
+                " ".repeat(BORDER_LENGTH - timestamp.len())
+            ),
+            None,
+        )?;
+        self.writer
+            .writeln_fmt(format_args!("// {} //", "=".repeat(BORDER_LENGTH)), None)?;
+        self.writer.newline()?;
 
         Ok(())
     }
@@ -73,12 +80,12 @@ where
     fn write_uses(&mut self) -> Result<(), std::io::Error> {
         self.writer.writeln("uses System.DateUtils,", None)?;
         self.writer
-            .writeln("System.Generics.Collections,\n", Some(5))?;
-        self.writer.writeln("     System.Types,\n", Some(5))?;
-        self.writer.writeln("     System.StrUtils,\n", Some(5))?;
-        self.writer.writeln("     System.SysUtils,\n", Some(5))?;
-        self.writer.writeln("     Xml.XMLDoc,\n", Some(5))?;
-        self.writer.writeln("     Xml.XMLIntf;", Some(5))?;
+            .writeln("System.Generics.Collections,", Some(5))?;
+        self.writer.writeln("System.Types,", Some(5))?;
+        self.writer.writeln("System.StrUtils,", Some(5))?;
+        self.writer.writeln("System.SysUtils,", Some(5))?;
+        self.writer.writeln("Xml.XMLDoc,", Some(5))?;
+        self.writer.writeln("Xml.XMLIntf;", Some(5))?;
         self.writer.newline()
     }
 
@@ -177,6 +184,7 @@ where
         UnionTypeCodeGenerator::write_implementations(
             &mut self.writer,
             &self.internal_representation.union_types,
+            &self.internal_representation.enumerations,
             &self.internal_representation.types_aliases,
             &self.options,
         )?;
@@ -200,12 +208,12 @@ where
     }
 }
 
-impl<'a, T> CodeGenerator<'a, T> for DelphiCodeGenerator<'a, T>
+impl<T> CodeGenerator<T> for DelphiCodeGenerator<T>
 where
     T: Write,
 {
     fn new(
-        buffer: &'a mut BufWriter<T>,
+        buffer: BufWriter<T>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
     ) -> Self {

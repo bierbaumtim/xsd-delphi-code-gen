@@ -10,8 +10,8 @@ use super::{code_writer::CodeWriter, helper::Helper};
 pub(crate) struct EnumCodeGenerator;
 
 impl EnumCodeGenerator {
-    pub(crate) fn write_declarations<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    pub(crate) fn write_declarations<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
         indentation: usize,
@@ -40,8 +40,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_implementation<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    pub(crate) fn write_implementation<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
@@ -62,8 +62,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_declaration<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    fn generate_declaration<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumeration: &Enumeration,
         options: &CodeGenOptions,
         indentation: usize,
@@ -88,8 +88,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_declaration<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    fn generate_helper_declaration<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumeration: &Enumeration,
         options: &CodeGenOptions,
         indentation: usize,
@@ -125,8 +125,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_implementation<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    fn generate_helper_implementation<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumeration: &Enumeration,
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
@@ -147,35 +147,33 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_from_xml<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    fn generate_helper_from_xml<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumeration: &Enumeration,
         formatted_enum_name: &String,
     ) -> Result<(), CodeGenError> {
-        writer.writeln(
-            format!(
+        writer.writeln_fmt(
+            format_args!(
                 "class function {}Helper.FromXmlValue(const pXmlValue: String): {};",
                 formatted_enum_name, formatted_enum_name,
-            )
-            .as_str(),
+            ),
             None,
         )?;
         writer.writeln("begin", None)?;
         let prefix = Helper::get_enum_variant_prefix(&enumeration.name);
 
         for (i, value) in enumeration.values.iter().enumerate() {
-            writer.writeln(
-                format!("if pXmlValue = '{}' then begin\n", value.xml_value,).as_str(),
+            writer.writeln_fmt(
+                format_args!("if pXmlValue = '{}' then begin\n", value.xml_value,),
                 if i == 0 { Some(2) } else { None },
             )?;
-            writer.writeln(
-                format!(
+            writer.writeln_fmt(
+                format_args!(
                     "Result := {}.{}{};\n",
                     formatted_enum_name,
                     prefix,
                     value.variant_name.to_ascii_uppercase(),
-                )
-                .as_str(),
+                ),
                 Some(4),
             )?;
             writer.write("end", Some(2))?;
@@ -186,12 +184,11 @@ impl EnumCodeGenerator {
         }
 
         writer.writeln(" else begin", None)?;
-        writer.writeln(
-            format!(
+        writer.writeln_fmt(
+            format_args!(
                 "raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {}');\n",
                 formatted_enum_name,
-            )
-            .as_str(),
+            ),
             Some(4),
         )?;
         writer.writeln("end;", Some(2))?;
@@ -199,8 +196,8 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    fn generate_helper_to_xml<'a, T: Write>(
-        writer: &mut CodeWriter<'a, T>,
+    fn generate_helper_to_xml<T: Write>(
+        writer: &mut CodeWriter<T>,
         enumeration: &Enumeration,
         formatted_enum_name: String,
     ) -> Result<(), CodeGenError> {
@@ -211,23 +208,22 @@ impl EnumCodeGenerator {
             .max()
             .unwrap_or(1);
 
-        writer.writeln(
-            format!("function {}Helper.ToXmlValue: String;", formatted_enum_name,).as_str(),
+        writer.writeln_fmt(
+            format_args!("function {}Helper.ToXmlValue: String;", formatted_enum_name,),
             None,
         )?;
         writer.writeln("begin", None)?;
         writer.writeln("case Self of", Some(2))?;
         for value in &enumeration.values {
-            writer.writeln(
-                format!(
+            writer.writeln_fmt(
+                format_args!(
                     "{}.{}{}{}: Result := '{}';",
                     formatted_enum_name,
                     Helper::get_enum_variant_prefix(&enumeration.name),
                     value.variant_name.to_ascii_uppercase(),
                     " ".repeat(max_variant_len - value.variant_name.len() + 1),
                     value.xml_value,
-                )
-                .as_str(),
+                ),
                 Some(4),
             )?;
         }

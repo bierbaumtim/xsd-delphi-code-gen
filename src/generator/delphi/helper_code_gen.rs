@@ -1,82 +1,88 @@
-use std::io::{BufWriter, Write};
+use std::io::Write;
 
 use crate::generator::code_generator_trait::CodeGenOptions;
+
+use super::code_writer::CodeWriter;
 
 pub(crate) struct HelperCodeGenerator;
 
 impl HelperCodeGenerator {
     pub(crate) fn write<T: Write>(
-        buffer: &mut BufWriter<T>,
+        writer: &mut CodeWriter<T>,
         options: &CodeGenOptions,
         generate_date_time_helper: bool,
         generate_hex_binary_helper: bool,
     ) -> Result<(), std::io::Error> {
         if generate_date_time_helper || generate_hex_binary_helper {
-            buffer.write_all(b"{$REGION 'Helper'}\n")?;
+            writer.writeln("{$REGION 'Helper'}", None)?;
 
             if generate_date_time_helper {
-                Self::write_date_time_helper(buffer, options)?;
+                Self::write_date_time_helper(writer, options)?;
             }
 
             if generate_date_time_helper && generate_hex_binary_helper {
-                buffer.write_all(b"\n")?;
+                writer.newline()?;
             }
 
             if generate_hex_binary_helper {
-                Self::write_hex_binary_helper(buffer, options)?;
+                Self::write_hex_binary_helper(writer, options)?;
             }
 
-            buffer.write_all(b"{$ENDREGION}\n")?;
-            buffer.write_all(b"\n")?;
+            writer.writeln("{$ENDREGION}", None)?;
+            writer.newline()?;
         }
 
         Ok(())
     }
 
     fn write_date_time_helper<T: Write>(
-        buffer: &mut BufWriter<T>,
+        writer: &mut CodeWriter<T>,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         if options.generate_from_xml {
-            buffer
-            .write_all(b"function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;\n")?;
-            buffer.write_all(b"begin\n")?;
-            buffer.write_all(b"  if pFormat = '' then Exit(ISO8601ToDate(pDateStr));\n")?;
-            buffer.write_all(b"\n")?;
-            buffer.write_all(b"  Result := ISO8601ToDate(pDateStr);\n")?;
-            buffer.write_all(b"end;\n")?;
+            writer
+            .writeln("function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;", None)?;
+            writer.writeln("begin", None)?;
+            writer.writeln(
+                "if pFormat = '' then Exit(ISO8601ToDate(pDateStr));",
+                Some(2),
+            )?;
+            writer.newline()?;
+            writer.writeln("Result := ISO8601ToDate(pDateStr);", Some(2))?;
+            writer.writeln("end;", None)?;
         }
 
         if options.generate_from_xml && options.generate_to_xml {
-            buffer.write_all(b"\n")?;
+            writer.newline()?;
         }
 
         if options.generate_to_xml {
-            buffer.write_all(
-                b"function EncodeTime(const pTime: TTime; const pFormat: String): String;\n",
+            writer.writeln(
+                "function EncodeTime(const pTime: TTime; const pFormat: String): String;",
+                None,
             )?;
-            buffer.write_all(b"begin\n")?;
-            buffer.write_all(b"  var vFormatSettings := TFormatSettings.Create;\n")?;
-            buffer.write_all(b"  vFormatSettings.LongTimeFormat := pFormat;\n")?;
-            buffer.write_all(b"\n")?;
-            buffer.write_all(b"  Result := TimeToStr(pTime, vFormatSettings);\n")?;
-            buffer.write_all(b"end;\n")?;
+            writer.writeln("begin", None)?;
+            writer.writeln("var vFormatSettings := TFormatSettings.Create;", Some(2))?;
+            writer.writeln("vFormatSettings.LongTimeFormat := pFormat;", Some(2))?;
+            writer.newline()?;
+            writer.writeln("Result := TimeToStr(pTime, vFormatSettings);", Some(2))?;
+            writer.writeln("end;", None)?;
         }
 
         Ok(())
     }
 
     fn write_hex_binary_helper<T: Write>(
-        buffer: &mut BufWriter<T>,
+        writer: &mut CodeWriter<T>,
         options: &CodeGenOptions,
     ) -> Result<(), std::io::Error> {
         if options.generate_to_xml {
-            buffer.write_all(b"function BinToHexStr(const pBin: TBytes): String;\n")?;
-            buffer.write_all(b"begin\n")?;
-            buffer.write_all(b"  var vTemp: TBytes;\n")?;
-            buffer.write_all(b"  BinToHex(pBin, 0, vTemp, Length(pBin));\n")?;
-            buffer.write_all(b"  Result := TEncoding.GetString(vTemp);\n")?;
-            buffer.write_all(b"end;\n")?;
+            writer.writeln("function BinToHexStr(const pBin: TBytes): String;", None)?;
+            writer.writeln("begin", None)?;
+            writer.writeln("var vTemp: TBytes;", Some(2))?;
+            writer.writeln("BinToHex(pBin, 0, vTemp, Length(pBin));", Some(2))?;
+            writer.writeln("Result := TEncoding.GetString(vTemp);", Some(2))?;
+            writer.writeln("end;", None)?;
         }
 
         Ok(())
@@ -95,10 +101,11 @@ mod tests {
     #[test]
     fn write_nothing_when_all_flags_false() {
         let options = CodeGenOptions::default();
-        let mut buffer = BufWriter::new(Vec::new());
-        HelperCodeGenerator::write(&mut buffer, &options, false, false).unwrap();
+        let writer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer: writer };
+        HelperCodeGenerator::write(&mut writer, &options, false, false).unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         assert_eq!(content, "", "Content should be empty");
@@ -112,10 +119,11 @@ mod tests {
             unit_name: String::new(),
             type_prefix: None,
         };
-        let mut buffer = BufWriter::new(Vec::new());
-        HelperCodeGenerator::write(&mut buffer, &options, false, true).unwrap();
+        let writer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer: writer };
+        HelperCodeGenerator::write(&mut writer, &options, false, true).unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"
@@ -141,10 +149,11 @@ mod tests {
             unit_name: String::new(),
             type_prefix: None,
         };
-        let mut buffer = BufWriter::new(Vec::new());
-        HelperCodeGenerator::write(&mut buffer, &options, false, true).unwrap();
+        let writer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer: writer };
+        HelperCodeGenerator::write(&mut writer, &options, false, true).unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"
@@ -164,10 +173,11 @@ mod tests {
             unit_name: String::new(),
             type_prefix: None,
         };
-        let mut buffer = BufWriter::new(Vec::new());
-        HelperCodeGenerator::write(&mut buffer, &options, true, false).unwrap();
+        let writer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer: writer };
+        HelperCodeGenerator::write(&mut writer, &options, true, false).unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"
@@ -194,17 +204,18 @@ mod tests {
     }
 
     #[test]
-    fn write_all_helpers() {
+    fn writeln_helpers() {
         let options = CodeGenOptions {
             generate_from_xml: true,
             generate_to_xml: true,
             unit_name: String::new(),
             type_prefix: None,
         };
-        let mut buffer = BufWriter::new(Vec::new());
-        HelperCodeGenerator::write(&mut buffer, &options, true, true).unwrap();
+        let writer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer: writer };
+        HelperCodeGenerator::write(&mut writer, &options, true, true).unwrap();
 
-        let bytes = buffer.into_inner().unwrap();
+        let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
         let expected = indoc! {"
