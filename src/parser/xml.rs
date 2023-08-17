@@ -351,6 +351,10 @@ impl XmlParser {
                     _ => (),
                 },
                 Ok(Event::Empty(e)) => match e.name().as_ref() {
+                    b"xs:restriction" => {
+                        base_type = Self::get_attribute_value(&e, "base")?;
+                        break;
+                    }
                     b"xs:enumeration" => {
                         let value = Self::get_attribute_value(&e, "value")?;
                         enumerations.push(value);
@@ -389,6 +393,8 @@ impl XmlParser {
             Some(self.as_qualified_name(name.as_str()))
         };
 
+        let base_type = self.resolve_namespace(base_type)?;
+
         let s_type = SimpleType {
             name: name.clone(),
             qualified_name,
@@ -415,7 +421,11 @@ impl XmlParser {
         registry: &mut TypeRegistry,
         name: &String,
     ) -> Result<Vec<UnionVariant>, ParserError> {
-        let mut types = self.get_union_member_types(node)?;
+        let mut types = match self.get_union_member_types(node) {
+            Ok(v) => v,
+            Err(ParserError::MissingAttribute(_)) => Vec::new(),
+            Err(e) => return Err(e),
+        };
         let mut variant_count: usize = types.len() + 1;
         let mut buf = Vec::new();
 
@@ -560,7 +570,7 @@ impl XmlParser {
     }
 
     fn resolve_namespace(&self, b_type: String) -> Result<String, ParserError> {
-        if b_type.starts_with("xs:") {
+        if b_type.is_empty() || b_type.starts_with("xs:") {
             return Ok(b_type);
         }
 
