@@ -81,14 +81,8 @@ impl CustomTypeDefinition {
 
     pub(crate) fn get_qualified_name(&self) -> String {
         match self {
-            CustomTypeDefinition::Simple(t) => match &t.qualified_name {
-                Some(v) => v.clone(),
-                None => t.name.clone(),
-            },
-            CustomTypeDefinition::Complex(t) => match &t.qualified_name {
-                Some(v) => v.clone(),
-                None => t.name.clone(),
-            },
+            CustomTypeDefinition::Simple(t) => t.qualified_name.clone(),
+            CustomTypeDefinition::Complex(t) => t.qualified_name.clone(),
         }
     }
 }
@@ -108,9 +102,9 @@ impl From<ComplexType> for CustomTypeDefinition {
 /// types in xs:union
 #[derive(Debug, Clone)]
 pub(crate) enum UnionVariant {
-  Standard(NodeBaseType),
-  Named(String),
-  Simple(SimpleType),
+    Standard(NodeBaseType),
+    Named(String),
+    Simple(SimpleType),
 }
 
 /// xs:simpleType
@@ -119,7 +113,7 @@ pub(crate) struct SimpleType {
     /// name-attribute
     pub(crate) name: String,
     /// namespace + name
-    pub(crate) qualified_name: Option<String>,
+    pub(crate) qualified_name: String,
 
     pub(crate) base_type: Option<NodeType>,
     /// possible values for an enumeration
@@ -138,7 +132,7 @@ pub(crate) struct ComplexType {
     /// name-attribute
     pub(crate) name: String,
     /// namespace + name
-    pub(crate) qualified_name: Option<String>,
+    pub(crate) qualified_name: String,
     /// qualified name of another complex type
     pub(crate) base_type: Option<String>,
     /// elements of the complex type

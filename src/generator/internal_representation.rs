@@ -60,7 +60,7 @@ impl InternalRepresentation {
                         if let Some(d_type) = Self::list_type_to_data_type(lt, registry) {
                             let type_alias = TypeAlias {
                                 name: st.name.clone(),
-                                qualified_name: st.qualified_name.clone().unwrap_or_default(),
+                                qualified_name: st.qualified_name.clone(),
                                 for_type: DataType::List(Box::new(d_type)),
                                 pattern: None,
                             };
@@ -196,7 +196,7 @@ impl InternalRepresentation {
 
                     let class_type = ClassType {
                         name: ct.name.clone(),
-                        qualified_name: ct.qualified_name.clone().unwrap_or_default(),
+                        qualified_name: ct.qualified_name.clone(),
                         super_type,
                         variables,
                     };
@@ -274,7 +274,7 @@ impl InternalRepresentation {
 
         Enumeration {
             name: st.name.clone(),
-            qualified_name: st.qualified_name.clone().unwrap_or_default(),
+            qualified_name: st.qualified_name.clone(),
             values,
         }
     }
@@ -291,7 +291,7 @@ impl InternalRepresentation {
 
         TypeAlias {
             name: st.name.clone(),
-            qualified_name: st.qualified_name.clone().unwrap_or_default(),
+            qualified_name: st.qualified_name.clone(),
             pattern: st.pattern.clone(),
             for_type,
         }
@@ -300,7 +300,7 @@ impl InternalRepresentation {
     fn build_union_type_ir(st: &SimpleType, registry: &TypeRegistry) -> UnionType {
         UnionType {
             name: st.name.clone(),
-            qualified_name: st.qualified_name.clone().unwrap_or_default(),
+            qualified_name: st.qualified_name.clone(),
             variants: st.variants.as_ref().unwrap()
                 .iter()
                 .enumerate()

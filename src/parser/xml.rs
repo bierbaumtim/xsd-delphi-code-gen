@@ -76,7 +76,7 @@ impl XmlParser {
                         b"xs:complexType" => {
                             if let Some(name) = &current_element_name {
                                 let c_type =
-                                    self.parse_complex_type(reader, registry, name.clone(), true)?;
+                                    self.parse_complex_type(reader, registry, name.clone(), None)?;
 
                                 let c_type = CustomTypeDefinition::Complex(c_type);
                                 registry.register_type(c_type);
@@ -95,7 +95,7 @@ impl XmlParser {
                                     .unwrap_or_else(|| registry.generate_type_name());
 
                                 let c_type =
-                                    self.parse_complex_type(reader, registry, name, false)?;
+                                    self.parse_complex_type(reader, registry, name, None)?;
 
                                 let c_type = CustomTypeDefinition::Complex(c_type);
 
@@ -105,7 +105,7 @@ impl XmlParser {
                         b"xs:simpleType" => {
                             if let Some(name) = &current_element_name {
                                 let (s_type, type_name) =
-                                    self.parse_simple_type(reader, registry, name.clone(), true)?;
+                                    self.parse_simple_type(reader, registry, name.clone(), None)?;
 
                                 registry.register_type(s_type.into());
 
@@ -123,7 +123,7 @@ impl XmlParser {
                                     .unwrap_or_else(|| registry.generate_type_name());
 
                                 let (s_type, _) =
-                                    self.parse_simple_type(reader, registry, name, false)?;
+                                    self.parse_simple_type(reader, registry, name, None)?;
 
                                 registry.register_type(s_type.into());
                             }
@@ -167,7 +167,7 @@ impl XmlParser {
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,
         name: String,
-        is_local: bool,
+        qualified_parent: Option<String>,
     ) -> Result<ComplexType, ParserError> {
         let mut children = Vec::new();
         let mut buf = Vec::new();
@@ -176,6 +176,10 @@ impl XmlParser {
         let mut base_type = None::<String>;
         let mut current_element_name = None::<String>;
         let mut order = OrderIndicator::Sequence;
+        let qualified_name = qualified_parent.map_or_else(
+            || self.as_qualified_name(name.as_str()),
+            |v| format!("{}.{}", v, name),
+        );
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -226,8 +230,12 @@ impl XmlParser {
                     }
                     b"xs:simpleType" => {
                         if let Some(name) = &current_element_name {
-                            let (s_type, type_name) =
-                                self.parse_simple_type(reader, registry, name.clone(), true)?;
+                            let (s_type, type_name) = self.parse_simple_type(
+                                reader,
+                                registry,
+                                name.clone(),
+                                Some(qualified_name.clone()),
+                            )?;
 
                             registry.register_type(s_type.into());
 
@@ -244,16 +252,24 @@ impl XmlParser {
                                 .ok()
                                 .unwrap_or_else(|| registry.generate_type_name());
 
-                            let (s_type, _) =
-                                self.parse_simple_type(reader, registry, name, true)?;
+                            let (s_type, _) = self.parse_simple_type(
+                                reader,
+                                registry,
+                                name,
+                                Some(qualified_name.clone()),
+                            )?;
 
                             registry.register_type(s_type.into());
                         }
                     }
                     b"xs:complexType" => {
                         if let Some(name) = &current_element_name {
-                            let c_type =
-                                self.parse_complex_type(reader, registry, name.clone(), true)?;
+                            let c_type = self.parse_complex_type(
+                                reader,
+                                registry,
+                                name.clone(),
+                                Some(qualified_name.clone()),
+                            )?;
 
                             let c_type = CustomTypeDefinition::Complex(c_type);
                             registry.register_type(c_type);
@@ -271,7 +287,12 @@ impl XmlParser {
                                 .ok()
                                 .unwrap_or_else(|| registry.generate_type_name());
 
-                            let c_type = self.parse_complex_type(reader, registry, name, true)?;
+                            let c_type = self.parse_complex_type(
+                                reader,
+                                registry,
+                                name,
+                                Some(qualified_name.clone()),
+                            )?;
                             let c_type = CustomTypeDefinition::Complex(c_type);
 
                             registry.register_type(c_type);
@@ -311,11 +332,7 @@ impl XmlParser {
 
         Ok(ComplexType {
             name: name.clone(),
-            qualified_name: if is_local {
-                None
-            } else {
-                Some(self.as_qualified_name(name.as_str()))
-            },
+            qualified_name: qualified_name,
             base_type,
             children,
             order,
@@ -327,7 +344,7 @@ impl XmlParser {
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,
         name: String,
-        is_local: bool,
+        qualified_parent: Option<String>,
     ) -> Result<(SimpleType, String), ParserError> {
         let mut base_type = String::new();
         let mut list_type = String::new();
@@ -335,6 +352,10 @@ impl XmlParser {
         let mut pattern = None::<String>;
         let mut variants = None::<Vec<UnionVariant>>;
         let mut buf = Vec::new();
+        let qualified_name = qualified_parent.map_or_else(
+            || self.as_qualified_name(name.as_str()),
+            |v| format!("{}.{}", v, name),
+        );
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -345,7 +366,13 @@ impl XmlParser {
                             return Err(ParserError::UnexpectedStartOfNode("xs:union".to_owned()));
                         }
 
-                        let types = self.parse_union_local_variants(&s, reader, registry, &name)?;
+                        let types = self.parse_union_local_variants(
+                            &s,
+                            reader,
+                            registry,
+                            &name,
+                            &qualified_name,
+                        )?;
                         variants = Some(types);
                     }
                     _ => (),
@@ -387,12 +414,6 @@ impl XmlParser {
             }
         }
 
-        let qualified_name = if is_local {
-            None
-        } else {
-            Some(self.as_qualified_name(name.as_str()))
-        };
-
         let base_type = self.resolve_namespace(base_type)?;
 
         let s_type = SimpleType {
@@ -420,6 +441,7 @@ impl XmlParser {
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,
         name: &String,
+        qualified_parent: &String,
     ) -> Result<Vec<UnionVariant>, ParserError> {
         let mut types = match self.get_union_member_types(node) {
             Ok(v) => v,
@@ -435,8 +457,13 @@ impl XmlParser {
                     if s.name().as_ref() == b"xs:simpleType" {
                         let variant_name = format!("{}Variant{}", name, variant_count);
 
-                        let (s_type, _) =
-                            Self::parse_simple_type(self, reader, registry, variant_name, true)?;
+                        let (s_type, _) = Self::parse_simple_type(
+                            self,
+                            reader,
+                            registry,
+                            variant_name,
+                            Some(qualified_parent.clone()),
+                        )?;
 
                         registry.register_type(s_type.clone().into());
 
