@@ -65,6 +65,7 @@ pub(crate) struct ClassType {
     pub(crate) qualified_name: String,
     pub(crate) super_type: Option<String>,
     pub(crate) variables: Vec<Variable>,
+    pub(crate) documentations: Vec<String>,
     // local_types: Vec<ClassType>,
     // type_aliases: Vec<TypeAlias>,
     // enumerations: Vec<Enumeration>,

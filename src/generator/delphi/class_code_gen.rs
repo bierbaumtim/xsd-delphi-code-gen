@@ -94,6 +94,7 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
+        writer.write_documentation(&class_type.documentations, Some(indentation))?;
         writer.writeln_fmt(
             format_args!("// XML Qualified Name: {}", class_type.qualified_name),
             Some(indentation),

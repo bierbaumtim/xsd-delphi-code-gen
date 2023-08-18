@@ -13,7 +13,7 @@ pub(crate) struct InternalRepresentation {
 }
 
 impl InternalRepresentation {
-    pub(crate) fn build(nodes: &Vec<Node>, registry: &TypeRegistry) -> InternalRepresentation {
+    pub(crate) fn build(data: &ParsedData, registry: &TypeRegistry) -> InternalRepresentation {
         let mut classes_dep_graph = DependencyGraph::<String, ClassType, _>::new(|c| {
             (
                 c.name.clone(),
@@ -200,6 +200,7 @@ impl InternalRepresentation {
                         qualified_name: ct.qualified_name.clone(),
                         super_type,
                         variables,
+                        documentations: ct.documentations.clone(),
                     };
 
                     classes_dep_graph.push(class_type);
@@ -209,7 +210,7 @@ impl InternalRepresentation {
 
         let mut document_variables = Vec::new();
 
-        for node in nodes {
+        for node in &data.nodes {
             let variable = Variable {
                 name: node.name.clone(),
                 xml_name: node.name.clone(),
@@ -248,6 +249,7 @@ impl InternalRepresentation {
             name: String::from(DOCUMENT_NAME),
             qualified_name: String::from(DOCUMENT_NAME),
             variables: document_variables,
+            documentations: vec![],
         };
 
         classes_dep_graph.push(document_type.clone());

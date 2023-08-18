@@ -3,6 +3,12 @@ use std::{error::Error, fmt::Display};
 pub(crate) const UNBOUNDED_OCCURANCE: i64 = -1;
 pub(crate) const DEFAULT_OCCURANCE: i64 = 1;
 
+#[derive(Debug)]
+pub(crate) struct ParsedData {
+    pub(crate) nodes: Vec<Node>,
+    pub(crate) documentations: Vec<String>,
+}
+
 // xs:element
 #[derive(Debug)]
 pub(crate) struct Node {
@@ -145,6 +151,10 @@ pub(crate) struct ComplexType {
     pub(crate) name: String,
     /// namespace + name
     pub(crate) qualified_name: String,
+
+    /// Documentation
+    pub(crate) documentations: Vec<String>,
+
     /// qualified name of another complex type
     pub(crate) base_type: Option<String>,
     /// elements of the complex type

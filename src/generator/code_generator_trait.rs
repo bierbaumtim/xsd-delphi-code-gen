@@ -10,6 +10,7 @@ pub(crate) trait CodeGenerator<T: Write> {
         buffer: BufWriter<T>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
+        documentations: Vec<String>,
     ) -> Self;
 
     fn generate(&mut self) -> Result<(), CodeGenError>;

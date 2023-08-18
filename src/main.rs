@@ -11,7 +11,7 @@ use generator::{
     delphi::code_generator::DelphiCodeGenerator,
     internal_representation::InternalRepresentation,
 };
-use parser::{types::Node, xml::XmlParser};
+use parser::{types::ParsedData, xml::XmlParser};
 use type_registry::TypeRegistry;
 
 fn main() {
@@ -41,7 +41,7 @@ fn main() {
     let mut parser = XmlParser::default();
     let mut type_registry = TypeRegistry::new();
 
-    let nodes: Vec<Node> = if args.input.len() == 1 {
+    let data: ParsedData = if args.input.len() == 1 {
         match parser.parse_file(args.input.first().unwrap(), &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
@@ -59,12 +59,13 @@ fn main() {
         }
     };
 
-    let internal_representation = InternalRepresentation::build(&nodes, &type_registry);
+    let internal_representation = InternalRepresentation::build(&data, &type_registry);
     let buffer = BufWriter::new(Box::new(output_file));
     let mut generator = DelphiCodeGenerator::new(
         buffer,
         build_code_gen_options(&args),
         internal_representation,
+        data.documentations,
     );
 
     match generator.generate() {

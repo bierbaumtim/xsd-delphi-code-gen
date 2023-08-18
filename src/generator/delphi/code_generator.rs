@@ -17,6 +17,7 @@ pub(crate) struct DelphiCodeGenerator<T: Write> {
     writer: CodeWriter<T>,
     options: CodeGenOptions,
     internal_representation: InternalRepresentation,
+    documentations: Vec<String>,
     generate_date_time_helper: bool,
     generate_hex_binary_helper: bool,
 }
@@ -65,6 +66,18 @@ impl<T: Write> DelphiCodeGenerator<T> {
         self.writer
             .writeln_fmt(format_args!("// {} //", "=".repeat(BORDER_LENGTH)), None)?;
         self.writer.newline()?;
+
+        Ok(())
+    }
+
+    #[inline]
+    fn write_documentations(&mut self) -> Result<(), std::io::Error> {
+        if !self.documentations.is_empty() {
+            self.writer.newline()?;
+            self.writer
+                .write_documentation(&self.documentations, None)?;
+            self.writer.newline()?;
+        }
 
         Ok(())
     }
@@ -216,10 +229,12 @@ where
         buffer: BufWriter<T>,
         options: CodeGenOptions,
         internal_representation: InternalRepresentation,
+        documentations: Vec<String>,
     ) -> Self {
         DelphiCodeGenerator {
             writer: CodeWriter { buffer },
             options,
+            documentations,
             generate_date_time_helper: internal_representation.classes.iter().any(|c| {
                 c.variables.iter().any(|v| {
                     matches!(
@@ -249,6 +264,7 @@ where
 
     fn generate(&mut self) -> Result<(), CodeGenError> {
         self.write_header_comment()?;
+        self.write_documentations()?;
         self.write_unit()?;
         self.write_interface_start()?;
         self.write_uses()?;
