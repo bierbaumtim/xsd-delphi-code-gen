@@ -93,6 +93,7 @@ mod tests {
 
         let expected = indoc! {"
             {$REGION 'Aliases'}
+            // XML Qualified Name: CustomString
             TCustomString = String;
             {$ENDREGION}
             "
@@ -121,6 +122,7 @@ mod tests {
 
         let expected = indoc! {"
               {$REGION 'Aliases'}
+              // XML Qualified Name: CustomString
               TCustomString = String;
               {$ENDREGION}
             "
@@ -277,23 +279,41 @@ mod tests {
 
         let expected = indoc! {"
             {$REGION 'Aliases'}
+            // XML Qualified Name: CustomBool
             TCustomBool = Boolean;
+            // XML Qualified Name: CustomDateTime
             TCustomDateTime = TDateTime;
+            // XML Qualified Name: CustomDate
             TCustomDate = TDate;
+            // XML Qualified Name: CustomDouble
             TCustomDouble = Double;
+            // XML Qualified Name: CustomBinary
             TCustomBinary = TBytes;
+            // XML Qualified Name: CustomShortInt
             TCustomShortInt = ShortInt;
+            // XML Qualified Name: CustomSmallInt
             TCustomSmallInt = SmallInt;
+            // XML Qualified Name: CustomInteger
             TCustomInteger = Integer;
+            // XML Qualified Name: CustomLongInt
             TCustomLongInt = LongInt;
+            // XML Qualified Name: CustomShortUInt
             TCustomShortUInt = Byte;
+            // XML Qualified Name: CustomSmallUInt
             TCustomSmallUInt = Word;
+            // XML Qualified Name: CustomUInt
             TCustomUInt = NativeUInt;
+            // XML Qualified Name: CustomLongUInt
             TCustomLongUInt = UInt64;
+            // XML Qualified Name: CustomString
             TCustomString = String;
+            // XML Qualified Name: CustomTime
             TCustomTime = TTime;
+            // XML Qualified Name: CustomAlias
             TCustomAlias = TNestedAlias;
+            // XML Qualified Name: CustomEnum
             TCustomEnum = TNestedEnum;
+            // XML Qualified Name: CustomIntList
             TCustomIntList = TList<Integer>;
             {$ENDREGION}
             "
