@@ -74,8 +74,8 @@ impl EnumCodeGenerator {
             format_args!("// XML Qualified Name: {}", enumeration.qualified_name),
             Some(indentation),
         )?;
-        writer.writeln(
-            format!(
+        writer.writeln_fmt(
+            format_args!(
                 "{} = ({});",
                 Helper::as_type_name(&enumeration.name, &options.type_prefix),
                 enumeration
@@ -84,8 +84,7 @@ impl EnumCodeGenerator {
                     .map(|v| prefix.clone() + v.variant_name.to_ascii_uppercase().as_str())
                     .collect::<Vec<String>>()
                     .join(", ")
-            )
-            .as_str(),
+            ),
             Some(indentation),
         )?;
 
@@ -100,22 +99,20 @@ impl EnumCodeGenerator {
     ) -> Result<(), CodeGenError> {
         let formatted_enum_name = Helper::as_type_name(&enumeration.name, &options.type_prefix);
 
-        writer.writeln(
-            format!(
+        writer.writeln_fmt(
+            format_args!(
                 "{}Helper = record helper for {}",
                 formatted_enum_name, formatted_enum_name,
-            )
-            .as_str(),
+            ),
             Some(indentation),
         )?;
 
         if options.generate_from_xml {
-            writer.writeln(
-                format!(
+            writer.writeln_fmt(
+                format_args!(
                     "class function FromXmlValue(const pXmlValue: String): {}; static;",
                     formatted_enum_name,
-                )
-                .as_str(),
+                ),
                 Some(indentation + 2),
             )?;
         }
@@ -168,12 +165,12 @@ impl EnumCodeGenerator {
 
         for (i, value) in enumeration.values.iter().enumerate() {
             writer.writeln_fmt(
-                format_args!("if pXmlValue = '{}' then begin\n", value.xml_value,),
+                format_args!("if pXmlValue = '{}' then begin", value.xml_value,),
                 if i == 0 { Some(2) } else { None },
             )?;
             writer.writeln_fmt(
                 format_args!(
-                    "Result := {}.{}{};\n",
+                    "Result := {}.{}{};",
                     formatted_enum_name,
                     prefix,
                     value.variant_name.to_ascii_uppercase(),
@@ -190,7 +187,7 @@ impl EnumCodeGenerator {
         writer.writeln(" else begin", None)?;
         writer.writeln_fmt(
             format_args!(
-                "raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {}');\n",
+                "raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {}');",
                 formatted_enum_name,
             ),
             Some(4),
