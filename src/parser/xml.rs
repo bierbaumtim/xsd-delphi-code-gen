@@ -331,8 +331,8 @@ impl XmlParser {
         }
 
         Ok(ComplexType {
-            name: name.clone(),
-            qualified_name: qualified_name,
+            name,
+            qualified_name,
             base_type,
             children,
             order,
@@ -441,7 +441,7 @@ impl XmlParser {
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,
         name: &String,
-        qualified_parent: &String,
+        qualified_parent: &str,
     ) -> Result<Vec<UnionVariant>, ParserError> {
         let mut types = match self.get_union_member_types(node) {
             Ok(v) => v,
@@ -462,7 +462,7 @@ impl XmlParser {
                             reader,
                             registry,
                             variant_name,
-                            Some(qualified_parent.clone()),
+                            Some(qualified_parent.to_owned()),
                         )?;
 
                         registry.register_type(s_type.clone().into());
