@@ -41,11 +41,13 @@ pub(crate) struct Enumeration {
     pub(crate) name: String,
     pub(crate) qualified_name: String,
     pub(crate) values: Vec<EnumerationValue>,
+    pub(crate) documentations: Vec<String>,
 }
 
 pub(crate) struct EnumerationValue {
     pub(crate) variant_name: String,
     pub(crate) xml_value: String,
+    pub(crate) documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -54,6 +56,7 @@ pub(crate) struct TypeAlias {
     pub(crate) qualified_name: String,
     pub(crate) for_type: DataType,
     pub(crate) pattern: Option<String>,
+    pub(crate) documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -80,6 +83,7 @@ pub(crate) struct UnionType {
     pub(crate) name: String,
     pub(crate) qualified_name: String,
     pub(crate) variants: Vec<UnionVariant>,
+    pub(crate) documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]

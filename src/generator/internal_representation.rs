@@ -63,6 +63,7 @@ impl InternalRepresentation {
                                 qualified_name: st.qualified_name.clone(),
                                 for_type: DataType::List(Box::new(d_type)),
                                 pattern: None,
+                                documentations: st.documentations.clone(),
                             };
 
                             aliases_dep_graph.push(type_alias);
@@ -267,8 +268,9 @@ impl InternalRepresentation {
             .unwrap()
             .iter()
             .map(|v| EnumerationValue {
-                variant_name: v.clone(),
-                xml_value: v.clone(),
+                variant_name: v.name.clone(),
+                xml_value: v.name.clone(),
+                documentations: v.documentations.clone(),
             })
             .collect::<Vec<EnumerationValue>>();
 
@@ -276,6 +278,7 @@ impl InternalRepresentation {
             name: st.name.clone(),
             qualified_name: st.qualified_name.clone(),
             values,
+            documentations: st.documentations.clone(),
         }
     }
 
@@ -294,6 +297,7 @@ impl InternalRepresentation {
             qualified_name: st.qualified_name.clone(),
             pattern: st.pattern.clone(),
             for_type,
+            documentations: st.documentations.clone(),
         }
     }
 
@@ -301,6 +305,7 @@ impl InternalRepresentation {
         UnionType {
             name: st.name.clone(),
             qualified_name: st.qualified_name.clone(),
+            documentations: st.documentations.clone(),
             variants: st.variants.as_ref().unwrap()
                 .iter()
                 .enumerate()

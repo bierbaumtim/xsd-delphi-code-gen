@@ -43,6 +43,20 @@ impl<T: Write> CodeWriter<T> {
         self.buffer.write_fmt(content)?;
         self.newline()
     }
+
+    pub(crate) fn write_documentation(
+        &mut self,
+        documentations: &Vec<String>,
+        indentation: Option<usize>,
+    ) -> Result<(), std::io::Error> {
+        for documentation in documentations {
+            for line in documentation.split('\n') {
+                self.writeln_fmt(format_args!("// {}", line), indentation)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

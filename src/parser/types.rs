@@ -115,15 +115,27 @@ pub(crate) struct SimpleType {
     /// namespace + name
     pub(crate) qualified_name: String,
 
+    /// Documentation
+    pub(crate) documentations: Vec<String>,
+
     pub(crate) base_type: Option<NodeType>,
     /// possible values for an enumeration
-    pub(crate) enumeration: Option<Vec<String>>,
+    pub(crate) enumeration: Option<Vec<EnumerationVariant>>,
     /// type of items in a list
     pub(crate) list_type: Option<NodeType>,
     /// type of items in a list
     pub(crate) pattern: Option<String>,
     /// variants of union type
     pub(crate) variants: Option<Vec<UnionVariant>>,
+}
+
+/// xs:enumeration
+#[derive(Debug, Clone)]
+pub(crate) struct EnumerationVariant {
+    /// Variant name
+    pub(crate) name: String,
+    /// Documentation
+    pub(crate) documentations: Vec<String>,
 }
 
 /// xs:complexType

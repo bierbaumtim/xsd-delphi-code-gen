@@ -21,8 +21,12 @@ impl EnumCodeGenerator {
         }
 
         writer.writeln("{$REGION 'Enumerations'}", Some(indentation))?;
-        for enumeration in enumerations {
+        for (i, enumeration) in enumerations.iter().enumerate() {
             Self::generate_declaration(writer, enumeration, options, indentation)?;
+
+            if i < enumerations.len() - 1 {
+                writer.newline()?;
+            }
         }
         writer.writeln("{$ENDREGION}", Some(indentation))?;
 
@@ -70,23 +74,57 @@ impl EnumCodeGenerator {
     ) -> Result<(), CodeGenError> {
         let prefix = Helper::get_enum_variant_prefix(&enumeration.name);
 
+        writer.write_documentation(&enumeration.documentations, Some(indentation))?;
         writer.writeln_fmt(
             format_args!("// XML Qualified Name: {}", enumeration.qualified_name),
             Some(indentation),
         )?;
-        writer.writeln_fmt(
-            format_args!(
-                "{} = ({});",
-                Helper::as_type_name(&enumeration.name, &options.type_prefix),
-                enumeration
-                    .values
-                    .iter()
-                    .map(|v| prefix.clone() + v.variant_name.to_ascii_uppercase().as_str())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-            Some(indentation),
-        )?;
+
+        if enumeration
+            .values
+            .iter()
+            .any(|v| !v.documentations.is_empty())
+        {
+            writer.writeln_fmt(
+                format_args!(
+                    "{} = (",
+                    Helper::as_type_name(&enumeration.name, &options.type_prefix),
+                ),
+                Some(indentation),
+            )?;
+
+            for (i, value) in enumeration.values.iter().enumerate() {
+                writer.write_documentation(&value.documentations, Some(indentation + 2))?;
+                writer.writeln_fmt(
+                    format_args!(
+                        "{}{}",
+                        prefix.clone() + value.variant_name.to_ascii_uppercase().as_str(),
+                        if i < enumeration.values.len() - 1 {
+                            ", "
+                        } else {
+                            ""
+                        }
+                    ),
+                    Some(indentation + 2),
+                )?;
+            }
+
+            writer.writeln(");", Some(indentation))?;
+        } else {
+            writer.writeln_fmt(
+                format_args!(
+                    "{} = ({});",
+                    Helper::as_type_name(&enumeration.name, &options.type_prefix),
+                    enumeration
+                        .values
+                        .iter()
+                        .map(|v| prefix.clone() + v.variant_name.to_ascii_uppercase().as_str())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ),
+                Some(indentation),
+            )?;
+        }
 
         Ok(())
     }

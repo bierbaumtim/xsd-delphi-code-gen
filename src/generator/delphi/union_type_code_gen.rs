@@ -85,6 +85,7 @@ impl UnionTypeCodeGenerator {
     ) -> Result<(), CodeGenError> {
         let variant_prefix = Self::get_enum_variant_prefix(&union_type.name, options);
 
+        writer.write_documentation(&union_type.documentations, Some(indentation))?;
         writer.writeln_fmt(
             format_args!("// XML Qualified Name: {}", union_type.qualified_name),
             Some(indentation),
@@ -309,7 +310,6 @@ impl UnionTypeCodeGenerator {
                     ), Some(4))?,
                 }
             }
-            writer.writeln("else Result := '';", Some(4))?;
             writer.writeln("end;", Some(2))?;
             writer.writeln("end;", None)?;
         }

@@ -348,10 +348,13 @@ impl XmlParser {
     ) -> Result<(SimpleType, String), ParserError> {
         let mut base_type = String::new();
         let mut list_type = String::new();
+        let mut annotations = Vec::new();
         let mut enumerations = Vec::new();
         let mut pattern = None::<String>;
         let mut variants = None::<Vec<UnionVariant>>;
         let mut buf = Vec::new();
+        let mut current_enum_variant = None::<EnumerationVariant>;
+
         let qualified_name = qualified_parent.map_or_else(
             || self.as_qualified_name(name.as_str()),
             |v| format!("{}.{}", v, name),
@@ -375,6 +378,29 @@ impl XmlParser {
                         )?;
                         variants = Some(types);
                     }
+                    b"xs:enumeration" => {
+                        if current_enum_variant.is_some() {
+                            return Err(ParserError::UnexpectedStartOfNode(
+                                "xs:enumeration".to_owned(),
+                            ));
+                        }
+
+                        let value = Self::get_attribute_value(&s, "value")?;
+
+                        current_enum_variant = Some(EnumerationVariant {
+                            name: value,
+                            documentations: vec![],
+                        });
+                    }
+                    b"xs:annotation" => {
+                        let mut values = self.parse_annotation(reader)?;
+
+                        if let Some(variant) = current_enum_variant.as_mut() {
+                            variant.documentations.append(&mut values);
+                        } else {
+                            annotations.append(&mut values);
+                        }
+                    }
                     _ => (),
                 },
                 Ok(Event::Empty(e)) => match e.name().as_ref() {
@@ -384,7 +410,10 @@ impl XmlParser {
                     }
                     b"xs:enumeration" => {
                         let value = Self::get_attribute_value(&e, "value")?;
-                        enumerations.push(value);
+                        enumerations.push(EnumerationVariant {
+                            name: value,
+                            documentations: vec![],
+                        });
                     }
                     b"xs:list" => {
                         let l_type = Self::get_attribute_value(&e, "itemType")?;
@@ -405,11 +434,25 @@ impl XmlParser {
                     _ => (),
                 },
                 Ok(Event::End(e)) => match e.name().as_ref() {
+                    b"xs:enumeration" => {
+                        if current_enum_variant.is_none() {
+                            return Err(ParserError::UnexpectedError); // TODO: Add better error
+                        }
+
+                        let variant = current_enum_variant.unwrap();
+                        enumerations.push(variant);
+
+                        current_enum_variant = None;
+                    }
                     b"xs:simpleType" => break,
                     _ => continue,
                 },
                 Ok(Event::Eof) => return Err(ParserError::UnexpectedEndOfFile),
-                Err(_) => return Err(ParserError::UnexpectedError),
+                Err(e) => {
+                    println!("{}", e);
+
+                    return Err(ParserError::UnexpectedError);
+                }
                 _ => (),
             }
         }
@@ -428,6 +471,7 @@ impl XmlParser {
             list_type: Self::base_type_str_to_node_type(list_type.as_str()),
             pattern,
             variants,
+            documentations: annotations,
         };
 
         buf.clear();
@@ -483,6 +527,55 @@ impl XmlParser {
         }
 
         Ok(types)
+    }
+
+    fn parse_annotation(
+        &self,
+        reader: &mut Reader<BufReader<File>>,
+    ) -> Result<Vec<String>, ParserError> {
+        let mut values = Vec::new();
+        let mut buf = Vec::new();
+        let mut current_value = String::new();
+        let mut should_read_text = false;
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Start(s)) => match s.name().as_ref() {
+                    b"xs:appinfo" | b"xs:documentation" => should_read_text = true,
+                    _ => (),
+                },
+                Ok(Event::Text(t)) if should_read_text => {
+                    let content = match t.into_inner() {
+                        Cow::Borrowed(v) => {
+                            String::from_utf8(v.to_vec()).map_err(|_| ParserError::UnexpectedError)
+                        }
+                        Cow::Owned(v) => {
+                            String::from_utf8(v).map_err(|_| ParserError::UnexpectedError)
+                        }
+                    }?;
+
+                    current_value.push_str(content.as_str());
+                }
+                Ok(Event::End(e)) => match e.name().as_ref() {
+                    b"xs:appinfo" | b"xs:documentation" => {
+                        should_read_text = false;
+
+                        if !current_value.is_empty() {
+                            values.push(current_value);
+                            current_value = String::new();
+                        }
+                    }
+                    b"xs:annotation" => {
+                        break;
+                    }
+                    _ => (),
+                },
+                Ok(_) => (),
+                Err(_) => return Err(ParserError::UnexpectedError),
+            }
+        }
+
+        Ok(values)
     }
 
     fn base_type_str_to_node_type(base_type: &str) -> Option<NodeType> {
