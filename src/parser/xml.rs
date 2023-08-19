@@ -8,8 +8,6 @@ use super::{
 };
 use crate::type_registry::*;
 
-
-
 #[derive(Default)]
 pub(crate) struct XmlParser {
     pub(crate) current_namespace: Option<String>,
@@ -90,7 +88,7 @@ impl XmlParser {
                                 let c_type = ComplexTypeParser::parse(
                                     reader,
                                     registry,
-                                    &self,
+                                    self,
                                     name.clone(),
                                     None,
                                 )?;
@@ -112,7 +110,7 @@ impl XmlParser {
                                     .unwrap_or_else(|| registry.generate_type_name());
 
                                 let c_type =
-                                    ComplexTypeParser::parse(reader, registry, &self, name, None)?;
+                                    ComplexTypeParser::parse(reader, registry, self, name, None)?;
 
                                 let c_type = CustomTypeDefinition::Complex(c_type);
 
@@ -124,7 +122,7 @@ impl XmlParser {
                                 let (s_type, type_name) = SimpleTypeParser::parse(
                                     reader,
                                     registry,
-                                    &self,
+                                    self,
                                     name.clone(),
                                     None,
                                 )?;
@@ -145,7 +143,7 @@ impl XmlParser {
                                     .unwrap_or_else(|| registry.generate_type_name());
 
                                 let (s_type, _) =
-                                    SimpleTypeParser::parse(reader, registry, &self, name, None)?;
+                                    SimpleTypeParser::parse(reader, registry, self, name, None)?;
 
                                 registry.register_type(s_type.into());
                             }

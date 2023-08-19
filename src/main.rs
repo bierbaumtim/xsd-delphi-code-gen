@@ -67,8 +67,7 @@ fn main() {
     let elapsed_for_ir = instant
         .elapsed()
         .as_millis()
-        .checked_sub(elapsed_for_parse)
-        .unwrap_or(0);
+        .saturating_sub(elapsed_for_parse);
     println!("Internal Representation created in {}ms", elapsed_for_ir);
 
     let buffer = BufWriter::new(Box::new(output_file));
@@ -82,11 +81,7 @@ fn main() {
     match generator.generate() {
         Ok(_) => println!(
             "Completed successfully within {}ms",
-            instant
-                .elapsed()
-                .as_millis()
-                .checked_sub(elapsed_for_ir)
-                .unwrap_or(0),
+            instant.elapsed().as_millis().saturating_sub(elapsed_for_ir),
         ),
         Err(e) => {
             eprintln!(
