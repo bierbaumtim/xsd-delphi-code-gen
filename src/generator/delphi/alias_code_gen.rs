@@ -52,6 +52,7 @@ impl TypeAliasCodeGenerator {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use std::io::BufWriter;
 
     use crate::generator::types::{BinaryEncoding, DataType};
@@ -114,19 +115,16 @@ mod tests {
         let options = CodeGenOptions::default();
         let buffer = BufWriter::new(Vec::new());
         let mut writer = CodeWriter { buffer };
-        TypeAliasCodeGenerator::write_declarations(&mut writer, &type_aliases, &options, 0)
+        TypeAliasCodeGenerator::write_declarations(&mut writer, &type_aliases, &options, 2)
             .unwrap();
 
         let bytes = writer.get_writer().unwrap().clone();
         let content = String::from_utf8(bytes).unwrap();
 
-        let expected = indoc! {"
-              {$REGION 'Aliases'}
-              // XML Qualified Name: CustomString
-              TCustomString = String;
-              {$ENDREGION}
-            "
-        };
+        let expected = "  {$REGION 'Aliases'}\n  \
+               // XML Qualified Name: CustomString\n  \
+               TCustomString = String;\n  \
+               {$ENDREGION}\n";
 
         assert_eq!(content, expected);
     }
