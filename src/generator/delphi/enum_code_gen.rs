@@ -98,7 +98,7 @@ impl EnumCodeGenerator {
                 writer.writeln_fmt(
                     format_args!(
                         "{}{}",
-                        prefix.clone() + value.variant_name.to_ascii_uppercase().as_str(),
+                        prefix.clone() + Helper::first_char_uppercase(&value.variant_name).as_str(),
                         if i < enumeration.values.len() - 1 {
                             ", "
                         } else {
@@ -118,7 +118,8 @@ impl EnumCodeGenerator {
                     enumeration
                         .values
                         .iter()
-                        .map(|v| prefix.clone() + v.variant_name.to_ascii_uppercase().as_str())
+                        .map(|v| prefix.clone()
+                            + Helper::first_char_uppercase(&v.variant_name).as_str())
                         .collect::<Vec<String>>()
                         .join(", ")
                 ),
@@ -211,7 +212,7 @@ impl EnumCodeGenerator {
                     "Result := {}.{}{};",
                     formatted_enum_name,
                     prefix,
-                    value.variant_name.to_ascii_uppercase(),
+                    Helper::first_char_uppercase(&value.variant_name),
                 ),
                 Some(4),
             )?;
@@ -259,7 +260,7 @@ impl EnumCodeGenerator {
                     "{}.{}{}{}: Result := '{}';",
                     formatted_enum_name,
                     Helper::get_enum_variant_prefix(&enumeration.name),
-                    value.variant_name.to_ascii_uppercase(),
+                    Helper::first_char_uppercase(&value.variant_name),
                     " ".repeat(max_variant_len - value.variant_name.len() + 1),
                     value.xml_value,
                 ),
@@ -274,7 +275,175 @@ impl EnumCodeGenerator {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use pretty_assertions::assert_eq;
+    use std::io::BufWriter;
 
-    // TODO: Write Test
+    use crate::generator::types::EnumerationValue;
+
+    use super::*;
+
+    fn get_test_enumerations() -> Vec<Enumeration> {
+        vec![
+            Enumeration {
+                name: "ItemStatus".to_owned(),
+                qualified_name: "ItemStatus".to_owned(),
+                documentations: vec![],
+                values: vec![
+                    EnumerationValue {
+                        variant_name: "open".to_owned(),
+                        xml_value: "o".to_owned(),
+                        documentations: vec![],
+                    },
+                    EnumerationValue {
+                        variant_name: "closed".to_owned(),
+                        xml_value: "c".to_owned(),
+                        documentations: vec![],
+                    },
+                    EnumerationValue {
+                        variant_name: "unknown".to_owned(),
+                        xml_value: "u".to_owned(),
+                        documentations: vec![],
+                    },
+                ],
+            },
+            Enumeration {
+                name: "Fontsize".to_owned(),
+                qualified_name: "Fontsize".to_owned(),
+                documentations: vec![],
+                values: vec![
+                    EnumerationValue {
+                        variant_name: "small".to_owned(),
+                        xml_value: "s".to_owned(),
+                        documentations: vec![],
+                    },
+                    EnumerationValue {
+                        variant_name: "medium".to_owned(),
+                        xml_value: "m".to_owned(),
+                        documentations: vec![],
+                    },
+                    EnumerationValue {
+                        variant_name: "large".to_owned(),
+                        xml_value: "l".to_owned(),
+                        documentations: vec![],
+                    },
+                ],
+            },
+        ]
+    }
+
+    #[test]
+    fn write_nothing_when_no_enumerations_available() {
+        let enumerations = vec![];
+        let options = CodeGenOptions::default();
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        EnumCodeGenerator::write_declarations(&mut writer, &enumerations, &options, 0).unwrap();
+
+        let bytes = writer.get_writer().unwrap().clone();
+        let content = String::from_utf8(bytes).unwrap();
+
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn write_declarations_all() {
+        let enumerations = get_test_enumerations();
+        let options = CodeGenOptions {
+            generate_from_xml: true,
+            generate_to_xml: true,
+            ..Default::default()
+        };
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        EnumCodeGenerator::write_declarations(&mut writer, &enumerations, &options, 2).unwrap();
+
+        let bytes = writer.get_writer().unwrap().clone();
+        let content = String::from_utf8(bytes).unwrap();
+
+        let expected = "  {$REGION 'Enumerations'}\n  \
+              // XML Qualified Name: ItemStatus\n  \
+              TItemStatus = (isOpen, isClosed, isUnknown);\n\
+              \n  \
+              // XML Qualified Name: Fontsize\n  \
+              TFontsize = (fSmall, fMedium, fLarge);\n  \
+              {$ENDREGION}\n\
+              \n  \
+              {$REGION 'Enumerations Helper'}\n  \
+              TItemStatusHelper = record helper for TItemStatus\n    \
+                class function FromXmlValue(const pXmlValue: String): TItemStatus; static;\n    \
+                function ToXmlValue: String;\n  \
+              end;\n\
+              \n  \
+              TFontsizeHelper = record helper for TFontsize\n    \
+                class function FromXmlValue(const pXmlValue: String): TFontsize; static;\n    \
+                function ToXmlValue: String;\n  \
+              end;\n  \
+              {$ENDREGION}\n";
+
+        assert_eq!(content, expected);
+    }
+
+    #[test]
+    fn write_implementations_all() {
+        let enumerations = get_test_enumerations();
+        let options = CodeGenOptions {
+            generate_from_xml: true,
+            generate_to_xml: true,
+            ..Default::default()
+        };
+        let buffer = BufWriter::new(Vec::new());
+        let mut writer = CodeWriter { buffer };
+        EnumCodeGenerator::write_implementation(&mut writer, &enumerations, &options).unwrap();
+
+        let bytes = writer.get_writer().unwrap().clone();
+        let content = String::from_utf8(bytes).unwrap();
+
+        let expected = "{$REGION 'Enumerations Helper'}\n\
+              class function TItemStatusHelper.FromXmlValue(const pXmlValue: String): TItemStatus;\n\
+              begin\n  \
+                if pXmlValue = 'o' then begin\n    \
+                  Result := TItemStatus.isOpen;\n  \
+                end else if pXmlValue = 'c' then begin\n    \
+                  Result := TItemStatus.isClosed;\n  \
+                end else if pXmlValue = 'u' then begin\n    \
+                  Result := TItemStatus.isUnknown;\n  \
+                end else begin\n    \
+                  raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for TItemStatus');\n  \
+                end;\n\
+              end;\n\
+              \n\
+              function TItemStatusHelper.ToXmlValue: String;\n\
+              begin\n  \
+                case Self of\n    \
+                  TItemStatus.isOpen    : Result := 'o';\n    \
+                  TItemStatus.isClosed  : Result := 'c';\n    \
+                  TItemStatus.isUnknown : Result := 'u';\n  \
+                end;\n\
+              end;\n\
+              \n\
+              class function TFontsizeHelper.FromXmlValue(const pXmlValue: String): TFontsize;\n\
+              begin\n  \
+                if pXmlValue = 's' then begin\n    \
+                  Result := TFontsize.fSmall;\n  \
+                end else if pXmlValue = 'm' then begin\n    \
+                  Result := TFontsize.fMedium;\n  \
+                end else if pXmlValue = 'l' then begin\n    \
+                  Result := TFontsize.fLarge;\n  \
+                end else begin\n    \
+                  raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for TFontsize');\n  \
+                end;\n\
+              end;\n\
+              \n\
+              function TFontsizeHelper.ToXmlValue: String;\n\
+              begin\n  \
+                case Self of\n    \
+                  TFontsize.fSmall  : Result := 's';\n    \
+                  TFontsize.fMedium : Result := 'm';\n    \
+                  TFontsize.fLarge  : Result := 'l';\n  \
+                end;\n\
+              end;\n\
+              {$ENDREGION}\n";
+
+        assert_eq!(content, expected);
+    }
 }
