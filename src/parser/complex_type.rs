@@ -194,6 +194,7 @@ impl ComplexTypeParser {
                 _ => (),
             }
 
+            // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
             buf.clear();
         }
 

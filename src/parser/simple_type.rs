@@ -136,6 +136,9 @@ impl SimpleTypeParser {
                 }
                 _ => (),
             }
+
+            // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
+            buf.clear();
         }
 
         let base_type = xml_parser.resolve_namespace(base_type)?;
@@ -205,6 +208,9 @@ impl SimpleTypeParser {
                 Ok(_) => (),
                 Err(_) => return Err(ParserError::UnexpectedError),
             }
+
+            // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
+            buf.clear();
         }
 
         Ok(types)
