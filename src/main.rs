@@ -59,7 +59,18 @@ fn main() {
         }
     };
 
+    let elapsed_for_parse = instant.elapsed().as_millis();
+    println!("Files parsed in {}ms", elapsed_for_parse);
+
     let internal_representation = InternalRepresentation::build(&data, &type_registry);
+
+    let elapsed_for_ir = instant
+        .elapsed()
+        .as_millis()
+        .checked_sub(elapsed_for_parse)
+        .unwrap_or(0);
+    println!("Internal Representation created in {}ms", elapsed_for_ir);
+
     let buffer = BufWriter::new(Box::new(output_file));
     let mut generator = DelphiCodeGenerator::new(
         buffer,
@@ -71,7 +82,11 @@ fn main() {
     match generator.generate() {
         Ok(_) => println!(
             "Completed successfully within {}ms",
-            instant.elapsed().as_millis(),
+            instant
+                .elapsed()
+                .as_millis()
+                .checked_sub(elapsed_for_ir)
+                .unwrap_or(0),
         ),
         Err(e) => {
             eprintln!(

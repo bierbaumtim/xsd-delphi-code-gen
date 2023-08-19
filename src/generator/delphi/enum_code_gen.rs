@@ -249,7 +249,7 @@ impl EnumCodeGenerator {
             .unwrap_or(1);
 
         writer.writeln_fmt(
-            format_args!("function {}Helper.ToXmlValue: String;", formatted_enum_name,),
+            format_args!("function {}Helper.ToXmlValue: String;", formatted_enum_name),
             None,
         )?;
         writer.writeln("begin", None)?;
