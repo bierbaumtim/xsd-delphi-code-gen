@@ -193,6 +193,8 @@ impl Helper {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use crate::generator::types::BinaryEncoding;
 
     use super::*;

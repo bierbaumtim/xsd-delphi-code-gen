@@ -92,6 +92,7 @@ impl HelperCodeGenerator {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use std::io::BufWriter;
 
     use crate::generator::code_generator_trait::CodeGenOptions;
