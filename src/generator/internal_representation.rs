@@ -61,7 +61,7 @@ impl InternalRepresentation {
                             let type_alias = TypeAlias {
                                 name: st.name.clone(),
                                 qualified_name: st.qualified_name.clone(),
-                                for_type: DataType::List(Box::new(d_type)),
+                                for_type: DataType::InlineList(Box::new(d_type)),
                                 pattern: None,
                                 documentations: st.documentations.clone(),
                             };
@@ -147,8 +147,7 @@ impl InternalRepresentation {
                                         CustomTypeDefinition::Simple(s)
                                             if s.list_type.is_some() =>
                                         {
-                                            panic!("Nested lists are not supported");
-                                            // return Err();
+                                            DataType::Alias(s.name.clone())
                                         }
                                         CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
                                             DataType::Union(s.name.clone())
@@ -180,7 +179,10 @@ impl InternalRepresentation {
                                         name: child.name.clone(),
                                         xml_name: child.name.clone(),
                                         requires_free: requires_free
-                                            || matches!(data_type, DataType::List(_)),
+                                            || matches!(
+                                                data_type,
+                                                DataType::List(_) | DataType::InlineList(_)
+                                            ),
                                         data_type,
                                     };
 
@@ -375,9 +377,13 @@ impl InternalRepresentation {
                         CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
                             Some(DataType::Enumeration(s.name.clone()))
                         }
+                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                            Some(DataType::Union(s.name.clone()))
+                        }
                         CustomTypeDefinition::Simple(s) if s.base_type.is_some() => {
                             Some(DataType::Alias(s.name.clone()))
                         }
+                        CustomTypeDefinition::Simple(s) if s.list_type.is_some() => None,
                         _ => Some(DataType::Custom(c_type.get_name())),
                     };
                 }

@@ -115,7 +115,7 @@ impl ClassCodeGenerator {
         // Variables
         for variable in &class_type.variables {
             match &variable.data_type {
-                DataType::List(_) => {
+                DataType::List(_) | DataType::InlineList(_) => {
                     writer.writeln_fmt(
                         format_args!(
                             "{}: {};",
@@ -144,6 +144,7 @@ impl ClassCodeGenerator {
                         )?;
                     }
                 }
+
                 _ => {
                     writer.writeln_fmt(
                         format_args!(
@@ -219,7 +220,13 @@ impl ClassCodeGenerator {
         writer.writeln_fmt(format_args!("{{ {} }}", formated_name), None)?;
 
         if options.generate_to_xml {
-            Self::generate_constructor_implementation(writer, &formated_name, class_type, options)?;
+            Self::generate_constructor_implementation(
+                writer,
+                &formated_name,
+                class_type,
+                type_aliases,
+                options,
+            )?;
         }
 
         if options.generate_from_xml {
@@ -287,6 +294,7 @@ impl ClassCodeGenerator {
         writer: &mut CodeWriter<T>,
         formated_name: &String,
         class_type: &ClassType,
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
         writer.writeln_fmt(format_args!("constructor {}.Create;", formated_name), None)?;
@@ -299,14 +307,33 @@ impl ClassCodeGenerator {
 
         for variable in &class_type.variables {
             match &variable.data_type {
-                DataType::Alias(name) => writer.writeln_fmt(
-                    format_args!(
-                        "{} := Default({});",
-                        Helper::as_variable_name(&variable.name),
-                        Helper::as_type_name(name, &options.type_prefix),
-                    ),
-                    Some(2),
-                )?,
+                DataType::Alias(name) => {
+                    if let Some((data_type, _)) =
+                        Helper::get_alias_data_type(name.as_str(), type_aliases)
+                    {
+                        match data_type {
+                            DataType::InlineList(_) => writer.writeln_fmt(
+                                format_args!(
+                                    "{} := {}.Create;",
+                                    Helper::as_variable_name(&variable.name),
+                                    Helper::get_datatype_language_representation(
+                                        &variable.data_type,
+                                        &options.type_prefix
+                                    ),
+                                ),
+                                Some(2),
+                            )?,
+                            _ => writer.writeln_fmt(
+                                format_args!(
+                                    "{} := Default({});",
+                                    Helper::as_variable_name(&variable.name),
+                                    Helper::as_type_name(name, &options.type_prefix),
+                                ),
+                                Some(2),
+                            )?,
+                        }
+                    }
+                }
                 DataType::Enumeration(name) => writer.writeln_fmt(
                     format_args!(
                         "{} := Default({});",
@@ -325,7 +352,7 @@ impl ClassCodeGenerator {
                         Some(2),
                     )?;
                 }
-                DataType::List(_) => {
+                DataType::List(_) | DataType::InlineList(_) => {
                     writer.writeln_fmt(
                         format_args!(
                             "{} := {}.Create;",
@@ -416,7 +443,7 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
         writer.writeln_fmt(
-            format_args!("constructor {}.FromXml(node: IXMLNode);", formated_name,),
+            format_args!("constructor {}.FromXml(node: IXMLNode);", formated_name),
             None,
         )?;
         writer.writeln("begin", None)?;
@@ -428,6 +455,35 @@ impl ClassCodeGenerator {
 
         for variable in &class_type.variables {
             match &variable.data_type {
+                DataType::Alias(name) => {
+                    if let Some((data_type, pattern)) =
+                        Helper::get_alias_data_type(name.as_str(), type_aliases)
+                    {
+                        match data_type {
+                            DataType::InlineList(lt) => {
+                                Self::generate_inline_list_from_xml(
+                                    writer,
+                                    type_aliases,
+                                    options,
+                                    variable,
+                                    lt.as_ref(),
+                                )?;
+                            }
+                            _ => writer.writeln_fmt(
+                                format_args!(
+                                    "{} := {};",
+                                    Helper::as_variable_name(&variable.name),
+                                    Self::generate_standard_type_from_xml(
+                                        &data_type,
+                                        format!("node.ChildNodes['{}'].Text", variable.xml_name),
+                                        pattern,
+                                    )
+                                ),
+                                Some(2),
+                            )?,
+                        }
+                    }
+                }
                 DataType::Enumeration(name) => {
                     writer.writeln_fmt(
                         format_args!(
@@ -438,22 +494,6 @@ impl ClassCodeGenerator {
                         ),
                         Some(2),
                     )?;
-                }
-                DataType::Alias(name) => {
-                    if let Some((data_type, pattern)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        writer.writeln(
-                            Self::generate_standard_type_from_xml(
-                                &data_type,
-                                &Helper::as_variable_name(&variable.name),
-                                format!("node.ChildNodes['{}']", variable.xml_name),
-                                pattern,
-                            )
-                            .as_str(),
-                            Some(2),
-                        )?;
-                    }
                 }
                 DataType::Custom(name) => {
                     writer.writeln_fmt(
@@ -485,15 +525,26 @@ impl ClassCodeGenerator {
                         size,
                     )?;
                 }
+                DataType::InlineList(lt) => {
+                    Self::generate_inline_list_from_xml(
+                        writer,
+                        type_aliases,
+                        options,
+                        variable,
+                        lt.as_ref(),
+                    )?;
+                }
                 _ => {
-                    writer.writeln(
-                        Self::generate_standard_type_from_xml(
-                            &variable.data_type,
-                            &Helper::as_variable_name(&variable.name),
-                            format!("node.ChildNodes['{}']", variable.xml_name),
-                            None,
-                        )
-                        .as_str(),
+                    writer.writeln_fmt(
+                        format_args!(
+                            "{} := {};",
+                            Helper::as_variable_name(&variable.name),
+                            Self::generate_standard_type_from_xml(
+                                &variable.data_type,
+                                format!("node.ChildNodes['{}'].Text", variable.xml_name),
+                                None,
+                            )
+                        ),
                         Some(2),
                     )?;
                 }
@@ -576,13 +627,13 @@ impl ClassCodeGenerator {
                 {
                     writer.writeln_fmt(
                         format_args!(
-                            "var {}",
+                            "var {} := {};",
+                            Helper::as_variable_name(&variable.name),
                             Self::generate_standard_type_from_xml(
                                 &data_type,
-                                &Helper::as_variable_name(&variable.name),
-                                format!("__{}Node", variable.name),
+                                format!("__{}Node.Text", variable.name),
                                 pattern,
-                            ),
+                            )
                         ),
                         Some(6),
                     )?;
@@ -609,13 +660,13 @@ impl ClassCodeGenerator {
             _ => {
                 writer.writeln_fmt(
                     format_args!(
-                        "var {}",
+                        "var __{} := {};",
+                        formatted_variable_name,
                         Self::generate_standard_type_from_xml(
                             item_type,
-                            &format!("__{}", formatted_variable_name),
-                            format!("__{}Node", variable.name),
+                            format!("__{}Node.Text", variable.name),
                             None,
-                        ),
+                        )
                     ),
                     Some(6),
                 )?;
@@ -707,14 +758,15 @@ impl ClassCodeGenerator {
                     {
                         writer.writeln_fmt(
                             format_args!(
-                                "{}: {}",
+                                "{}: {}{} := {};",
                                 i - 1,
+                                Helper::as_variable_name(&variable.name),
+                                i,
                                 Self::generate_standard_type_from_xml(
                                     &data_type,
-                                    &Helper::as_variable_name(&variable.name),
-                                    format!("__{}Node", variable.name),
+                                    format!("__{}Node.Text", variable.name),
                                     pattern,
-                                ),
+                                )
                             ),
                             Some(8),
                         )?;
@@ -736,12 +788,13 @@ impl ClassCodeGenerator {
                 _ => {
                     writer.writeln_fmt(
                         format_args!(
-                            "{}: {}",
+                            "{}: {}{} := {};",
                             i - 1,
+                            Helper::as_variable_name(&variable.name),
+                            i,
                             Self::generate_standard_type_from_xml(
                                 item_type,
-                                &format!("{}{}", Helper::as_variable_name(&variable.name), i,),
-                                format!("__{}Node", variable.name),
+                                format!("__{}Node.Text", variable.name),
                                 None,
                             ),
                         ),
@@ -753,6 +806,83 @@ impl ClassCodeGenerator {
         writer.writeln("end;", Some(6))?;
         writer.writeln("end;", Some(4))?;
         writer.writeln("end;", Some(2))?;
+        Ok(())
+    }
+
+    fn generate_inline_list_from_xml<T: Write>(
+        writer: &mut CodeWriter<T>,
+        type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
+        variable: &Variable,
+        item_type: &DataType,
+    ) -> Result<(), CodeGenError> {
+        let formatted_variable_name = Helper::as_variable_name(&variable.name);
+
+        writer.newline()?;
+        writer.writeln_fmt(
+            format_args!(
+                "{} := {}.Create;",
+                formatted_variable_name,
+                Helper::get_datatype_language_representation(
+                    &variable.data_type,
+                    &options.type_prefix
+                ),
+            ),
+            Some(2),
+        )?;
+        writer.writeln_fmt(
+            format_args!(
+                "for var vPart in node.ChildNodes['{}'].Text.Split([' ']) do begin",
+                variable.xml_name,
+            ),
+            Some(2),
+        )?;
+
+        match item_type {
+            DataType::Alias(name) => {
+                if let Some((data_type, pattern)) =
+                    Helper::get_alias_data_type(name.as_str(), type_aliases)
+                {
+                    writer.writeln_fmt(
+                        format_args!(
+                            "{}.Add({});",
+                            formatted_variable_name,
+                            Self::generate_standard_type_from_xml(
+                                &data_type,
+                                "vPart".to_owned(),
+                                pattern,
+                            ),
+                        ),
+                        Some(4),
+                    )?;
+                }
+            }
+            DataType::Enumeration(n) | DataType::Union(n) => {
+                writer.writeln_fmt(
+                    format_args!(
+                        "{}.Add({}Helper.FromXmlValue(vPart));",
+                        formatted_variable_name,
+                        Helper::as_type_name(n, &options.type_prefix),
+                    ),
+                    Some(4),
+                )?;
+            }
+            DataType::Custom(_)
+            | DataType::List(_)
+            | DataType::FixedSizeList(_, _)
+            | DataType::InlineList(_) => todo!(),
+            _ => writer.writeln_fmt(
+                format_args!(
+                    "{}.Add({});",
+                    formatted_variable_name,
+                    Self::generate_standard_type_from_xml(item_type, "vPart".to_owned(), None),
+                ),
+                Some(4),
+            )?,
+        };
+
+        writer.writeln("end;", Some(2))?;
+
         Ok(())
     }
 
@@ -799,9 +929,68 @@ impl ClassCodeGenerator {
         writer.newline()?;
         for (index, variable) in class_type.variables.iter().enumerate() {
             match &variable.data_type {
+                DataType::Alias(name) => {
+                    if let Some((data_type, pattern)) =
+                        Helper::get_alias_data_type(name.as_str(), type_aliases)
+                    {
+                        match data_type {
+                            DataType::InlineList(lt) => {
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "node := pParent.AddChild('{}');",
+                                        variable.xml_name
+                                    ),
+                                    Some(2),
+                                )?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "for var I := 0 to {}.Count - 1 do begin",
+                                        Helper::as_variable_name(&variable.name)
+                                    ),
+                                    Some(2),
+                                )?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "node.Text := node.Text + {};",
+                                        Helper::get_variable_value_as_string(
+                                            lt.as_ref(),
+                                            &format!(
+                                                "{}[I]",
+                                                Helper::as_variable_name(&variable.name)
+                                            ),
+                                            &pattern
+                                        )
+                                    ),
+                                    Some(4),
+                                )?;
+                                writer.newline()?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "if I < {}.Count - 1 then begin",
+                                        Helper::as_variable_name(&variable.name)
+                                    ),
+                                    Some(4),
+                                )?;
+                                writer.writeln("node.Text := node.Text + ' ';", Some(6))?;
+                                writer.writeln("end;", Some(4))?;
+                                writer.writeln("end;", Some(2))?;
+                            }
+                            _ => {
+                                for arg in Self::generate_standard_type_to_xml(
+                                    &data_type,
+                                    &Helper::as_variable_name(&variable.name),
+                                    &variable.xml_name,
+                                    &pattern,
+                                ) {
+                                    writer.writeln(arg.as_str(), Some(2))?;
+                                }
+                            }
+                        }
+                    }
+                }
                 DataType::Enumeration(_) => {
                     writer.writeln_fmt(
-                        format_args!("node := pParent.AddChild('{}');", variable.xml_name,),
+                        format_args!("node := pParent.AddChild('{}');", variable.xml_name),
                         Some(2),
                     )?;
 
@@ -813,23 +1002,9 @@ impl ClassCodeGenerator {
                         Some(2),
                     )?;
                 }
-                DataType::Alias(name) => {
-                    if let Some((data_type, pattern)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        for arg in Self::generate_standard_type_to_xml(
-                            &data_type,
-                            &Helper::as_variable_name(&variable.name),
-                            &variable.xml_name,
-                            pattern,
-                        ) {
-                            writer.writeln(arg.as_str(), Some(2))?;
-                        }
-                    }
-                }
                 DataType::Custom(_) => {
                     writer.writeln_fmt(
-                        format_args!("node := pParent.AddChild('{}');", variable.xml_name,),
+                        format_args!("node := pParent.AddChild('{}');", variable.xml_name),
                         Some(2),
                     )?;
                     writer.writeln_fmt(
@@ -881,7 +1056,7 @@ impl ClassCodeGenerator {
                         &variable.data_type,
                         &Helper::as_variable_name(&variable.name),
                         &variable.xml_name,
-                        None,
+                        &None,
                     ) {
                         writer.writeln(arg.as_str(), Some(2))?;
                     }
@@ -912,7 +1087,7 @@ impl ClassCodeGenerator {
                 )?;
 
                 writer.writeln_fmt(
-                    format_args!("node.Text := {}.ToXmlValue;", variable_name,),
+                    format_args!("node.Text := {}.ToXmlValue;", variable_name),
                     Some(indentation),
                 )?;
             }
@@ -924,7 +1099,7 @@ impl ClassCodeGenerator {
                         &data_type,
                         variable_name,
                         xml_name,
-                        pattern,
+                        &pattern,
                     ) {
                         writer.writeln(arg.as_str(), Some(indentation))?;
                     }
@@ -936,14 +1111,14 @@ impl ClassCodeGenerator {
                     Some(indentation),
                 )?;
                 writer.writeln_fmt(
-                    format_args!("{}.AppendToXmlRaw(node);", variable_name,),
+                    format_args!("{}.AppendToXmlRaw(node);", variable_name),
                     Some(indentation),
                 )?;
             }
             DataType::List(_) => (),
             _ => {
                 for arg in
-                    Self::generate_standard_type_to_xml(data_type, variable_name, xml_name, None)
+                    Self::generate_standard_type_to_xml(data_type, variable_name, xml_name, &None)
                 {
                     writer.writeln(arg.as_str(), Some(indentation))?;
                 }
@@ -955,41 +1130,29 @@ impl ClassCodeGenerator {
 
     fn generate_standard_type_from_xml(
         data_type: &DataType,
-        variable_name: &String,
-        node: String,
+        value: String,
         pattern: Option<String>,
     ) -> String {
         match data_type {
-            DataType::Boolean => format!(
-                "{} := ({}.Text = cnXmlTrueValue) or ({}.Text = '1');",
-                variable_name, node, node
-            ),
+            DataType::Boolean => format!("({} = cnXmlTrueValue) or ({} = '1')", value, value),
             DataType::DateTime | DataType::Date if pattern.is_some() => format!(
-                "{} := DecodeDateTime({}.Text, '{}');",
-                variable_name,
-                node,
+                "DecodeDateTime({}, '{}')",
+                value,
                 pattern.unwrap_or_default(),
             ),
-            DataType::DateTime | DataType::Date => {
-                format!("{} := ISO8601ToDate({}.Text);", variable_name, node,)
+            DataType::DateTime | DataType::Date => format!("ISO8601ToDate({})", value),
+            DataType::Double => format!("StrToFloat({})", value),
+            DataType::Binary(BinaryEncoding::Base64) => {
+                format!("TNetEncoding.Base64.DecodeStringToBytes({})", value)
             }
-            DataType::Double => format!("{} := StrToFloat({}.Text);", variable_name, node),
-            DataType::Binary(BinaryEncoding::Base64) => format!(
-                "{} := TNetEncoding.Base64.DecodeStringToBytes({}.Text);",
-                variable_name, node
-            ),
-            DataType::Binary(BinaryEncoding::Hex) => format!(
-                "HexToBin({}.Text, 0, {}, 0, Length({}.Text));",
-                node, variable_name, node,
-            ),
-            DataType::String => format!("{} := {}.Text;", variable_name, node),
+            DataType::Binary(BinaryEncoding::Hex) => format!("HexStrToBin({})", value),
+            DataType::String => value,
             DataType::Time if pattern.is_some() => format!(
-                "{} := TimeOf(DecodeDateTime({}.Text, '{}'));",
-                variable_name,
-                node,
+                "TimeOf(DecodeDateTime({}, '{}'))",
+                value,
                 pattern.unwrap_or_default(),
             ),
-            DataType::Time => format!("{} := TimeOf(ISO8601ToDate({}.Text));", variable_name, node),
+            DataType::Time => format!("TimeOf(ISO8601ToDate({}))", value),
             DataType::SmallInteger
             | DataType::ShortInteger
             | DataType::Integer
@@ -998,7 +1161,7 @@ impl ClassCodeGenerator {
             | DataType::UnsignedShortInteger
             | DataType::UnsignedInteger
             | DataType::UnsignedLongInteger => {
-                format!("{} := StrToInt({}.Text);", variable_name, node)
+                format!("StrToInt({})", value)
             }
             _ => String::new(),
         }
@@ -1008,7 +1171,7 @@ impl ClassCodeGenerator {
         data_type: &DataType,
         variable_name: &String,
         xml_name: &String,
-        pattern: Option<String>,
+        pattern: &Option<String>,
     ) -> Vec<String> {
         match data_type {
             DataType::Alias(_)
@@ -1031,7 +1194,7 @@ impl ClassCodeGenerator {
 #[cfg(test)]
 mod tests {
     // use pretty_assertions::assert_eq;
-    
+
     // use super::*;
 
     // TODO: Write Test

@@ -104,12 +104,12 @@ impl Helper {
             DataType::Alias(a) => Self::as_type_name(a, prefix),
             DataType::Enumeration(e) => Self::as_type_name(e, prefix),
             DataType::Custom(c) => Self::as_type_name(c, prefix),
-            DataType::FixedSizeList(t, _) => Self::get_datatype_language_representation(t, prefix),
             DataType::Union(u) => Self::as_type_name(u, prefix),
-            DataType::List(s) => {
-                let gt = Self::get_datatype_language_representation(s, prefix);
+            DataType::FixedSizeList(t, _) => Self::get_datatype_language_representation(t, prefix),
+            DataType::List(lt) | DataType::InlineList(lt) => {
+                let gt = Self::get_datatype_language_representation(lt, prefix);
 
-                match **s {
+                match **lt {
                     DataType::Custom(_) => format!("TObjectList<{}>", gt),
                     _ => format!("TList<{}>", gt),
                 }
@@ -128,7 +128,7 @@ impl Helper {
     pub(crate) fn get_variable_value_as_string(
         data_type: &DataType,
         variable_name: &String,
-        pattern: Option<String>,
+        pattern: &Option<String>,
     ) -> String {
         match data_type {
             DataType::Boolean => {
@@ -136,22 +136,22 @@ impl Helper {
             }
             DataType::DateTime | DataType::Date if pattern.is_some() => format!(
                 "FormatDateTime('{}', {})",
-                pattern.unwrap_or_default(),
+                pattern.clone().unwrap_or_default(),
                 variable_name,
             ),
             DataType::DateTime | DataType::Date => format!("DateToISO8601({})", variable_name),
-            DataType::Double => format!("FloatToStr({})", variable_name,),
+            DataType::Double => format!("FloatToStr({})", variable_name),
             DataType::Binary(BinaryEncoding::Base64) => {
-                format!("TNetEncoding.Base64.EncodeStringToBytes({})", variable_name,)
+                format!("TNetEncoding.Base64.EncodeStringToBytes({})", variable_name)
             }
-            DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({})", variable_name,),
+            DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({})", variable_name),
             DataType::String => variable_name.to_string(),
             DataType::Time if pattern.is_some() => format!(
                 "EncodeTime({}, '{}')",
                 variable_name,
-                pattern.unwrap_or_default(),
+                pattern.clone().unwrap_or_default(),
             ),
-            DataType::Time => format!("TimeToStr({})", variable_name,),
+            DataType::Time => format!("TimeToStr({})", variable_name),
             DataType::SmallInteger
             | DataType::ShortInteger
             | DataType::Integer

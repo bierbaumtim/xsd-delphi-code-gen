@@ -255,7 +255,7 @@ impl UnionTypeCodeGenerator {
                                 "{}.{}: Result := {};",
                                 Self::ENUM_NAME,
                                 Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                                Helper::get_variable_value_as_string(&dt, &variable_name, pattern,),
+                                Helper::get_variable_value_as_string(&dt, &variable_name, &pattern),
                             ), Some(4))?,
                         }
                     }
@@ -305,7 +305,7 @@ impl UnionTypeCodeGenerator {
                         Helper::get_variable_value_as_string(
                             &variant.data_type,
                             &variable_name,
-                            None,
+                            &None,
                         ),
                     ), Some(4))?,
                 }

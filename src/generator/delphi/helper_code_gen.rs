@@ -85,6 +85,17 @@ impl HelperCodeGenerator {
             writer.writeln("end;", None)?;
         }
 
+        if options.generate_from_xml && options.generate_to_xml {
+            writer.newline()?;
+        }
+
+        if options.generate_from_xml {
+            writer.writeln("function HexStrToBin(const pHex: String): TBytes;", None)?;
+            writer.writeln("begin", None)?;
+            writer.writeln("HexToBin(pHex, 0, Result, 0, Length(pHex) / 2);", Some(2))?;
+            writer.writeln("end;", None)?;
+        }
+
         Ok(())
     }
 }

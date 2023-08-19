@@ -28,6 +28,9 @@ pub(crate) enum DataType {
     Enumeration(String),
     List(Box<DataType>),
     FixedSizeList(Box<DataType>, usize),
+    InlineList(Box<DataType>),
+    // TODO: for later
+    // InlineFixedSizeList(Box<DataType>, usize),
     Union(String),
 }
 

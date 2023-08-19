@@ -204,7 +204,7 @@ impl EnumCodeGenerator {
 
         for (i, value) in enumeration.values.iter().enumerate() {
             writer.writeln_fmt(
-                format_args!("if pXmlValue = '{}' then begin", value.xml_value,),
+                format_args!("if pXmlValue = '{}' then begin", value.xml_value),
                 if i == 0 { Some(2) } else { None },
             )?;
             writer.writeln_fmt(
