@@ -213,6 +213,9 @@ impl InternalRepresentation {
         let mut document_variables = Vec::new();
 
         for node in &data.nodes {
+            let min_occurs = node.base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE);
+            let max_occurs = node.base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE);
+
             let variable = Variable {
                 name: node.name.clone(),
                 xml_name: node.name.clone(),
@@ -222,7 +225,38 @@ impl InternalRepresentation {
                         let c_type = registry.types.get(e);
 
                         match c_type {
-                            Some(c) => DataType::Custom(c.get_name()),
+                            Some(c_type) => {
+                                let data_type = match c_type {
+                                    CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
+                                        DataType::Enumeration(s.name.clone())
+                                    }
+                                    CustomTypeDefinition::Simple(s) if s.base_type.is_some() => {
+                                        DataType::Alias(s.name.clone())
+                                    }
+                                    CustomTypeDefinition::Simple(s) if s.list_type.is_some() => {
+                                        DataType::Alias(s.name.clone())
+                                    }
+                                    CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                                        DataType::Union(s.name.clone())
+                                    }
+                                    _ => DataType::Custom(c_type.get_name()),
+                                };
+
+                                let data_type = if max_occurs == UNBOUNDED_OCCURANCE
+                                    || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
+                                {
+                                    DataType::List(Box::new(data_type))
+                                } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE
+                                {
+                                    let size = usize::try_from(max_occurs).unwrap();
+
+                                    DataType::FixedSizeList(Box::new(data_type), size)
+                                } else {
+                                    data_type
+                                };
+
+                                data_type
+                            }
                             None => todo!(),
                         }
                     }
