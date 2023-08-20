@@ -153,6 +153,7 @@ impl Helper {
                 pattern.clone().unwrap_or_default(),
             ),
             DataType::Time => format!("TimeToStr({})", variable_name),
+            DataType::Uri => format!("{}.ToString", variable_name),
             DataType::SmallInteger
             | DataType::ShortInteger
             | DataType::Integer
