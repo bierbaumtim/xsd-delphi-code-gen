@@ -298,7 +298,6 @@ impl ClassCodeGenerator {
                     if let Some((data_type, _)) =
                         Helper::get_alias_data_type(name.as_str(), type_aliases)
                     {
-                        println!("{}: {:?}", name, data_type);
                         match data_type {
                             DataType::InlineList(_) => writer.writeln_fmt(
                                 format_args!(
@@ -401,6 +400,15 @@ impl ClassCodeGenerator {
                             Some(2),
                         )?;
                     }
+                }
+                DataType::Uri => {
+                    writer.writeln_fmt(
+                        format_args!(
+                            "{} := TURI.Create('');",
+                            Helper::as_variable_name(&variable.name),
+                        ),
+                        Some(2),
+                    )?;
                 }
                 _ => {
                     writer.writeln_fmt(

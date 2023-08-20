@@ -101,6 +101,7 @@ impl Helper {
             DataType::Binary(_) => String::from("TBytes"),
             DataType::String => String::from("String"),
             DataType::Time => String::from("TTime"),
+            DataType::Uri => String::from("TURI"),
             DataType::Alias(a) => Self::as_type_name(a, prefix),
             DataType::Enumeration(e) => Self::as_type_name(e, prefix),
             DataType::Custom(c) => Self::as_type_name(c, prefix),

@@ -23,6 +23,7 @@ pub(crate) enum DataType {
     UnsignedLongInteger,
     String,
     Time,
+    Uri,
     Alias(String),
     Custom(String),
     Enumeration(String),
@@ -40,6 +41,7 @@ pub(crate) enum BinaryEncoding {
     Base64,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct Enumeration {
     pub(crate) name: String,
     pub(crate) qualified_name: String,
@@ -47,6 +49,7 @@ pub(crate) struct Enumeration {
     pub(crate) documentations: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct EnumerationValue {
     pub(crate) variant_name: String,
     pub(crate) xml_value: String,

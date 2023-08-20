@@ -94,6 +94,7 @@ impl<T: Write> DelphiCodeGenerator<T> {
         self.writer.writeln("uses System.DateUtils,", None)?;
         self.writer
             .writeln("System.Generics.Collections,", Some(5))?;
+        self.writer.writeln("System.Net.URLClient,", Some(5))?;
         self.writer.writeln("System.Types,", Some(5))?;
         self.writer.writeln("System.StrUtils,", Some(5))?;
         self.writer.writeln("System.SysUtils,", Some(5))?;
