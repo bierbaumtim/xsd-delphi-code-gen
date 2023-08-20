@@ -146,6 +146,7 @@ impl<T: Write> DelphiCodeGenerator<T> {
             UnionTypeCodeGenerator::write_declarations(
                 &mut self.writer,
                 &self.internal_representation.union_types,
+                &self.internal_representation.types_aliases,
                 &self.options,
                 2,
             )?;
@@ -283,7 +284,7 @@ where
 #[cfg(test)]
 mod tests {
     // use pretty_assertions::assert_eq;
-    
+
     // use super::*;
 
     // TODO: Write Test

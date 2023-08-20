@@ -322,7 +322,7 @@ impl InternalRepresentation {
 
                             if let Some(lt) = &st.list_type {
                                 Self::list_type_to_data_type(lt, registry)
-                                    .map(|d| (d, st.name.clone()))
+                                    .map(|d| (DataType::InlineList(Box::new(d)), st.name.clone()))
                             } else if st.enumeration.is_some() {
                                 Some((
                                     DataType::Enumeration(st.name.clone()),
@@ -338,7 +338,7 @@ impl InternalRepresentation {
                         crate::parser::types::UnionVariant::Simple(st) => {
                             if let Some(lt) = &st.list_type {
                                 Self::list_type_to_data_type(lt, registry)
-                                    .map(|d| (d, st.name.clone()))
+                                    .map(|d| (DataType::InlineList(Box::new(d)), st.name.clone()))
                             } else if st.enumeration.is_some() {
                                 Some((
                                     DataType::Enumeration(st.name.clone()),

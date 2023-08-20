@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::generator::{
     code_generator_trait::{CodeGenError, CodeGenOptions},
-    types::{Enumeration, TypeAlias, UnionType},
+    types::{Enumeration, TypeAlias, UnionType, DataType},
 };
 
 use super::{helper::Helper, code_writer::CodeWriter};
@@ -15,6 +15,7 @@ impl UnionTypeCodeGenerator {
     pub(crate) fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         union_types: &[UnionType],
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
@@ -24,7 +25,7 @@ impl UnionTypeCodeGenerator {
 
         writer.writeln("{$REGION 'Union Types'}", Some(indentation))?;
         for (i, union_type) in union_types.iter().enumerate() {
-            Self::generate_declaration(writer, union_type, options, indentation)?;
+            Self::generate_declaration(writer, union_type, type_aliases, options, indentation)?;
 
             if i < union_types.len() - 1 {
                 writer.newline()?;
@@ -80,6 +81,7 @@ impl UnionTypeCodeGenerator {
     fn generate_declaration<T: Write>(
         writer: &mut CodeWriter<T>,
         union_type: &UnionType,
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
@@ -113,16 +115,70 @@ impl UnionTypeCodeGenerator {
         ), Some(indentation+2))?;
 
         for (i, variant) in union_type.variants.iter().enumerate() {
-            writer.writeln_fmt(format_args!(
-                "{}.{}: ({}: {});",
-                Self::ENUM_NAME,
-                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                Helper::as_variable_name(variant.name.as_str()),
-                Helper::get_datatype_language_representation(
-                    &variant.data_type,
-                    &options.type_prefix
-                ),
-            ), Some(indentation+4))?;
+            match &variant.data_type {
+                DataType::Alias(a) => {
+                    if let Some((dt, _)) = Helper::get_alias_data_type(a, type_aliases) {
+                        match dt {
+                            DataType::String => {
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "{}.{}: ({}: string[255]);",
+                                        Self::ENUM_NAME,
+                                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                                        Helper::as_variable_name(variant.name.as_str()),
+                                    ),
+                                    Some(indentation+4)
+                                )?;
+                            }
+                            _ => {
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "{}.{}: ({}: {});",
+                                        Self::ENUM_NAME,
+                                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                                        Helper::as_variable_name(variant.name.as_str()),
+                                        Helper::get_datatype_language_representation(
+                                            &variant.data_type,
+                                            &options.type_prefix
+                                        ),
+                                    ),
+                                    Some(indentation+4)
+                                )?;
+                            }
+                        }
+                    }
+                }
+                DataType::InlineList(lt) => {
+                    writer.writeln_fmt(
+                        format_args!(
+                            "{}.{}: ({}: array[1..256] of {});",
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                            Helper::as_variable_name(variant.name.as_str()),
+                            Helper::get_datatype_language_representation(
+                                lt.as_ref(),
+                                &options.type_prefix
+                            ),
+                        ),
+                        Some(indentation+4)
+                    )?;
+                },
+                _ => {
+                    writer.writeln_fmt(
+                        format_args!(
+                            "{}.{}: ({}: {});",
+                            Self::ENUM_NAME,
+                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                            Helper::as_variable_name(variant.name.as_str()),
+                            Helper::get_datatype_language_representation(
+                                &variant.data_type,
+                                &options.type_prefix
+                            ),
+                        ),
+                        Some(indentation+4)
+                    )?;
+                }
+            }
         }
 
         writer.writeln("end;",Some(indentation))?;
@@ -154,9 +210,7 @@ impl UnionTypeCodeGenerator {
         }
 
         if options.generate_to_xml {
-            writer.writeln("function ToXmlValue: String;"
-                
-            ,Some(indentation+2))?;
+            writer.writeln("function ToXmlValue: String;", Some(indentation + 2))?;
         }
         writer.writeln("end;",Some(indentation))?;
 
@@ -238,10 +292,23 @@ impl UnionTypeCodeGenerator {
                             crate::generator::types::DataType::FixedSizeList(_, _) => {
                                 writer.writeln_fmt(format_args!(
                                     "{}.{}: Result := ''; // TODO: CodeGen for this type is currently not supported. Manual implementation required",
-                                    
                                     Self::ENUM_NAME,
                                     Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                                 ), Some(4))?;
+                            }
+                            crate::generator::types::DataType::InlineList(lt) => {
+                                writer.writeln_fmt(format_args!("{}.{}: begin",Self::ENUM_NAME,
+                                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),), Some(4))?;
+                                writer.writeln("Result := '';", Some(6))?;
+                                writer.newline()?;
+                                writer.writeln_fmt(format_args!("for var I := Low({}) to High({}) do begin", variable_name, variable_name), Some(6))?;
+                                writer.writeln_fmt(format_args!("Result := Result + {};", Helper::get_variable_value_as_string(lt.as_ref(), &format!("{}[I]", variable_name), &None)), Some(8))?;
+                                writer.newline()?;
+                                writer.writeln_fmt(format_args!("if I < High({}) then begin", variable_name), Some(8))?;
+                                writer.writeln("Result := Result + ' ';", Some(10))?;
+                                writer.writeln("end;", Some(8))?;
+                                writer.writeln("end;", Some(6))?;
+                                writer.writeln("end;", Some(4))?;
                             }
                             crate::generator::types::DataType::Union(n) => {
                                 writer.writeln_fmt(format_args!(
@@ -283,10 +350,23 @@ impl UnionTypeCodeGenerator {
                     crate::generator::types::DataType::FixedSizeList(_, _) => {
                         writer.writeln_fmt(format_args!(
                             "{}.{}: Result := ''; // TODO: CodeGen for this type is currently not supported. Manual implementation required",
-
                             Self::ENUM_NAME,
                             Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                         ), Some(4))?
+                    }
+                    crate::generator::types::DataType::InlineList(lt) => {
+                        writer.writeln_fmt(format_args!("{}.{}: begin",Self::ENUM_NAME,
+                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),), Some(4))?;
+                        writer.writeln("Result := '';", Some(6))?;
+                        writer.newline()?;
+                        writer.writeln_fmt(format_args!("for var I := Low({}) to High({}) do begin", variable_name, variable_name), Some(6))?;
+                        writer.writeln_fmt(format_args!("Result := Result + {};", Helper::get_variable_value_as_string(lt.as_ref(), &format!("{}[I]", variable_name), &None)), Some(8))?;
+                        writer.newline()?;
+                        writer.writeln_fmt(format_args!("if I < High({}) then begin", variable_name), Some(8))?;
+                        writer.writeln("Result := Result + ' ';", Some(10))?;
+                        writer.writeln("end;", Some(8))?;
+                        writer.writeln("end;", Some(6))?;
+                        writer.writeln("end;", Some(4))?;
                     }
                     crate::generator::types::DataType::Union(n) => {
                         writer.writeln_fmt(format_args!(
