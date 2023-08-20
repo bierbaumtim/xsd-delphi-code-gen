@@ -1149,6 +1149,7 @@ impl ClassCodeGenerator {
                 pattern.unwrap_or_default(),
             ),
             DataType::Time => format!("TimeOf(ISO8601ToDate({}))", value),
+            DataType::Uri => format!("TURI.Create({})", value),
             DataType::SmallInteger
             | DataType::ShortInteger
             | DataType::Integer
