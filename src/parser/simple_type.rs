@@ -23,7 +23,7 @@ impl SimpleTypeParser {
         xml_parser: &XmlParser,
         name: String,
         qualified_parent: Option<String>,
-    ) -> Result<(SimpleType, String), ParserError> {
+    ) -> Result<SimpleType, ParserError> {
         let mut base_type = String::new();
         let mut list_type = String::new();
         let mut annotations = Vec::new();
@@ -144,7 +144,7 @@ impl SimpleTypeParser {
         let base_type = xml_parser.resolve_namespace(base_type)?;
 
         let s_type = SimpleType {
-            name: name.clone(),
+            name,
             qualified_name,
             base_type: XmlParserHelper::base_type_str_to_node_type(base_type.as_str()),
             enumeration: if enumerations.is_empty() {
@@ -160,7 +160,7 @@ impl SimpleTypeParser {
 
         buf.clear();
 
-        Ok((s_type, name))
+        Ok(s_type)
     }
 
     fn parse_union_local_variants(
@@ -185,7 +185,7 @@ impl SimpleTypeParser {
                     if s.name().as_ref() == b"xs:simpleType" {
                         let variant_name = format!("{}Variant{}", name, variant_count);
 
-                        let (s_type, _) = Self::parse(
+                        let s_type = Self::parse(
                             reader,
                             registry,
                             xml_parser,

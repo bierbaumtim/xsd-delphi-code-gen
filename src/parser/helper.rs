@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use quick_xml::events::BytesStart;
 
+use crate::parser::types::UNBOUNDED_OCCURANCE;
+
 use super::types::{BaseAttributes, NodeBaseType, NodeType, ParserError};
 
 pub(crate) struct XmlParserHelper;
@@ -19,6 +21,7 @@ impl XmlParserHelper {
             "xs:hexBinary" => Some(NodeType::Standard(NodeBaseType::HexBinary)),
             "xs:string" => Some(NodeType::Standard(NodeBaseType::String)),
             "xs:time" => Some(NodeType::Standard(NodeBaseType::Time)),
+            "xs:anyURI" => Some(NodeType::Standard(NodeBaseType::Uri)),
             "xs:byte" => Some(NodeType::Standard(NodeBaseType::Byte)),
             "xs:short" => Some(NodeType::Standard(NodeBaseType::Short)),
             "xs:nonNegativeInteger"
@@ -74,9 +77,15 @@ impl XmlParserHelper {
         name: &str,
     ) -> Result<Option<i64>, ParserError> {
         let value = Self::get_attribute_value(node, name)
-            .map(|v| {
-                v.parse::<i64>()
-                    .map_err(|e| ParserError::MalformedAttribute(v, Some(format!("{:?}", e))))
+            .map(|v| match v.parse::<i64>() {
+                Ok(e) => Ok(e),
+                Err(e) => {
+                    if v == "unbounded" {
+                        Ok(UNBOUNDED_OCCURANCE)
+                    } else {
+                        Err(ParserError::MalformedAttribute(v, Some(format!("{:?}", e))))
+                    }
+                }
             })
             .map(|v| v.ok());
 

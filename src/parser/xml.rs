@@ -65,7 +65,7 @@ impl XmlParser {
         let mut documentations = Vec::new();
         let mut buf = Vec::new();
 
-        let mut current_element_name = None::<String>;
+        let mut current_element = None::<(String, BaseAttributes)>;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -80,11 +80,13 @@ impl XmlParser {
                             self.extract_schema_namespace_aliases(&s);
                         }
                         b"xs:element" => {
-                            current_element_name =
-                                Some(XmlParserHelper::get_attribute_value(&s, "name")?)
+                            let name = XmlParserHelper::get_attribute_value(&s, "name")?;
+                            let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
+
+                            current_element = Some((name, base_attributes))
                         }
                         b"xs:complexType" => {
-                            if let Some(name) = &current_element_name {
+                            if let Some((name, base_attributes)) = &current_element {
                                 let c_type = ComplexTypeParser::parse(
                                     reader,
                                     registry,
@@ -93,16 +95,12 @@ impl XmlParser {
                                     None,
                                 )?;
 
+                                let node_type = NodeType::Custom(c_type.qualified_name.clone());
                                 let c_type = CustomTypeDefinition::Complex(c_type);
                                 registry.register_type(c_type);
 
-                                let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
-
-                                let node = Node::new(
-                                    NodeType::Custom(name.clone()),
-                                    name.clone(),
-                                    base_attributes,
-                                );
+                                let node =
+                                    Node::new(node_type, name.clone(), (*base_attributes).clone());
                                 nodes.push(node);
                             } else {
                                 let name = XmlParserHelper::get_attribute_value(&s, "name")
@@ -118,8 +116,8 @@ impl XmlParser {
                             }
                         }
                         b"xs:simpleType" => {
-                            if let Some(name) = &current_element_name {
-                                let (s_type, type_name) = SimpleTypeParser::parse(
+                            if let Some((name, base_attributes)) = &current_element {
+                                let s_type = SimpleTypeParser::parse(
                                     reader,
                                     registry,
                                     self,
@@ -127,22 +125,18 @@ impl XmlParser {
                                     None,
                                 )?;
 
+                                let node_type = NodeType::Custom(s_type.qualified_name.clone());
                                 registry.register_type(s_type.into());
 
-                                let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
-
-                                let node = Node::new(
-                                    NodeType::Custom(type_name),
-                                    name.clone(),
-                                    base_attributes,
-                                );
+                                let node =
+                                    Node::new(node_type, name.clone(), (*base_attributes).clone());
                                 nodes.push(node);
                             } else {
                                 let name = XmlParserHelper::get_attribute_value(&s, "name")
                                     .ok()
                                     .unwrap_or_else(|| registry.generate_type_name());
 
-                                let (s_type, _) =
+                                let s_type =
                                     SimpleTypeParser::parse(reader, registry, self, name, None)?;
 
                                 registry.register_type(s_type.into());
@@ -158,7 +152,7 @@ impl XmlParser {
                 }
                 Ok(Event::End(e)) => {
                     if let b"xs:element" = e.name().as_ref() {
-                        current_element_name = None
+                        current_element = None
                     }
                 }
                 Ok(Event::Empty(e)) => {

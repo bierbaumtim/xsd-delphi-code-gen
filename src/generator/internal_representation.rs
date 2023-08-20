@@ -4,6 +4,7 @@ use super::{dependency_graph::DependencyGraph, types::*};
 
 pub(crate) const DOCUMENT_NAME: &str = "Document";
 
+#[derive(Debug)]
 pub(crate) struct InternalRepresentation {
     pub(crate) document: ClassType,
     pub(crate) classes: Vec<ClassType>,
@@ -123,7 +124,10 @@ impl InternalRepresentation {
                                 let variable = Variable {
                                     name: child.name.clone(),
                                     xml_name: child.name.clone(),
-                                    requires_free: matches!(d_type, DataType::List(_)),
+                                    requires_free: matches!(
+                                        d_type,
+                                        DataType::List(_) | DataType::Uri
+                                    ),
                                     data_type: d_type,
                                 };
 
@@ -181,7 +185,9 @@ impl InternalRepresentation {
                                         requires_free: requires_free
                                             || matches!(
                                                 data_type,
-                                                DataType::List(_) | DataType::InlineList(_)
+                                                DataType::List(_)
+                                                    | DataType::InlineList(_)
+                                                    | DataType::Uri
                                             ),
                                         data_type,
                                     };
@@ -437,6 +443,7 @@ impl InternalRepresentation {
             NodeBaseType::Base64Binary => DataType::Binary(BinaryEncoding::Base64),
             NodeBaseType::String => DataType::String,
             NodeBaseType::Time => DataType::Time,
+            NodeBaseType::Uri => DataType::Uri,
             NodeBaseType::Byte => DataType::ShortInteger,
             NodeBaseType::Short => DataType::SmallInteger,
             NodeBaseType::Integer => DataType::Integer,

@@ -63,9 +63,10 @@ pub(crate) enum NodeBaseType {
     UnsignedLong,
     String,
     Time,
+    Uri,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BaseAttributes {
     pub(crate) min_occurs: Option<i64>,
     pub(crate) max_occurs: Option<i64>,
