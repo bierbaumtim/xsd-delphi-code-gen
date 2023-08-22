@@ -129,6 +129,7 @@ impl InternalRepresentation {
                                         DataType::List(_) | DataType::Uri
                                     ),
                                     data_type: d_type,
+                                    required: min_occurs > 0,
                                 };
 
                                 variables.push(variable);
@@ -190,6 +191,7 @@ impl InternalRepresentation {
                                                     | DataType::Uri
                                             ),
                                         data_type,
+                                        required: min_occurs > 0,
                                     };
 
                                     variables.push(variable);
@@ -225,6 +227,7 @@ impl InternalRepresentation {
             let variable = Variable {
                 name: node.name.clone(),
                 xml_name: node.name.clone(),
+                required: min_occurs > 0,
                 data_type: match &node.node_type {
                     NodeType::Standard(s) => Self::node_base_type_to_datatype(s),
                     NodeType::Custom(e) => {

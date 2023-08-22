@@ -40,19 +40,26 @@ impl ClassCodeGenerator {
         writer: &mut CodeWriter<T>,
         classes: &Vec<ClassType>,
         document: &ClassType,
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
         writer.writeln("{$REGION 'Declarations}", Some(2))?;
 
-        Self::generate_class_declaration(writer, document, options, indentation)?;
+        Self::generate_class_declaration(writer, document, type_aliases, options, indentation)?;
 
         for class_type in classes {
             if class_type.name == DOCUMENT_NAME {
                 continue;
             }
 
-            Self::generate_class_declaration(writer, class_type, options, indentation)?;
+            Self::generate_class_declaration(
+                writer,
+                class_type,
+                type_aliases,
+                options,
+                indentation,
+            )?;
         }
         writer.writeln("{$ENDREGION}", Some(2))?;
 
@@ -91,6 +98,7 @@ impl ClassCodeGenerator {
     fn generate_class_declaration<T: Write>(
         writer: &mut CodeWriter<T>,
         class_type: &ClassType,
+        type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
@@ -114,36 +122,98 @@ impl ClassCodeGenerator {
 
         // Variables
         for variable in &class_type.variables {
+            let variable_name = Helper::as_variable_name(&variable.name);
+
             match &variable.data_type {
+                DataType::Alias(n) => {
+                    if let Some((data_type, _)) =
+                        Helper::get_alias_data_type(n.as_str(), type_aliases)
+                    {
+                        match data_type {
+                            DataType::InlineList(_) => {
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "{}: {};",
+                                        variable_name,
+                                        Helper::as_type_name(&n, &options.type_prefix)
+                                    ),
+                                    Some(indentation + 2),
+                                )?;
+                            }
+                            _ => {
+                                let lang_rep = Helper::get_datatype_language_representation(
+                                    &variable.data_type,
+                                    &options.type_prefix,
+                                );
+
+                                if variable.required
+                                    || matches!(
+                                        variable.data_type,
+                                        DataType::Custom(_)
+                                            | DataType::List(_)
+                                            | DataType::InlineList(_)
+                                    )
+                                {
+                                    writer.writeln_fmt(
+                                        format_args!("{}: {};", variable_name, lang_rep,),
+                                        Some(indentation + 2),
+                                    )?;
+                                } else {
+                                    writer.writeln_fmt(
+                                        format_args!("{}: TOptional<{}>;", variable_name, lang_rep,),
+                                        Some(indentation + 2),
+                                    )?;
+                                }
+                            }
+                        }
+                    } else {
+                        return Err(CodeGenError::MissingDataType(
+                            class_type.name.clone(),
+                            variable_name,
+                        ));
+                    }
+                }
                 DataType::FixedSizeList(item_type, size) => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        item_type,
+                        &options.type_prefix,
+                    );
+                    let rhs =
+                        if variable.required || matches!(variable.data_type, DataType::Custom(_)) {
+                            lang_rep
+                        } else {
+                            format!("TOptional<{}>", lang_rep)
+                        };
+
                     for i in 1..size + 1 {
                         writer.writeln_fmt(
-                            format_args!(
-                                "{}{}: {};",
-                                Helper::as_variable_name(&variable.name),
-                                i,
-                                Helper::get_datatype_language_representation(
-                                    item_type,
-                                    &options.type_prefix
-                                ),
-                            ),
+                            format_args!("{}{}: {};", variable_name, i, rhs),
                             Some(indentation + 2),
                         )?;
                     }
                 }
-
                 _ => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{}: {};",
-                            Helper::as_variable_name(&variable.name),
-                            Helper::get_datatype_language_representation(
-                                &variable.data_type,
-                                &options.type_prefix
-                            ),
-                        ),
-                        Some(indentation + 2),
-                    )?;
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix,
+                    );
+
+                    if variable.required
+                        || matches!(
+                            variable.data_type,
+                            DataType::Custom(_) | DataType::List(_) | DataType::InlineList(_)
+                        )
+                    {
+                        writer.writeln_fmt(
+                            format_args!("{}: {};", variable_name, lang_rep,),
+                            Some(indentation + 2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!("{}: TOptional<{}>;", variable_name, lang_rep,),
+                            Some(indentation + 2),
+                        )?;
+                    }
                 }
             }
         }
@@ -169,7 +239,11 @@ impl ClassCodeGenerator {
             )?;
         }
 
-        if class_type.variables.iter().any(|v| v.requires_free) {
+        if class_type
+            .variables
+            .iter()
+            .any(|v| v.requires_free || !v.required)
+        {
             writer.writeln("destructor Destroy; override;", Some(indentation + 2))?;
         }
 
@@ -202,7 +276,10 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
         let formated_name = Helper::as_type_name(&class_type.name, &options.type_prefix);
-        let needs_destroy = class_type.variables.iter().any(|v| v.requires_free);
+        let needs_destroy = class_type
+            .variables
+            .iter()
+            .any(|v| v.requires_free || !v.required);
 
         writer.writeln_fmt(format_args!("{{ {} }}", formated_name), None)?;
 
@@ -246,7 +323,11 @@ impl ClassCodeGenerator {
 
             writer.writeln("begin", None)?;
 
-            for variable in class_type.variables.iter().filter(|v| v.requires_free) {
+            for variable in class_type
+                .variables
+                .iter()
+                .filter(|v| v.requires_free || !v.required)
+            {
                 match &variable.data_type {
                     DataType::FixedSizeList(_, size) => {
                         for i in 1..size + 1 {
@@ -293,80 +374,147 @@ impl ClassCodeGenerator {
         }
 
         for variable in &class_type.variables {
+            let variable_name = Helper::as_variable_name(&variable.name);
+
             match &variable.data_type {
                 DataType::Alias(name) => {
                     if let Some((data_type, _)) =
                         Helper::get_alias_data_type(name.as_str(), type_aliases)
                     {
                         match data_type {
-                            DataType::InlineList(_) => writer.writeln_fmt(
-                                format_args!(
-                                    "{} := {}.Create;",
-                                    Helper::as_variable_name(&variable.name),
-                                    Helper::get_datatype_language_representation(
-                                        &variable.data_type,
-                                        &options.type_prefix
-                                    ),
-                                ),
-                                Some(2),
-                            )?,
-                            _ => writer.writeln_fmt(
-                                format_args!(
-                                    "{} := Default({});",
-                                    Helper::as_variable_name(&variable.name),
-                                    Helper::as_type_name(name, &options.type_prefix),
-                                ),
-                                Some(2),
-                            )?,
+                            DataType::InlineList(_) => {
+                                if variable.required {
+                                    writer.writeln_fmt(
+                                        format_args!(
+                                            "{} := {}.Create;",
+                                            variable_name,
+                                            Helper::get_datatype_language_representation(
+                                                &variable.data_type,
+                                                &options.type_prefix,
+                                            )
+                                        ),
+                                        Some(2),
+                                    )?;
+                                } else {
+                                    writer.writeln_fmt(
+                                        format_args!("{} := nil;", variable_name),
+                                        Some(2),
+                                    )?;
+                                }
+                            }
+                            _ => {
+                                if variable.required {
+                                    writer.writeln_fmt(
+                                        format_args!(
+                                            "{} := Default({});",
+                                            variable_name,
+                                            Helper::as_type_name(name, &options.type_prefix),
+                                        ),
+                                        Some(2),
+                                    )?;
+                                } else {
+                                    writer.writeln_fmt(
+                                        format_args!(
+                                            "{} := TNone<{}>.Create;",
+                                            variable_name,
+                                            Helper::as_type_name(name, &options.type_prefix),
+                                        ),
+                                        Some(2),
+                                    )?;
+                                }
+                            }
                         }
                     }
                 }
-                DataType::Enumeration(name) => writer.writeln_fmt(
-                    format_args!(
-                        "{} := Default({});",
-                        Helper::as_variable_name(&variable.name),
-                        Helper::as_type_name(name, &options.type_prefix),
-                    ),
-                    Some(2),
-                )?,
+                DataType::Enumeration(name) => {
+                    let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!("{} := Default({});", variable_name, type_name),
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!("{} := TNone<{}>.Create;", variable_name, type_name),
+                            Some(2),
+                        )?
+                    }
+                }
                 DataType::Custom(name) => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := {}.Create;",
-                            Helper::as_variable_name(&variable.name),
-                            Helper::as_type_name(name, &options.type_prefix),
-                        ),
-                        Some(2),
-                    )?;
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := {}.Create;",
+                                variable_name,
+                                Helper::as_type_name(name, &options.type_prefix)
+                            ),
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(format_args!("{} := nil;", variable_name), Some(2))?;
+                    }
                 }
                 DataType::List(_) | DataType::InlineList(_) => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := {}.Create;",
-                            Helper::as_variable_name(&variable.name),
-                            Helper::get_datatype_language_representation(
-                                &variable.data_type,
-                                &options.type_prefix
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := {}.Create;",
+                                variable_name,
+                                Helper::get_datatype_language_representation(
+                                    &variable.data_type,
+                                    &options.type_prefix
+                                ),
                             ),
-                        ),
-                        Some(2),
-                    )?;
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(format_args!("{} := nil;", variable_name,), Some(2))?;
+                    }
                 }
                 DataType::FixedSizeList(item_type, size) => {
                     let rhs = match item_type.as_ref() {
-                        DataType::Alias(name) => format!(
-                            "Default({})",
-                            Helper::as_type_name(name, &options.type_prefix)
-                        ),
-                        DataType::Enumeration(name) => format!(
-                            "Default({})",
-                            Helper::as_type_name(name, &options.type_prefix)
-                        ),
+                        DataType::Alias(name) => {
+                            if let Some((data_type, _)) =
+                                Helper::get_alias_data_type(name.as_str(), type_aliases)
+                            {
+                                let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                                match data_type {
+                                    DataType::Custom(_) => String::from("nil"),
+                                    _ => {
+                                        if variable.required {
+                                            format!("Default({})", type_name)
+                                        } else {
+                                            format!("TNone<{}>.Create", type_name)
+                                        }
+                                    }
+                                }
+                            } else {
+                                return Err(CodeGenError::MissingDataType(
+                                    class_type.name.clone(),
+                                    variable_name,
+                                ));
+                            }
+                        }
+                        DataType::Enumeration(name) => {
+                            let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                            if variable.required {
+                                format!("Default({})", type_name)
+                            } else {
+                                format!("TNone<{}>.Create", type_name)
+                            }
+                        }
                         DataType::Custom(name) => {
-                            format!(
-                                "{}.Create",
-                                Helper::as_type_name(name, &options.type_prefix)
-                            )
+                            if variable.required {
+                                format!(
+                                    "{}.Create",
+                                    Helper::as_type_name(name, &options.type_prefix)
+                                )
+                            } else {
+                                String::from("nil")
+                            }
                         }
                         DataType::List(_) => {
                             return Err(CodeGenError::NestedListInFixedSizeList(
@@ -380,48 +528,57 @@ impl ClassCodeGenerator {
                                 variable.name.clone(),
                             ))
                         }
-                        _ => format!(
-                            "Default({})",
-                            Helper::get_datatype_language_representation(
+                        _ => {
+                            let lang_rep = Helper::get_datatype_language_representation(
                                 item_type.as_ref(),
-                                &options.type_prefix
-                            )
-                        ),
+                                &options.type_prefix,
+                            );
+
+                            if variable.required {
+                                format!("Default({})", lang_rep)
+                            } else {
+                                format!("TNone<{}>.Create", lang_rep)
+                            }
+                        }
                     };
 
                     for i in 1..size + 1 {
                         writer.writeln_fmt(
-                            format_args!(
-                                "{}{} := {};",
-                                Helper::as_variable_name(&variable.name),
-                                i,
-                                rhs,
-                            ),
+                            format_args!("{}{} := {};", variable_name, i, rhs,),
                             Some(2),
                         )?;
                     }
                 }
                 DataType::Uri => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := TURI.Create('');",
-                            Helper::as_variable_name(&variable.name),
-                        ),
-                        Some(2),
-                    )?;
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!("{} := TURI.Create('');", variable_name),
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!("{} := TNone<TURI>.Create('');", variable_name),
+                            Some(2),
+                        )?;
+                    }
                 }
                 _ => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := Default({});",
-                            Helper::as_variable_name(&variable.name),
-                            Helper::get_datatype_language_representation(
-                                &variable.data_type,
-                                &options.type_prefix
-                            ),
-                        ),
-                        Some(2),
-                    )?;
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix,
+                    );
+
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!("{} := Default({});", variable_name, lang_rep),
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!("{} := TNone<{}>.Create;", variable_name, lang_rep),
+                            Some(2),
+                        )?;
+                    }
                 }
             }
         }
@@ -449,7 +606,14 @@ impl ClassCodeGenerator {
             writer.newline()?;
         }
 
+        if class_type.variables.iter().any(|v| !v.required) {
+            writer.writeln("var vOptionalNode: IXMLNode;", Some(2))?;
+            writer.newline()?;
+        }
+
         for variable in &class_type.variables {
+            let variable_name = Helper::as_variable_name(&variable.name);
+
             match &variable.data_type {
                 DataType::Alias(name) => {
                     if let Some((data_type, pattern)) =
@@ -468,7 +632,7 @@ impl ClassCodeGenerator {
                             _ => writer.writeln_fmt(
                                 format_args!(
                                     "{} := {};",
-                                    Helper::as_variable_name(&variable.name),
+                                    variable_name,
                                     Self::generate_standard_type_from_xml(
                                         &data_type,
                                         format!("node.ChildNodes['{}'].Text", variable.xml_name),
@@ -481,26 +645,73 @@ impl ClassCodeGenerator {
                     }
                 }
                 DataType::Enumeration(name) => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := {}.FromXmlValue(node.ChildNodes['{}'].Text);",
-                            Helper::as_variable_name(&variable.name),
-                            Helper::as_type_name(name, &options.type_prefix),
-                            variable.xml_name
-                        ),
-                        Some(2),
-                    )?;
+                    let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := {}.FromXmlValue(node.ChildNodes['{}'].Text);",
+                                variable_name, type_name, variable.xml_name
+                            ),
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "vOptionalNode := node.ChildNodes.FindNode('{}');",
+                                variable.xml_name
+                            ),
+                            Some(2),
+                        )?;
+                        writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := TSome<{}>.Create({}.FromXmlValue(vOptionalNode.Text));",
+                                variable_name, type_name, type_name,
+                            ),
+                            Some(4),
+                        )?;
+                        writer.writeln("end else begin", Some(2))?;
+                        writer.writeln_fmt(
+                            format_args!("{} := TNone<{}>.Create", variable_name, type_name),
+                            Some(4),
+                        )?;
+                        writer.writeln("end;", Some(2))?;
+                        writer.newline()?;
+                    }
                 }
                 DataType::Custom(name) => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := {}.FromXml(node.ChildNodes['{}']);",
-                            Helper::as_variable_name(&variable.name),
-                            Helper::as_type_name(name, &options.type_prefix),
-                            variable.xml_name
-                        ),
-                        Some(2),
-                    )?;
+                    let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := {}.FromXml(node.ChildNodes['{}']);",
+                                variable_name, type_name, variable.xml_name
+                            ),
+                            Some(2),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "vOptionalNode := node.ChildNodes.FindNode('{}');",
+                                variable.xml_name
+                            ),
+                            Some(2),
+                        )?;
+                        writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := {}.FromXml(vOptionalNode);",
+                                variable_name, type_name,
+                            ),
+                            Some(4),
+                        )?;
+                        writer.writeln("end else begin", Some(2))?;
+                        writer.writeln_fmt(format_args!("{} := nil;", variable_name), Some(4))?;
+                        writer.writeln("end;", Some(2))?;
+                        writer.newline()?;
+                    }
                 }
                 DataType::List(item_type) => {
                     Self::generate_list_from_xml(
@@ -531,18 +742,54 @@ impl ClassCodeGenerator {
                     )?;
                 }
                 _ => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := {};",
-                            Helper::as_variable_name(&variable.name),
-                            Self::generate_standard_type_from_xml(
-                                &variable.data_type,
-                                format!("node.ChildNodes['{}'].Text", variable.xml_name),
-                                None,
-                            )
-                        ),
-                        Some(2),
-                    )?;
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := {};",
+                                variable_name,
+                                Self::generate_standard_type_from_xml(
+                                    &variable.data_type,
+                                    format!("node.ChildNodes['{}'].Text", variable.xml_name),
+                                    None,
+                                )
+                            ),
+                            Some(2),
+                        )?;
+                    } else {
+                        let lang_rep = Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix,
+                        );
+
+                        writer.writeln_fmt(
+                            format_args!(
+                                "vOptionalNode := node.ChildNodes.FindNode('{}');",
+                                variable.xml_name
+                            ),
+                            Some(2),
+                        )?;
+                        writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{} := TSome<{}>.Create({});",
+                                variable_name,
+                                lang_rep,
+                                Self::generate_standard_type_from_xml(
+                                    &variable.data_type,
+                                    "vOptionalNode.Text".to_owned(),
+                                    None,
+                                ),
+                            ),
+                            Some(4),
+                        )?;
+                        writer.writeln("end else begin", Some(2))?;
+                        writer.writeln_fmt(
+                            format_args!("{} := TNone<{}>.Create", variable_name, lang_rep),
+                            Some(4),
+                        )?;
+                        writer.writeln("end;", Some(2))?;
+                        writer.newline()?;
+                    }
                 }
             }
         }
@@ -560,18 +807,20 @@ impl ClassCodeGenerator {
     ) -> Result<(), CodeGenError> {
         let formatted_variable_name = Helper::as_variable_name(&variable.name);
 
-        writer.writeln_fmt(
-            format_args!(
-                "{} := {}.Create;",
-                formatted_variable_name,
-                Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix
+        if variable.required {
+            writer.writeln_fmt(
+                format_args!(
+                    "{} := {}.Create;",
+                    formatted_variable_name,
+                    Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix
+                    ),
                 ),
-            ),
-            Some(2),
-        )?;
-        writer.newline()?;
+                Some(2),
+            )?;
+            writer.newline()?;
+        }
         writer.writeln_fmt(
             format_args!(
                 "var __{}Index := node.ChildNodes.IndexOf('{}');",
@@ -583,6 +832,21 @@ impl ClassCodeGenerator {
             format_args!("if __{}Index >= 0 then begin", variable.name),
             Some(2),
         )?;
+
+        if !variable.required {
+            writer.writeln_fmt(
+                format_args!(
+                    "{} := {}.Create;",
+                    formatted_variable_name,
+                    Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix
+                    ),
+                ),
+                Some(2),
+            )?;
+        }
+
         writer.writeln_fmt(
             format_args!(
                 "for var I := 0 to node.ChildNodes.Count - __{}Index - 1 do begin",
@@ -701,6 +965,7 @@ impl ClassCodeGenerator {
                 Some(2),
             )?;
         }
+
         writer.newline()?;
         writer.writeln_fmt(
             format_args!(
@@ -813,26 +1078,57 @@ impl ClassCodeGenerator {
         item_type: &DataType,
     ) -> Result<(), CodeGenError> {
         let formatted_variable_name = Helper::as_variable_name(&variable.name);
+        let mut indentation = 2;
 
         writer.newline()?;
-        writer.writeln_fmt(
-            format_args!(
-                "{} := {}.Create;",
-                formatted_variable_name,
-                Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix
+        if variable.required {
+            writer.writeln_fmt(
+                format_args!(
+                    "{} := {}.Create;",
+                    formatted_variable_name,
+                    Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix
+                    ),
                 ),
-            ),
-            Some(2),
-        )?;
-        writer.writeln_fmt(
-            format_args!(
-                "for var vPart in node.ChildNodes['{}'].Text.Split([' ']) do begin",
-                variable.xml_name,
-            ),
-            Some(2),
-        )?;
+                Some(indentation),
+            )?;
+            writer.writeln_fmt(
+                format_args!(
+                    "for var vPart in node.ChildNodes['{}'].Text.Split([' ']) do begin",
+                    variable.xml_name,
+                ),
+                Some(indentation),
+            )?;
+        } else {
+            writer.writeln_fmt(
+                format_args!(
+                    "vOptionalNode := node.ChildNodes.FindNode('{}');",
+                    variable.xml_name
+                ),
+                Some(indentation),
+            )?;
+            writer.writeln("if Assigned(vOptionalNode) then begin", Some(indentation))?;
+
+            indentation = 4;
+
+            writer.writeln_fmt(
+                format_args!(
+                    "{} := {}.Create;",
+                    formatted_variable_name,
+                    Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix
+                    ),
+                ),
+                Some(indentation),
+            )?;
+            writer.newline()?;
+            writer.writeln(
+                "for var vPart in vOptionalNode.Text.Split([' ']) do begin",
+                Some(indentation),
+            )?;
+        }
 
         match item_type {
             DataType::Alias(name) => {
@@ -849,7 +1145,7 @@ impl ClassCodeGenerator {
                                 pattern,
                             ),
                         ),
-                        Some(4),
+                        Some(indentation + 2),
                     )?;
                 }
             }
@@ -860,7 +1156,7 @@ impl ClassCodeGenerator {
                         formatted_variable_name,
                         Helper::as_type_name(n, &options.type_prefix),
                     ),
-                    Some(4),
+                    Some(indentation + 2),
                 )?;
             }
             DataType::Custom(_)
@@ -873,11 +1169,22 @@ impl ClassCodeGenerator {
                     formatted_variable_name,
                     Self::generate_standard_type_from_xml(item_type, "vPart".to_owned(), None),
                 ),
-                Some(4),
+                Some(indentation + 2),
             )?,
         };
 
-        writer.writeln("end;", Some(2))?;
+        if variable.required {
+            writer.writeln("end;", Some(2))?;
+        } else {
+            writer.writeln("end;", Some(indentation))?;
+
+            writer.writeln("end else begin", Some(2))?;
+            writer.writeln_fmt(
+                format_args!("{} := nil;", formatted_variable_name,),
+                Some(indentation),
+            )?;
+            writer.writeln("end;", Some(2))?;
+        }
 
         Ok(())
     }
@@ -924,6 +1231,9 @@ impl ClassCodeGenerator {
         writer.writeln("var node: IXMLNode;", Some(2))?;
         writer.newline()?;
         for (index, variable) in class_type.variables.iter().enumerate() {
+            let variable_name = Helper::as_variable_name(&variable.name);
+            let mut indentation = 2;
+
             match &variable.data_type {
                 DataType::Alias(name) => {
                     if let Some((data_type, pattern)) =
@@ -931,107 +1241,162 @@ impl ClassCodeGenerator {
                     {
                         match data_type {
                             DataType::InlineList(lt) => {
+                                if variable.required {
+                                    writer.writeln_fmt(
+                                        format_args!("if Assigned({}) then begin", variable_name),
+                                        Some(2),
+                                    )?;
+                                    indentation = 4;
+                                }
+
                                 writer.writeln_fmt(
                                     format_args!(
                                         "node := pParent.AddChild('{}');",
                                         variable.xml_name
                                     ),
-                                    Some(2),
+                                    Some(indentation),
                                 )?;
                                 writer.writeln_fmt(
                                     format_args!(
                                         "for var I := 0 to {}.Count - 1 do begin",
-                                        Helper::as_variable_name(&variable.name)
+                                        variable_name
                                     ),
-                                    Some(2),
+                                    Some(indentation),
                                 )?;
                                 writer.writeln_fmt(
                                     format_args!(
                                         "node.Text := node.Text + {};",
                                         Helper::get_variable_value_as_string(
                                             lt.as_ref(),
-                                            &format!(
-                                                "{}[I]",
-                                                Helper::as_variable_name(&variable.name)
-                                            ),
+                                            &format!("{}[I]", variable_name),
                                             &pattern
                                         )
                                     ),
-                                    Some(4),
+                                    Some(indentation + 2),
                                 )?;
                                 writer.newline()?;
                                 writer.writeln_fmt(
-                                    format_args!(
-                                        "if I < {}.Count - 1 then begin",
-                                        Helper::as_variable_name(&variable.name)
-                                    ),
+                                    format_args!("if I < {}.Count - 1 then begin", variable_name),
                                     Some(4),
                                 )?;
-                                writer.writeln("node.Text := node.Text + ' ';", Some(6))?;
-                                writer.writeln("end;", Some(4))?;
-                                writer.writeln("end;", Some(2))?;
+                                writer.writeln(
+                                    "node.Text := node.Text + ' ';",
+                                    Some(indentation + 4),
+                                )?;
+                                writer.writeln("end;", Some(indentation + 2))?;
+                                writer.writeln("end;", Some(indentation))?;
+
+                                if variable.required {
+                                    writer.writeln("end;", Some(2))?;
+                                }
                             }
                             _ => {
-                                for arg in Self::generate_standard_type_to_xml(
-                                    &data_type,
-                                    &Helper::as_variable_name(&variable.name),
-                                    &variable.xml_name,
-                                    &pattern,
-                                ) {
-                                    writer.writeln(arg.as_str(), Some(2))?;
+                                if variable.required {
+                                    for arg in Self::generate_standard_type_to_xml(
+                                        &data_type,
+                                        &variable_name,
+                                        &variable.xml_name,
+                                        &pattern,
+                                    ) {
+                                        writer.writeln(arg.as_str(), Some(indentation))?;
+                                    }
+                                } else {
+                                    writer.writeln_fmt(
+                                        format_args!("if {}.IsSome then begin", variable_name),
+                                        Some(2),
+                                    )?;
+                                    for arg in Self::generate_standard_type_to_xml(
+                                        &data_type,
+                                        &(variable_name.clone() + ".Unwrap"),
+                                        &variable.xml_name,
+                                        &pattern,
+                                    ) {
+                                        writer.writeln(arg.as_str(), Some(indentation + 2))?;
+                                    }
+                                    writer.writeln("end;", Some(2))?;
                                 }
                             }
                         }
                     }
                 }
                 DataType::Enumeration(_) => {
-                    writer.writeln_fmt(
-                        format_args!("node := pParent.AddChild('{}');", variable.xml_name),
-                        Some(2),
-                    )?;
+                    if variable.required {
+                        writer.writeln_fmt(
+                            format_args!("node := pParent.AddChild('{}');", variable.xml_name),
+                            Some(indentation),
+                        )?;
 
-                    writer.writeln_fmt(
-                        format_args!(
-                            "node.Text := {}.ToXmlValue;",
-                            Helper::as_variable_name(&variable.name),
-                        ),
-                        Some(2),
-                    )?;
+                        writer.writeln_fmt(
+                            format_args!("node.Text := {}.ToXmlValue;", variable_name),
+                            Some(indentation),
+                        )?;
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!("if {}.IsSome then begin", variable_name),
+                            Some(2),
+                        )?;
+                        writer.writeln_fmt(
+                            format_args!("node := pParent.AddChild('{}');", variable.xml_name),
+                            Some(indentation + 2),
+                        )?;
+
+                        writer.writeln_fmt(
+                            format_args!("node.Text := {}.Unwrap.ToXmlValue;", variable_name),
+                            Some(indentation + 2),
+                        )?;
+                        writer.writeln("end;", Some(2))?;
+                    }
                 }
                 DataType::Custom(_) => {
+                    if !variable.required {
+                        writer.writeln_fmt(
+                            format_args!("if Assigned({}) then begin", variable_name),
+                            Some(2),
+                        )?;
+
+                        indentation = 4;
+                    }
                     writer.writeln_fmt(
                         format_args!("node := pParent.AddChild('{}');", variable.xml_name),
-                        Some(2),
+                        Some(indentation),
                     )?;
                     writer.writeln_fmt(
-                        format_args!(
-                            "{}.AppendToXmlRaw(node);",
-                            Helper::as_variable_name(&variable.name),
-                        ),
-                        Some(2),
+                        format_args!("{}.AppendToXmlRaw(node);", variable_name,),
+                        Some(indentation),
                     )?;
+                    if !variable.required {
+                        writer.writeln("end;", Some(2))?;
+                    }
                 }
                 DataType::List(lt) => {
+                    if !variable.required {
+                        writer.writeln_fmt(
+                            format_args!("if Assigned({}) then begin", variable_name),
+                            Some(2),
+                        )?;
+
+                        indentation = 4;
+                    }
                     writer.writeln_fmt(
-                        format_args!(
-                            "for var {} in {} do begin",
-                            variable.name,
-                            Helper::as_variable_name(&variable.name),
-                        ),
-                        Some(2),
+                        format_args!("for var {} in {} do begin", variable.name, variable_name),
+                        Some(indentation),
                     )?;
                     Self::generate_list_to_xml(
                         writer,
                         lt,
-                        &Helper::as_variable_name(&variable.name),
+                        &variable_name,
                         &variable.xml_name,
                         type_aliases,
-                        4,
+                        indentation + 2,
                     )?;
-                    writer.writeln("end;", Some(2))?;
+                    writer.writeln("end;", Some(indentation))?;
+                    if !variable.required {
+                        writer.writeln("end;", Some(2))?;
+                    }
                 }
                 DataType::FixedSizeList(item_type, size) => {
                     for i in 1..size + 1 {
+                        // TODO: Abhängig vom DataType Assigned oder Unwrap
                         Self::generate_list_to_xml(
                             writer,
                             item_type,
@@ -1039,7 +1404,7 @@ impl ClassCodeGenerator {
                                 + i.to_string().as_str()),
                             &variable.xml_name,
                             type_aliases,
-                            2,
+                            indentation,
                         )?;
 
                         if i < *size {
@@ -1048,13 +1413,29 @@ impl ClassCodeGenerator {
                     }
                 }
                 _ => {
-                    for arg in Self::generate_standard_type_to_xml(
-                        &variable.data_type,
-                        &Helper::as_variable_name(&variable.name),
-                        &variable.xml_name,
-                        &None,
-                    ) {
-                        writer.writeln(arg.as_str(), Some(2))?;
+                    if variable.required {
+                        for arg in Self::generate_standard_type_to_xml(
+                            &variable.data_type,
+                            &variable_name,
+                            &variable.xml_name,
+                            &None,
+                        ) {
+                            writer.writeln(arg.as_str(), Some(indentation))?;
+                        }
+                    } else {
+                        writer.writeln_fmt(
+                            format_args!("if {}.IsSome then begin", variable_name),
+                            Some(2),
+                        )?;
+                        for arg in Self::generate_standard_type_to_xml(
+                            &variable.data_type,
+                            &(variable_name.clone() + ".Unwrap"),
+                            &variable.xml_name,
+                            &None,
+                        ) {
+                            writer.writeln(arg.as_str(), Some(indentation + 2))?;
+                        }
+                        writer.writeln("end;", Some(2))?;
                     }
                 }
             }

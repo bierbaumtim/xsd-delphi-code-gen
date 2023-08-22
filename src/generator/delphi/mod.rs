@@ -6,4 +6,5 @@ mod const_code_gen;
 mod enum_code_gen;
 mod helper;
 mod helper_code_gen;
+mod optional_code_gen;
 mod union_type_code_gen;

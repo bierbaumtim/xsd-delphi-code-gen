@@ -10,7 +10,8 @@ use crate::generator::{
 use super::{
     alias_code_gen::TypeAliasCodeGenerator, class_code_gen::ClassCodeGenerator,
     code_writer::CodeWriter, const_code_gen::ConstCodeGenerator, enum_code_gen::EnumCodeGenerator,
-    helper_code_gen::HelperCodeGenerator, union_type_code_gen::UnionTypeCodeGenerator,
+    helper_code_gen::HelperCodeGenerator, optional_code_gen::OptionalCodeGenerator,
+    union_type_code_gen::UnionTypeCodeGenerator,
 };
 
 pub(crate) struct DelphiCodeGenerator<T: Write> {
@@ -96,6 +97,7 @@ impl<T: Write> DelphiCodeGenerator<T> {
             .writeln("System.Generics.Collections,", Some(5))?;
         self.writer.writeln("System.Net.URLClient,", Some(5))?;
         self.writer.writeln("System.Types,", Some(5))?;
+        self.writer.writeln("System.TypInfo,", Some(5))?;
         self.writer.writeln("System.StrUtils,", Some(5))?;
         self.writer.writeln("System.SysUtils,", Some(5))?;
         self.writer.writeln("Xml.XMLDoc,", Some(5))?;
@@ -112,6 +114,9 @@ impl<T: Write> DelphiCodeGenerator<T> {
     #[inline]
     fn write_forward_declerations(&mut self) -> Result<(), CodeGenError> {
         self.writer.writeln("type", None)?;
+
+        OptionalCodeGenerator::write_declarations(&mut self.writer, 2)?;
+        self.writer.newline()?;
 
         if !self.internal_representation.enumerations.is_empty() {
             EnumCodeGenerator::write_declarations(
@@ -163,6 +168,7 @@ impl<T: Write> DelphiCodeGenerator<T> {
             &mut self.writer,
             &self.internal_representation.classes,
             &self.internal_representation.document,
+            &self.internal_representation.types_aliases,
             &self.options,
             2,
         )?;
@@ -213,6 +219,8 @@ impl<T: Write> DelphiCodeGenerator<T> {
         )?;
 
         self.writer.newline()?;
+
+        OptionalCodeGenerator::write_implementationw(&mut self.writer)?;
 
         Ok(())
     }

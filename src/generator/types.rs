@@ -83,6 +83,7 @@ pub(crate) struct Variable {
     pub(crate) data_type: DataType,
     pub(crate) xml_name: String,
     pub(crate) requires_free: bool,
+    pub(crate) required: bool,
 }
 
 #[derive(Clone, Debug)]
