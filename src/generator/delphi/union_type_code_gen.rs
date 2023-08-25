@@ -2,10 +2,13 @@ use std::io::Write;
 
 use crate::generator::{
     code_generator_trait::{CodeGenError, CodeGenOptions},
-    types::{Enumeration, TypeAlias, UnionType, DataType},
+    types::{DataType, Enumeration, TypeAlias, UnionType},
 };
 
-use super::{helper::Helper, code_writer::CodeWriter};
+use super::{
+    code_writer::{CodeWriter, FunctionType},
+    helper::Helper,
+};
 
 pub(crate) struct UnionTypeCodeGenerator {}
 
@@ -88,31 +91,39 @@ impl UnionTypeCodeGenerator {
         let variant_prefix = Self::get_enum_variant_prefix(&union_type.name, options);
 
         writer.write_documentation(&union_type.documentations, Some(indentation))?;
-        writer.writeln_fmt(
-            format_args!("// XML Qualified Name: {}", union_type.qualified_name),
+        Helper::write_qualified_name_comment(
+            writer,
+            &union_type.qualified_name,
             Some(indentation),
         )?;
-        writer.writeln_fmt(format_args!(
-            "{} = record",
-            Helper::as_type_name(&union_type.name, &options.type_prefix),
-        ), Some(indentation))?;
-        writer.writeln_fmt(format_args!(
-            "type {} = ({});",
-            Self::ENUM_NAME,
-            union_type
-                .variants
-                .iter()
-                .enumerate()
-                .map(|(i, u)| Self::get_variant_enum_variant_name(&variant_prefix, &u.name, i))
-                .collect::<Vec<String>>()
-                .join(", ")
-        ), Some(indentation + 2))?;
+
+        writer.writeln_fmt(
+            format_args!(
+                "{} = record",
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+            ),
+            Some(indentation),
+        )?;
+        writer.writeln_fmt(
+            format_args!(
+                "type {} = ({});",
+                Self::ENUM_NAME,
+                union_type
+                    .variants
+                    .iter()
+                    .enumerate()
+                    .map(|(i, u)| Self::get_variant_enum_variant_name(&variant_prefix, &u.name, i))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Some(indentation + 2),
+        )?;
         writer.newline()?;
 
-        writer.writeln_fmt(format_args!(
-            "case Variant: {} of",
-            Self::ENUM_NAME,
-        ), Some(indentation+2))?;
+        writer.writeln_fmt(
+            format_args!("case Variant: {} of", Self::ENUM_NAME,),
+            Some(indentation + 2),
+        )?;
 
         for (i, variant) in union_type.variants.iter().enumerate() {
             match &variant.data_type {
@@ -124,10 +135,14 @@ impl UnionTypeCodeGenerator {
                                     format_args!(
                                         "{}.{}: ({}: string[255]);",
                                         Self::ENUM_NAME,
-                                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                                        Self::get_variant_enum_variant_name(
+                                            &variant_prefix,
+                                            &variant.name,
+                                            i
+                                        ),
                                         Helper::as_variable_name(variant.name.as_str()),
                                     ),
-                                    Some(indentation+4)
+                                    Some(indentation + 4),
                                 )?;
                             }
                             _ => {
@@ -135,14 +150,18 @@ impl UnionTypeCodeGenerator {
                                     format_args!(
                                         "{}.{}: ({}: {});",
                                         Self::ENUM_NAME,
-                                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
+                                        Self::get_variant_enum_variant_name(
+                                            &variant_prefix,
+                                            &variant.name,
+                                            i
+                                        ),
                                         Helper::as_variable_name(variant.name.as_str()),
                                         Helper::get_datatype_language_representation(
                                             &variant.data_type,
                                             &options.type_prefix
                                         ),
                                     ),
-                                    Some(indentation+4)
+                                    Some(indentation + 4),
                                 )?;
                             }
                         }
@@ -160,9 +179,9 @@ impl UnionTypeCodeGenerator {
                                 &options.type_prefix
                             ),
                         ),
-                        Some(indentation+4)
+                        Some(indentation + 4),
                     )?;
-                },
+                }
                 _ => {
                     writer.writeln_fmt(
                         format_args!(
@@ -175,13 +194,13 @@ impl UnionTypeCodeGenerator {
                                 &options.type_prefix
                             ),
                         ),
-                        Some(indentation+4)
+                        Some(indentation + 4),
                     )?;
                 }
             }
         }
 
-        writer.writeln("end;",Some(indentation))?;
+        writer.writeln("end;", Some(indentation))?;
 
         Ok(())
     }
@@ -192,17 +211,25 @@ impl UnionTypeCodeGenerator {
         options: &CodeGenOptions,
         indentation: usize,
     ) -> Result<(), CodeGenError> {
-        writer.writeln_fmt(format_args!(
-            "{}Helper = record helper for {}",
-            Helper::as_type_name(&union_type.name, &options.type_prefix),
-            Helper::as_type_name(&union_type.name, &options.type_prefix),
-        ), Some(indentation))?;
+        writer.writeln_fmt(
+            format_args!(
+                "{}Helper = record helper for {}",
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+                Helper::as_type_name(&union_type.name, &options.type_prefix),
+            ),
+            Some(indentation),
+        )?;
 
         if options.generate_from_xml {
-            writer.writeln_fmt(format_args!(
-                "class function FromXml(node: IXMLNode): {}; static;",
-                Helper::as_type_name(&union_type.name, &options.type_prefix),
-            ), Some(indentation+2))?;
+            writer.write_function_declaration(
+                FunctionType::Function,
+                "FromXml",
+                Some(vec![("node", "IXMLNode")]),
+                true,
+                Some(Helper::as_type_name(&union_type.name, &options.type_prefix).as_str()),
+                None,
+                indentation + 2,
+            )?;
         }
 
         if options.generate_from_xml && options.generate_to_xml {
@@ -212,7 +239,7 @@ impl UnionTypeCodeGenerator {
         if options.generate_to_xml {
             writer.writeln("function ToXmlValue: String;", Some(indentation + 2))?;
         }
-        writer.writeln("end;",Some(indentation))?;
+        writer.writeln("end;", Some(indentation))?;
 
         Ok(())
     }
@@ -225,14 +252,17 @@ impl UnionTypeCodeGenerator {
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
         if options.generate_from_xml {
-            writer.writeln_fmt(format_args!(
-                "class function {}Helper.FromXml(node: IXMLNode): {};",
-                Helper::as_type_name(&union_type.name, &options.type_prefix),
-                Helper::as_type_name(&union_type.name, &options.type_prefix),
-            ), None)?;
+            writer.writeln_fmt(
+                format_args!(
+                    "class function {}Helper.FromXml(node: IXMLNode): {};",
+                    Helper::as_type_name(&union_type.name, &options.type_prefix),
+                    Helper::as_type_name(&union_type.name, &options.type_prefix),
+                ),
+                None,
+            )?;
             writer.writeln("begin", None)?;
             writer.writeln("// TODO: CodeGen for this is currently not supported. Manual implementation required", Some(2))?;
-            writer.writeln("end;",None)?;
+            writer.writeln("end;", None)?;
         }
 
         if options.generate_from_xml && options.generate_to_xml {
@@ -242,12 +272,15 @@ impl UnionTypeCodeGenerator {
         if options.generate_to_xml {
             let variant_prefix = Self::get_enum_variant_prefix(&union_type.name, options);
 
-            writer.writeln_fmt(format_args!(
-                "function {}Helper.ToXmlValue: String;\n",
-                Helper::as_type_name(&union_type.name, &options.type_prefix),
-            ),None)?;
-            writer.writeln("begin",None)?;
-            writer.writeln("case Self.Variant of",Some(2))?;
+            writer.writeln_fmt(
+                format_args!(
+                    "function {}Helper.ToXmlValue: String;\n",
+                    Helper::as_type_name(&union_type.name, &options.type_prefix),
+                ),
+                None,
+            )?;
+            writer.writeln("begin", None)?;
+            writer.writeln("case Self.Variant of", Some(2))?;
             for (i, variant) in union_type.variants.iter().enumerate() {
                 let variable_name = Helper::as_variable_name(variant.name.as_str());
 
@@ -267,7 +300,7 @@ impl UnionTypeCodeGenerator {
                                         Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                                         variable_name,
                                     ), Some(4))?
-                                } else {       
+                                } else {
                                     return Err(CodeGenError::ComplexTypeInSimpleTypeNotAllowed(
                                         union_type.name.clone(),
                                         variant.name.clone(),
@@ -371,7 +404,7 @@ impl UnionTypeCodeGenerator {
                     crate::generator::types::DataType::Union(n) => {
                         writer.writeln_fmt(format_args!(
                             "{}.{}: Result := {}.ToXmlValue;",
-                            
+
                             Self::ENUM_NAME,
                             Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                             Helper::as_type_name(n, &options.type_prefix),
@@ -379,7 +412,7 @@ impl UnionTypeCodeGenerator {
                     }
                     _ => writer.writeln_fmt(format_args!(
                         "{}.{}: Result := {};",
-                        
+
                         Self::ENUM_NAME,
                         Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
                         Helper::get_variable_value_as_string(

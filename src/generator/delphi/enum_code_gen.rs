@@ -75,8 +75,9 @@ impl EnumCodeGenerator {
         let prefix = Helper::get_enum_variant_prefix(&enumeration.name);
 
         writer.write_documentation(&enumeration.documentations, Some(indentation))?;
-        writer.writeln_fmt(
-            format_args!("// XML Qualified Name: {}", enumeration.qualified_name),
+        Helper::write_qualified_name_comment(
+            writer,
+            &enumeration.qualified_name,
             Some(indentation),
         )?;
 

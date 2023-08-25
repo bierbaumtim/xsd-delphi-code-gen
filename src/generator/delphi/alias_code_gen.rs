@@ -27,10 +27,12 @@ impl TypeAliasCodeGenerator {
             }
 
             writer.write_documentation(&type_alias.documentations, Some(indentation))?;
-            writer.writeln_fmt(
-                format_args!("// XML Qualified Name: {}", type_alias.qualified_name),
+            Helper::write_qualified_name_comment(
+                writer,
+                &type_alias.qualified_name,
                 Some(indentation),
             )?;
+
             writer.writeln_fmt(
                 format_args!(
                     "{} = {};",

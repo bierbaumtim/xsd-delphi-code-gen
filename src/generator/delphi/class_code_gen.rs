@@ -6,7 +6,10 @@ use crate::generator::{
     types::{BinaryEncoding, ClassType, DataType, TypeAlias, Variable},
 };
 
-use super::{code_writer::CodeWriter, helper::Helper};
+use super::{
+    code_writer::{CodeWriter, FunctionModifier, FunctionType},
+    helper::Helper,
+};
 
 pub(crate) struct ClassCodeGenerator;
 
@@ -103,10 +106,12 @@ impl ClassCodeGenerator {
         indentation: usize,
     ) -> Result<(), CodeGenError> {
         writer.write_documentation(&class_type.documentations, Some(indentation))?;
-        writer.writeln_fmt(
-            format_args!("// XML Qualified Name: {}", class_type.qualified_name),
+        Helper::write_qualified_name_comment(
+            writer,
+            &class_type.qualified_name,
             Some(indentation),
         )?;
+
         writer.writeln_fmt(
             format_args!(
                 "{} = class{}",
@@ -223,18 +228,17 @@ impl ClassCodeGenerator {
         let fn_decorator = class_type
             .super_type
             .as_ref()
-            .map_or("virtual", |_| "override");
+            .map_or(FunctionModifier::Virtual, |_| FunctionModifier::Override);
 
         // constructors and destructors
         if options.generate_to_xml {
-            writer.writeln_fmt(
-                format_args!("constructor Create; {};", fn_decorator),
-                Some(indentation + 2),
-            )?;
+            writer.write_default_constructor(Some(fn_decorator.clone()), Some(indentation + 2))?;
         }
         if options.generate_from_xml {
-            writer.writeln_fmt(
-                format_args!("constructor FromXml(node: IXMLNode); {};", fn_decorator),
+            writer.write_constructor(
+                "FromXml",
+                Some(vec![("node", "IXMLNode")]),
+                Some(fn_decorator.clone()),
                 Some(indentation + 2),
             )?;
         }
@@ -244,22 +248,32 @@ impl ClassCodeGenerator {
             .iter()
             .any(|v| v.requires_free || !v.required)
         {
-            writer.writeln("destructor Destroy; override;", Some(indentation + 2))?;
+            writer.write_destructor(Some(indentation + 2))?;
         }
 
         if options.generate_to_xml {
             writer.newline()?;
-            writer.writeln_fmt(
-                format_args!(
-                    "procedure AppendToXmlRaw(pParent: IXMLNode); {};",
-                    fn_decorator,
-                ),
-                Some(indentation + 2),
+            writer.write_function_declaration(
+                FunctionType::Procedure,
+                "AppendToXmlRaw",
+                Some(vec![("pParent", "IXMLNode")]),
+                false,
+                None,
+                Some(vec![fn_decorator.clone()]),
+                indentation + 2,
             )?;
 
             if class_type.name == DOCUMENT_NAME {
                 writer.newline()?;
-                writer.writeln("function ToXml: String;", Some(indentation + 2))?;
+                writer.write_function_declaration(
+                    FunctionType::Function,
+                    "ToXml",
+                    None,
+                    false,
+                    Some("String"),
+                    Some(vec![fn_decorator.clone()]),
+                    indentation + 2,
+                )?;
             }
         }
 
@@ -383,94 +397,60 @@ impl ClassCodeGenerator {
                     {
                         match data_type {
                             DataType::InlineList(_) => {
-                                if variable.required {
-                                    writer.writeln_fmt(
-                                        format_args!(
-                                            "{} := {}.Create;",
-                                            variable_name,
-                                            Helper::get_datatype_language_representation(
-                                                &variable.data_type,
-                                                &options.type_prefix,
-                                            )
-                                        ),
-                                        Some(2),
-                                    )?;
-                                } else {
-                                    writer.writeln_fmt(
-                                        format_args!("{} := nil;", variable_name),
-                                        Some(2),
-                                    )?;
-                                }
+                                writer.write_variable_initialization(
+                                    variable_name.as_str(),
+                                    Helper::get_datatype_language_representation(
+                                        &variable.data_type,
+                                        &options.type_prefix,
+                                    )
+                                    .as_str(),
+                                    variable.required,
+                                    false,
+                                    Some(2),
+                                )?;
                             }
                             _ => {
-                                if variable.required {
-                                    writer.writeln_fmt(
-                                        format_args!(
-                                            "{} := Default({});",
-                                            variable_name,
-                                            Helper::as_type_name(name, &options.type_prefix),
-                                        ),
-                                        Some(2),
-                                    )?;
-                                } else {
-                                    writer.writeln_fmt(
-                                        format_args!(
-                                            "{} := TNone<{}>.Create;",
-                                            variable_name,
-                                            Helper::as_type_name(name, &options.type_prefix),
-                                        ),
-                                        Some(2),
-                                    )?;
-                                }
+                                writer.write_variable_initialization(
+                                    variable_name.as_str(),
+                                    Helper::as_type_name(name, &options.type_prefix).as_str(),
+                                    variable.required,
+                                    true,
+                                    Some(2),
+                                )?;
                             }
                         }
                     }
                 }
                 DataType::Enumeration(name) => {
-                    let type_name = Helper::as_type_name(name, &options.type_prefix);
-
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!("{} := Default({});", variable_name, type_name),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!("{} := TNone<{}>.Create;", variable_name, type_name),
-                            Some(2),
-                        )?
-                    }
+                    writer.write_variable_initialization(
+                        variable_name.as_str(),
+                        Helper::as_type_name(name, &options.type_prefix).as_str(),
+                        variable.required,
+                        true,
+                        Some(2),
+                    )?;
                 }
                 DataType::Custom(name) => {
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := {}.Create;",
-                                variable_name,
-                                Helper::as_type_name(name, &options.type_prefix)
-                            ),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(format_args!("{} := nil;", variable_name), Some(2))?;
-                    }
+                    writer.write_variable_initialization(
+                        variable_name.as_str(),
+                        Helper::as_type_name(name, &options.type_prefix).as_str(),
+                        variable.required,
+                        false,
+                        Some(2),
+                    )?;
                 }
                 DataType::List(_) | DataType::InlineList(_) => {
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := {}.Create;",
-                                variable_name,
-                                Helper::get_datatype_language_representation(
-                                    &variable.data_type,
-                                    &options.type_prefix
-                                ),
-                            ),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(format_args!("{} := nil;", variable_name,), Some(2))?;
-                    }
+                    writer.write_variable_initialization(
+                        variable_name.as_str(),
+                        Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix,
+                        )
+                        .as_str(),
+                        variable.required,
+                        false,
+                        Some(2),
+                    )?;
                 }
                 DataType::FixedSizeList(item_type, size) => {
                     let rhs = match item_type.as_ref() {
@@ -482,13 +462,8 @@ impl ClassCodeGenerator {
 
                                 match data_type {
                                     DataType::Custom(_) => String::from("nil"),
-                                    _ => {
-                                        if variable.required {
-                                            format!("Default({})", type_name)
-                                        } else {
-                                            format!("TNone<{}>.Create", type_name)
-                                        }
-                                    }
+                                    _ if variable.required => format!("Default({})", type_name),
+                                    _ => format!("TNone<{}>.Create", type_name),
                                 }
                             } else {
                                 return Err(CodeGenError::MissingDataType(
@@ -557,28 +532,23 @@ impl ClassCodeGenerator {
                         )?;
                     } else {
                         writer.writeln_fmt(
-                            format_args!("{} := TNone<TURI>.Create('');", variable_name),
+                            format_args!("{} := TNone<TURI>.Create;", variable_name),
                             Some(2),
                         )?;
                     }
                 }
                 _ => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix,
-                    );
-
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!("{} := Default({});", variable_name, lang_rep),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!("{} := TNone<{}>.Create;", variable_name, lang_rep),
-                            Some(2),
-                        )?;
-                    }
+                    writer.write_variable_initialization(
+                        variable_name.as_str(),
+                        Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix,
+                        )
+                        .as_str(),
+                        variable.required,
+                        true,
+                        Some(2),
+                    )?;
                 }
             }
         }
