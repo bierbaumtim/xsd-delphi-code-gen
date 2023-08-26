@@ -180,7 +180,7 @@ impl ClassCodeGenerator {
                                     format_args!(
                                         "{}: {};",
                                         variable_name,
-                                        Helper::as_type_name(&n, &options.type_prefix)
+                                        Helper::as_type_name(n, &options.type_prefix)
                                     ),
                                     Some(indentation + 2),
                                 )?;
@@ -190,7 +190,7 @@ impl ClassCodeGenerator {
                                     &variable.data_type,
                                     &options.type_prefix,
                                 );
-                                
+
                                 if variable.required {
                                     Helper::write_required_comment(writer, Some(indentation + 2))?;
                                 }
@@ -230,7 +230,7 @@ impl ClassCodeGenerator {
                         &variable.data_type,
                         &options.type_prefix,
                     );
-                    
+
                     if variable.required {
                         Helper::write_required_comment(writer, Some(indentation + 2))?;
                     }
@@ -278,7 +278,6 @@ impl ClassCodeGenerator {
                 "AppendToXmlRaw",
                 Some(vec![("pParent", "IXMLNode")]),
                 false,
-                None,
                 Some(vec![fn_decorator.clone()]),
                 indentation + 2,
             )?;
@@ -286,12 +285,11 @@ impl ClassCodeGenerator {
             if class_type.name == DOCUMENT_NAME {
                 writer.newline()?;
                 writer.write_function_declaration(
-                    FunctionType::Function,
+                    FunctionType::Function(String::from("String")),
                     "ToXml",
                     None,
                     false,
-                    Some("String"),
-                    Some(vec![fn_decorator.clone()]),
+                    Some(vec![fn_decorator]),
                     indentation + 2,
                 )?;
             }
@@ -369,9 +367,11 @@ impl ClassCodeGenerator {
             }
         }
         writer.newline()?;
-        Ok(for line in setter {
+        for line in setter {
             writer.writeln(line.as_str(), Some(indentation + 2))?;
-        })
+        }
+
+        Ok(())
     }
 
     fn generate_optional_properties_declaration<T: Write>(
@@ -382,53 +382,53 @@ impl ClassCodeGenerator {
         indentation: usize,
     ) -> Result<(), CodeGenError> {
         writer.newline()?;
-        Ok(
-            for variable in class_type
-                .variables
-                .iter()
-                .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
-            {
-                let variable_name = Helper::as_variable_name(&variable.name);
+        for variable in class_type
+            .variables
+            .iter()
+            .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
+        {
+            let variable_name = Helper::as_variable_name(&variable.name);
 
-                match &variable.data_type {
-                    DataType::FixedSizeList(item_type, size) => {
-                        let lang_rep = Helper::get_datatype_language_representation(
-                            item_type,
-                            &options.type_prefix,
-                        );
+            match &variable.data_type {
+                DataType::FixedSizeList(item_type, size) => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        item_type,
+                        &options.type_prefix,
+                    );
 
-                        for i in 1..size + 1 {
-                            writer.writeln_fmt(
-                                format_args!("F{}{}: {};", variable_name, i, lang_rep),
-                                Some(indentation + 2),
-                            )?;
-
-                            writer.writeln_fmt(
-                                format_args!(
-                                    "property {}{}: TOptional<{}> read F{}{} write Set{}{};",
-                                    variable_name, i, lang_rep, variable_name, i, variable_name, i
-                                ),
-                                Some(indentation + 2),
-                            )?;
-                        }
-                    }
-                    _ => {
-                        let lang_rep = Helper::get_datatype_language_representation(
-                            &variable.data_type,
-                            &options.type_prefix,
-                        );
+                    for i in 1..size + 1 {
+                        writer.writeln_fmt(
+                            format_args!("F{}{}: {};", variable_name, i, lang_rep),
+                            Some(indentation + 2),
+                        )?;
 
                         writer.writeln_fmt(
                             format_args!(
-                                "property {}: TOptional<{}> read F{} write Set{};",
-                                variable_name, lang_rep, variable_name, variable_name
+                                "property {}{}: TOptional<{}> read F{}{} write Set{}{};",
+                                variable_name, i, lang_rep, variable_name, i, variable_name, i
                             ),
                             Some(indentation + 2),
                         )?;
                     }
                 }
-            },
-        )
+                _ => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix,
+                    );
+
+                    writer.writeln_fmt(
+                        format_args!(
+                            "property {}: TOptional<{}> read F{} write Set{};",
+                            variable_name, lang_rep, variable_name, variable_name
+                        ),
+                        Some(indentation + 2),
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn generate_class_implementation<T: Write>(

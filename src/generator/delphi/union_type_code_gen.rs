@@ -222,11 +222,13 @@ impl UnionTypeCodeGenerator {
 
         if options.generate_from_xml {
             writer.write_function_declaration(
-                FunctionType::Function,
+                FunctionType::Function(Helper::as_type_name(
+                    &union_type.name,
+                    &options.type_prefix,
+                )),
                 "FromXml",
                 Some(vec![("node", "IXMLNode")]),
                 true,
-                Some(Helper::as_type_name(&union_type.name, &options.type_prefix).as_str()),
                 None,
                 indentation + 2,
             )?;

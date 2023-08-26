@@ -5,14 +5,14 @@ pub(crate) type FunctionParameter<'a> = (&'a str, &'a str);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum FunctionType {
     Procedure,
-    Function,
+    Function(String),
 }
 
 impl FunctionType {
     fn as_text(&self) -> &str {
         match self {
             FunctionType::Procedure => "procedure",
-            FunctionType::Function => "function",
+            FunctionType::Function(_) => "function",
         }
     }
 }
@@ -126,7 +126,7 @@ impl<T: Write> CodeWriter<T> {
             .write_fmt(format_args!("constructor {}", name))?;
 
         if let Some(parameters) = parameters {
-            self.buffer.write(b"(")?;
+            self.buffer.write_all(b"(")?;
 
             for (i, param) in parameters.iter().enumerate() {
                 self.buffer
@@ -137,10 +137,10 @@ impl<T: Write> CodeWriter<T> {
                 }
             }
 
-            self.buffer.write(b")")?;
+            self.buffer.write_all(b")")?;
         }
 
-        self.buffer.write(b";")?;
+        self.buffer.write_all(b";")?;
 
         if let Some(modifier) = modifier {
             self.buffer
@@ -165,7 +165,6 @@ impl<T: Write> CodeWriter<T> {
         name: &str,
         parameters: Option<Vec<FunctionParameter>>,
         is_class_function: bool,
-        return_type: Option<&str>,
         modifiers: Option<Vec<FunctionModifier>>,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
@@ -181,7 +180,7 @@ impl<T: Write> CodeWriter<T> {
             .write_fmt(format_args!("{} {}", f_type.as_text(), name))?;
 
         if let Some(parameters) = parameters {
-            self.buffer.write(b"(")?;
+            self.buffer.write_all(b"(")?;
 
             for (i, param) in parameters.iter().enumerate() {
                 self.buffer
@@ -192,14 +191,13 @@ impl<T: Write> CodeWriter<T> {
                 }
             }
 
-            self.buffer.write(b")")?;
+            self.buffer.write_all(b")")?;
         }
 
-        if f_type == FunctionType::Function && return_type.is_some() {
-            self.buffer
-                .write_fmt(format_args!(": {};", return_type.unwrap()))?;
+        if let FunctionType::Function(return_type) = f_type {
+            self.buffer.write_fmt(format_args!(": {};", return_type))?;
         } else {
-            self.buffer.write(b";")?;
+            self.buffer.write_all(b";")?;
         }
 
         if is_class_function {

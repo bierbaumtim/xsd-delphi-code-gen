@@ -251,7 +251,7 @@ impl InternalRepresentation {
                                     _ => DataType::Custom(c_type.get_name()),
                                 };
 
-                                let data_type = if max_occurs == UNBOUNDED_OCCURANCE
+                                if max_occurs == UNBOUNDED_OCCURANCE
                                     || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
                                 {
                                     DataType::List(Box::new(data_type))
@@ -262,9 +262,7 @@ impl InternalRepresentation {
                                     DataType::FixedSizeList(Box::new(data_type), size)
                                 } else {
                                     data_type
-                                };
-
-                                data_type
+                                }
                             }
                             None => todo!(),
                         }
