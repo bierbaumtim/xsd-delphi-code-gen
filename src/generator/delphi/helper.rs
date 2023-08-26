@@ -208,6 +208,13 @@ impl Helper {
 
         Ok(())
     }
+
+    pub(crate) fn write_required_comment<T: Write>(
+        writer: &mut CodeWriter<T>,
+        indentation: Option<usize>,
+    ) -> Result<(), std::io::Error> {
+        writer.writeln("/// <summary>Required</summary>", indentation)
+    }
 }
 
 #[cfg(test)]

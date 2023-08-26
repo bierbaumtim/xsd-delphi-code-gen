@@ -121,7 +121,7 @@ impl UnionTypeCodeGenerator {
         writer.newline()?;
 
         writer.writeln_fmt(
-            format_args!("case Variant: {} of", Self::ENUM_NAME,),
+            format_args!("case Variant: {} of", Self::ENUM_NAME),
             Some(indentation + 2),
         )?;
 
@@ -331,7 +331,7 @@ impl UnionTypeCodeGenerator {
                             }
                             crate::generator::types::DataType::InlineList(lt) => {
                                 writer.writeln_fmt(format_args!("{}.{}: begin",Self::ENUM_NAME,
-                                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),), Some(4))?;
+                                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i)), Some(4))?;
                                 writer.writeln("Result := '';", Some(6))?;
                                 writer.newline()?;
                                 writer.writeln_fmt(format_args!("for var I := Low({}) to High({}) do begin", variable_name, variable_name), Some(6))?;
@@ -389,7 +389,7 @@ impl UnionTypeCodeGenerator {
                     }
                     crate::generator::types::DataType::InlineList(lt) => {
                         writer.writeln_fmt(format_args!("{}.{}: begin",Self::ENUM_NAME,
-                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),), Some(4))?;
+                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i)), Some(4))?;
                         writer.writeln("Result := '';", Some(6))?;
                         writer.newline()?;
                         writer.writeln_fmt(format_args!("for var I := Low({}) to High({}) do begin", variable_name, variable_name), Some(6))?;

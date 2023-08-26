@@ -226,22 +226,20 @@ impl<T: Write> CodeWriter<T> {
         is_value_type: bool,
         indentation: Option<usize>,
     ) -> Result<(), std::io::Error> {
-        if let Some(indentation) = indentation {
-            self.buffer.write_all(" ".repeat(indentation).as_bytes())?;
-        }
-
         match (is_required, is_value_type) {
-            (false, false) => self.writeln_fmt(format_args!("{} := nil;", name), Some(2))?,
+            (false, false) => self.writeln_fmt(format_args!("{} := nil;", name), indentation)?,
             (false, true) => self.writeln_fmt(
                 format_args!("{} := TNone<{}>.Create;", name, type_name),
-                Some(2),
+                indentation,
             )?,
-            (true, false) => {
-                self.writeln_fmt(format_args!("{} := {}.Create;", name, type_name), Some(2))?
-            }
-            (true, true) => {
-                self.writeln_fmt(format_args!("{} := Default({});", name, type_name), Some(2))?
-            }
+            (true, false) => self.writeln_fmt(
+                format_args!("{} := {}.Create;", name, type_name),
+                indentation,
+            )?,
+            (true, true) => self.writeln_fmt(
+                format_args!("{} := Default({});", name, type_name),
+                indentation,
+            )?,
         }
 
         Ok(())

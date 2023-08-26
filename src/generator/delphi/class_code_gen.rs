@@ -151,6 +151,10 @@ impl ClassCodeGenerator {
                                     &options.type_prefix,
                                 );
 
+                                if variable.required {
+                                    Helper::write_required_comment(writer, Some(indentation + 2))?;
+                                }
+
                                 if variable.required
                                     || matches!(
                                         variable.data_type,
@@ -160,12 +164,12 @@ impl ClassCodeGenerator {
                                     )
                                 {
                                     writer.writeln_fmt(
-                                        format_args!("{}: {};", variable_name, lang_rep,),
+                                        format_args!("{}: {};", variable_name, lang_rep),
                                         Some(indentation + 2),
                                     )?;
                                 } else {
                                     writer.writeln_fmt(
-                                        format_args!("{}: TOptional<{}>;", variable_name, lang_rep,),
+                                        format_args!("{}: TOptional<{}>;", variable_name, lang_rep),
                                         Some(indentation + 2),
                                     )?;
                                 }
@@ -191,6 +195,10 @@ impl ClassCodeGenerator {
                         };
 
                     for i in 1..size + 1 {
+                        if variable.required {
+                            Helper::write_required_comment(writer, Some(indentation + 2))?;
+                        }
+
                         writer.writeln_fmt(
                             format_args!("{}{}: {};", variable_name, i, rhs),
                             Some(indentation + 2),
@@ -203,6 +211,10 @@ impl ClassCodeGenerator {
                         &options.type_prefix,
                     );
 
+                    if variable.required {
+                        Helper::write_required_comment(writer, Some(indentation + 2))?;
+                    }
+
                     if variable.required
                         || matches!(
                             variable.data_type,
@@ -210,12 +222,12 @@ impl ClassCodeGenerator {
                         )
                     {
                         writer.writeln_fmt(
-                            format_args!("{}: {};", variable_name, lang_rep,),
+                            format_args!("{}: {};", variable_name, lang_rep),
                             Some(indentation + 2),
                         )?;
                     } else {
                         writer.writeln_fmt(
-                            format_args!("{}: TOptional<{}>;", variable_name, lang_rep,),
+                            format_args!("{}: TOptional<{}>;", variable_name, lang_rep),
                             Some(indentation + 2),
                         )?;
                     }
@@ -519,7 +531,7 @@ impl ClassCodeGenerator {
 
                     for i in 1..size + 1 {
                         writer.writeln_fmt(
-                            format_args!("{}{} := {};", variable_name, i, rhs,),
+                            format_args!("{}{} := {};", variable_name, i, rhs),
                             Some(2),
                         )?;
                     }
@@ -1150,7 +1162,7 @@ impl ClassCodeGenerator {
 
             writer.writeln("end else begin", Some(2))?;
             writer.writeln_fmt(
-                format_args!("{} := nil;", formatted_variable_name,),
+                format_args!("{} := nil;", formatted_variable_name),
                 Some(indentation),
             )?;
             writer.writeln("end;", Some(2))?;
@@ -1331,7 +1343,7 @@ impl ClassCodeGenerator {
                         Some(indentation),
                     )?;
                     writer.writeln_fmt(
-                        format_args!("{}.AppendToXmlRaw(node);", variable_name,),
+                        format_args!("{}.AppendToXmlRaw(node);", variable_name),
                         Some(indentation),
                     )?;
                     if !variable.required {
