@@ -11,6 +11,18 @@ use super::{
     helper::Helper,
 };
 
+impl DataType {
+    fn is_reference_type(&self, type_aliases: &[TypeAlias]) -> bool {
+        match self {
+            DataType::Alias(n) => Helper::get_alias_data_type(n.as_str(), type_aliases)
+                .map_or(true, |(dt, _)| dt.is_reference_type(type_aliases)),
+            DataType::Custom(_) | DataType::List(_) | DataType::InlineList(_) => true,
+            DataType::FixedSizeList(dt, _) => dt.as_ref().is_reference_type(type_aliases),
+            _ => false,
+        }
+    }
+}
+
 pub(crate) struct ClassCodeGenerator;
 
 impl ClassCodeGenerator {
@@ -123,10 +135,34 @@ impl ClassCodeGenerator {
             ),
             Some(indentation),
         )?;
+
+        let optional_variable_count = class_type
+            .variables
+            .iter()
+            .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
+            .count();
+
+        if optional_variable_count > 0 {
+            writer.writeln("strict private", Some(indentation))?;
+
+            Self::generate_optional_properties_backing_fields_declaration(
+                writer,
+                class_type,
+                type_aliases,
+                options,
+                optional_variable_count,
+                indentation,
+            )?;
+        }
+
         writer.writeln("public", Some(indentation))?;
 
         // Variables
-        for variable in &class_type.variables {
+        for variable in class_type
+            .variables
+            .iter()
+            .filter(|v| v.required || v.data_type.is_reference_type(type_aliases))
+        {
             let variable_name = Helper::as_variable_name(&variable.name);
 
             match &variable.data_type {
@@ -136,6 +172,8 @@ impl ClassCodeGenerator {
                     {
                         match data_type {
                             DataType::InlineList(_) => {
+                                Helper::write_required_comment(writer, Some(indentation + 2))?;
+
                                 writer.writeln_fmt(
                                     format_args!(
                                         "{}: {};",
@@ -151,28 +189,12 @@ impl ClassCodeGenerator {
                                     &options.type_prefix,
                                 );
 
-                                if variable.required {
-                                    Helper::write_required_comment(writer, Some(indentation + 2))?;
-                                }
+                                Helper::write_required_comment(writer, Some(indentation + 2))?;
 
-                                if variable.required
-                                    || matches!(
-                                        variable.data_type,
-                                        DataType::Custom(_)
-                                            | DataType::List(_)
-                                            | DataType::InlineList(_)
-                                    )
-                                {
-                                    writer.writeln_fmt(
-                                        format_args!("{}: {};", variable_name, lang_rep),
-                                        Some(indentation + 2),
-                                    )?;
-                                } else {
-                                    writer.writeln_fmt(
-                                        format_args!("{}: TOptional<{}>;", variable_name, lang_rep),
-                                        Some(indentation + 2),
-                                    )?;
-                                }
+                                writer.writeln_fmt(
+                                    format_args!("{}: {};", variable_name, lang_rep),
+                                    Some(indentation + 2),
+                                )?;
                             }
                         }
                     } else {
@@ -187,20 +209,12 @@ impl ClassCodeGenerator {
                         item_type,
                         &options.type_prefix,
                     );
-                    let rhs =
-                        if variable.required || matches!(variable.data_type, DataType::Custom(_)) {
-                            lang_rep
-                        } else {
-                            format!("TOptional<{}>", lang_rep)
-                        };
 
                     for i in 1..size + 1 {
-                        if variable.required {
-                            Helper::write_required_comment(writer, Some(indentation + 2))?;
-                        }
+                        Helper::write_required_comment(writer, Some(indentation + 2))?;
 
                         writer.writeln_fmt(
-                            format_args!("{}{}: {};", variable_name, i, rhs),
+                            format_args!("{}{}: {};", variable_name, i, lang_rep),
                             Some(indentation + 2),
                         )?;
                     }
@@ -211,26 +225,11 @@ impl ClassCodeGenerator {
                         &options.type_prefix,
                     );
 
-                    if variable.required {
-                        Helper::write_required_comment(writer, Some(indentation + 2))?;
-                    }
-
-                    if variable.required
-                        || matches!(
-                            variable.data_type,
-                            DataType::Custom(_) | DataType::List(_) | DataType::InlineList(_)
-                        )
-                    {
-                        writer.writeln_fmt(
-                            format_args!("{}: {};", variable_name, lang_rep),
-                            Some(indentation + 2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!("{}: TOptional<{}>;", variable_name, lang_rep),
-                            Some(indentation + 2),
-                        )?;
-                    }
+                    Helper::write_required_comment(writer, Some(indentation + 2))?;
+                    writer.writeln_fmt(
+                        format_args!("{}: {};", variable_name, lang_rep),
+                        Some(indentation + 2),
+                    )?;
                 }
             }
         }
@@ -289,10 +288,138 @@ impl ClassCodeGenerator {
             }
         }
 
+        // Properties for optional value
+        if optional_variable_count > 0 {
+            Self::generate_optional_properties_declaration(
+                writer,
+                class_type,
+                type_aliases,
+                options,
+                indentation,
+            )?;
+        }
+
         writer.writeln("end;", Some(indentation))?;
         writer.newline()?;
 
         Ok(())
+    }
+
+    fn generate_optional_properties_backing_fields_declaration<T: Write>(
+        writer: &mut CodeWriter<T>,
+        class_type: &ClassType,
+        type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
+        optional_variable_count: usize,
+        indentation: usize,
+    ) -> Result<(), CodeGenError> {
+        let mut setter = Vec::with_capacity(optional_variable_count);
+
+        for variable in class_type
+            .variables
+            .iter()
+            .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
+        {
+            let variable_name = Helper::as_variable_name(&variable.name);
+
+            match &variable.data_type {
+                DataType::FixedSizeList(item_type, size) => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        item_type,
+                        &options.type_prefix,
+                    );
+
+                    for i in 1..size + 1 {
+                        writer.writeln_fmt(
+                            format_args!("F{}{}: {};", variable_name, i, lang_rep),
+                            Some(indentation + 2),
+                        )?;
+
+                        setter.push(format!(
+                            "procedure Set{}{}(pValue: TOptional<{}>);",
+                            variable_name, i, lang_rep
+                        ));
+                    }
+                }
+                _ => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix,
+                    );
+
+                    writer.writeln_fmt(
+                        format_args!("F{}: TOptional<{}>;", variable_name, lang_rep),
+                        Some(indentation + 2),
+                    )?;
+
+                    setter.push(format!(
+                        "procedure Set{}(pValue: TOptional<{}>);",
+                        variable_name, lang_rep
+                    ));
+                }
+            }
+        }
+        writer.newline()?;
+        Ok(for line in setter {
+            writer.writeln(line.as_str(), Some(indentation + 2))?;
+        })
+    }
+
+    fn generate_optional_properties_declaration<T: Write>(
+        writer: &mut CodeWriter<T>,
+        class_type: &ClassType,
+        type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
+        indentation: usize,
+    ) -> Result<(), CodeGenError> {
+        writer.newline()?;
+        Ok(
+            for variable in class_type
+                .variables
+                .iter()
+                .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
+            {
+                let variable_name = Helper::as_variable_name(&variable.name);
+
+                match &variable.data_type {
+                    DataType::FixedSizeList(item_type, size) => {
+                        let lang_rep = Helper::get_datatype_language_representation(
+                            item_type,
+                            &options.type_prefix,
+                        );
+
+                        for i in 1..size + 1 {
+                            writer.writeln_fmt(
+                                format_args!("F{}{}: {};", variable_name, i, lang_rep),
+                                Some(indentation + 2),
+                            )?;
+
+                            writer.writeln_fmt(
+                                format_args!(
+                                    "property {}{}: TOptional<{}> read F{}{} write Set{}{};",
+                                    variable_name, i, lang_rep, variable_name, i, variable_name, i
+                                ),
+                                Some(indentation + 2),
+                            )?;
+                        }
+                    }
+                    _ => {
+                        let lang_rep = Helper::get_datatype_language_representation(
+                            &variable.data_type,
+                            &options.type_prefix,
+                        );
+
+                        writer.writeln_fmt(
+                            format_args!(
+                                "property {}: TOptional<{}> read F{} write Set{};",
+                                variable_name, lang_rep, variable_name, variable_name
+                            ),
+                            Some(indentation + 2),
+                        )?;
+                    }
+                }
+            },
+        )
     }
 
     fn generate_class_implementation<T: Write>(
@@ -342,6 +469,8 @@ impl ClassCodeGenerator {
                 Self::generate_document_to_xml_implementation(writer, &formated_name)?;
             }
         }
+
+        Self::generate_optional_properties_setter(writer, class_type, type_aliases, options)?;
 
         if needs_destroy {
             writer.newline()?;
@@ -1481,6 +1610,104 @@ impl ClassCodeGenerator {
                 {
                     writer.writeln(arg.as_str(), Some(indentation))?;
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn generate_optional_properties_setter<T: Write>(
+        writer: &mut CodeWriter<T>,
+        class_type: &ClassType,
+        type_aliases: &[TypeAlias],
+        options: &CodeGenOptions,
+    ) -> Result<(), std::io::Error> {
+        let optional_variables_count = class_type
+            .variables
+            .iter()
+            .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
+            .count();
+
+        if optional_variables_count == 0 {
+            return Ok(());
+        }
+
+        writer.newline()?;
+
+        let class_type_name = Helper::as_type_name(&class_type.name, &options.type_prefix);
+
+        for (i, variable) in class_type
+            .variables
+            .iter()
+            .filter(|v| !v.required && !v.data_type.is_reference_type(type_aliases))
+            .enumerate()
+        {
+            let variable_name = Helper::as_variable_name(&variable.name);
+
+            match &variable.data_type {
+                DataType::FixedSizeList(item_type, size) => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        item_type,
+                        &options.type_prefix,
+                    );
+
+                    for i in 1..size + 1 {
+                        writer.writeln_fmt(
+                            format_args!(
+                                "procedure {}.Set{}{}(pValue: TOptional<{}>);",
+                                class_type_name, variable_name, i, lang_rep
+                            ),
+                            None,
+                        )?;
+                        writer.writeln("begin", None)?;
+                        writer.writeln_fmt(
+                            format_args!(
+                                "if F{}{} <> pValue then F{}.Free;",
+                                variable_name, i, variable_name
+                            ),
+                            Some(2),
+                        )?;
+                        writer.newline()?;
+                        writer.writeln_fmt(
+                            format_args!("F{}{} := pValue;", variable_name, i),
+                            Some(2),
+                        )?;
+                        writer.writeln("end;", None)?;
+
+                        if i < *size {
+                            writer.newline()?;
+                        }
+                    }
+                }
+                _ => {
+                    let lang_rep = Helper::get_datatype_language_representation(
+                        &variable.data_type,
+                        &options.type_prefix,
+                    );
+
+                    writer.writeln_fmt(
+                        format_args!(
+                            "procedure {}.Set{}(pValue: TOptional<{}>);",
+                            class_type_name, variable_name, lang_rep
+                        ),
+                        None,
+                    )?;
+                    writer.writeln("begin", None)?;
+                    writer.writeln_fmt(
+                        format_args!(
+                            "if F{} <> pValue then F{}.Free;",
+                            variable_name, variable_name
+                        ),
+                        Some(2),
+                    )?;
+                    writer.newline()?;
+                    writer.writeln_fmt(format_args!("F{} := pValue;", variable_name), Some(2))?;
+                    writer.writeln("end;", None)?;
+                }
+            }
+
+            if i < optional_variables_count - 1 {
+                writer.newline()?;
             }
         }
 
