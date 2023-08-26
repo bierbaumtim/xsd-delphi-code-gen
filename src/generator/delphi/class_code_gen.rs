@@ -172,7 +172,9 @@ impl ClassCodeGenerator {
                     {
                         match data_type {
                             DataType::InlineList(_) => {
-                                Helper::write_required_comment(writer, Some(indentation + 2))?;
+                                if variable.required {
+                                    Helper::write_required_comment(writer, Some(indentation + 2))?;
+                                }
 
                                 writer.writeln_fmt(
                                     format_args!(
@@ -188,8 +190,10 @@ impl ClassCodeGenerator {
                                     &variable.data_type,
                                     &options.type_prefix,
                                 );
-
-                                Helper::write_required_comment(writer, Some(indentation + 2))?;
+                                
+                                if variable.required {
+                                    Helper::write_required_comment(writer, Some(indentation + 2))?;
+                                }
 
                                 writer.writeln_fmt(
                                     format_args!("{}: {};", variable_name, lang_rep),
@@ -211,7 +215,9 @@ impl ClassCodeGenerator {
                     );
 
                     for i in 1..size + 1 {
-                        Helper::write_required_comment(writer, Some(indentation + 2))?;
+                        if variable.required {
+                            Helper::write_required_comment(writer, Some(indentation + 2))?;
+                        }
 
                         writer.writeln_fmt(
                             format_args!("{}{}: {};", variable_name, i, lang_rep),
@@ -224,8 +230,11 @@ impl ClassCodeGenerator {
                         &variable.data_type,
                         &options.type_prefix,
                     );
+                    
+                    if variable.required {
+                        Helper::write_required_comment(writer, Some(indentation + 2))?;
+                    }
 
-                    Helper::write_required_comment(writer, Some(indentation + 2))?;
                     writer.writeln_fmt(
                         format_args!("{}: {};", variable_name, lang_rep),
                         Some(indentation + 2),
