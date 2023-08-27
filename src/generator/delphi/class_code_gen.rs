@@ -243,7 +243,9 @@ impl ClassCodeGenerator {
             }
         }
 
-        writer.newline()?;
+        if optional_variable_count < class_type.variables.len() {
+            writer.newline()?;
+        }
 
         let fn_decorator = class_type
             .super_type
