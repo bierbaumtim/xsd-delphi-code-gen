@@ -11,7 +11,8 @@ where
     K: PartialEq,
     K: Hash,
 {
-    fn key_and_deps(&self) -> (K, Option<Vec<K>>);
+    fn key(&self) -> &K;
+    fn key_and_deps(&self) -> (&K, Option<Vec<K>>);
 }
 
 // Dependency Graph for Types
@@ -78,11 +79,11 @@ where
     }
 
     pub(crate) fn push(&mut self, item: T) {
-        let (item_key, dep_key) = item.key_and_deps();
-
         let mut node = Node::empty(item);
 
-        if let Some(dep_keys) = dep_key {
+        let (item_key, dep_keys) = node.item.key_and_deps();
+
+        if let Some(dep_keys) = dep_keys {
             for dep_key in dep_keys {
                 if let Some(dependency) = self.dependencies.get_mut(&dep_key) {
                     dependency.children.push(item_key.clone());
@@ -93,16 +94,16 @@ where
         }
 
         for value in self.dependencies.values() {
-            if value.parents.contains(&item_key) {
-                let (value_key, _) = value.item.key_and_deps();
+            if value.parents.contains(item_key) {
+                let value_key = value.item.key();
 
-                if !node.children.contains(&value_key) {
-                    node.children.push(value_key);
+                if !node.children.contains(value_key) {
+                    node.children.push(value_key.clone());
                 }
             }
         }
 
-        self.dependencies.insert(item_key, node);
+        self.dependencies.insert(item_key.clone(), node);
     }
 
     pub(crate) fn get_sorted_elements(&self) -> Vec<T> {
@@ -112,7 +113,7 @@ where
             .values()
             .filter(|i| i.children.is_empty())
             .flat_map(|node| self.get_node_creation_order(node))
-            .filter(|i| unique.insert(i.key_and_deps().0))
+            .filter(|i| unique.insert(i.key().clone()))
             .collect::<Vec<T>>()
     }
 
@@ -120,8 +121,8 @@ where
         node.parents
             .iter()
             .map(|i| self.dependencies.get(i))
-            .map(|v| v.map(|i| self.get_node_creation_order(i)))
-            .flat_map(|v| v.unwrap_or(Vec::new()))
+            .filter_map(|v| v.map(|i| self.get_node_creation_order(i)))
+            .flatten()
             .chain(vec![node.item.clone()])
             .collect::<Vec<T>>()
     }
@@ -138,8 +139,12 @@ mod tests {
     }
 
     impl Dependable<String> for GraphItem {
-        fn key_and_deps(&self) -> (String, Option<Vec<String>>) {
-            (self.key.clone(), self.dep.clone().map(|d| vec![d]))
+        fn key(&self) -> &String {
+            &self.key
+        }
+
+        fn key_and_deps(&self) -> (&String, Option<Vec<String>>) {
+            (&self.key, self.dep.clone().map(|d| vec![d]))
         }
     }
 
