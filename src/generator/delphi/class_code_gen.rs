@@ -130,7 +130,7 @@ impl ClassCodeGenerator {
                 Helper::as_type_name(&class_type.name, &options.type_prefix),
                 class_type.super_type.as_ref().map_or_else(
                     || "(TObject)".to_owned(),
-                    |v| format!("({})", Helper::as_type_name(v, &options.type_prefix))
+                    |(n, _)| format!("({})", Helper::as_type_name(n, &options.type_prefix))
                 )
             ),
             Some(indentation),

@@ -71,7 +71,7 @@ pub(crate) struct TypeAlias {
 pub(crate) struct ClassType {
     pub(crate) name: String,
     pub(crate) qualified_name: String,
-    pub(crate) super_type: Option<String>,
+    pub(crate) super_type: Option<(String, String)>,
     pub(crate) variables: Vec<Variable>,
     pub(crate) documentations: Vec<String>,
     // local_types: Vec<ClassType>,
@@ -110,7 +110,7 @@ impl Dependable<String> for ClassType {
     fn key_and_deps(&self) -> (&String, Option<Vec<String>>) {
         (
             &self.qualified_name,
-            self.super_type.as_ref().cloned().map(|s| vec![s]),
+            self.super_type.as_ref().cloned().map(|(_, qn)| vec![qn]),
         )
     }
 }

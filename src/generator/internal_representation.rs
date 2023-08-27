@@ -178,7 +178,10 @@ impl InternalRepresentation {
                     }
 
                     let super_type = match &ct.base_type {
-                        Some(t) => registry.types.get(t).map(|ct| ct.get_name()),
+                        Some(t) => registry
+                            .types
+                            .get(t)
+                            .map(|ct| (ct.get_name(), ct.get_qualified_name())),
                         None => None,
                     };
 
