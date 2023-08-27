@@ -14,33 +14,10 @@ pub(crate) struct InternalRepresentation {
 }
 
 impl InternalRepresentation {
-    pub(crate) fn build(data: &ParsedData, registry: &TypeRegistry) -> InternalRepresentation {
-        let mut classes_dep_graph = DependencyGraph::<String, ClassType, _>::new(|c| {
-            (
-                c.name.clone(),
-                c.super_type.as_ref().cloned().map(|s| vec![s]),
-            )
-        });
-        let mut aliases_dep_graph =
-            DependencyGraph::<String, TypeAlias, _>::new(|a| match &a.for_type {
-                DataType::Custom(name) => (a.name.clone(), Some(vec![name.clone()])),
-                _ => (a.name.clone(), None),
-            });
-        let mut union_types_dep_graph = DependencyGraph::<String, UnionType, _>::new(|u| {
-            (
-                u.name.clone(),
-                Some(
-                    u.variants
-                        .iter()
-                        .map(|v| match &v.data_type {
-                            DataType::Union(n) => n.clone(),
-                            _ => String::new(),
-                        })
-                        .filter(|d| !d.is_empty())
-                        .collect::<Vec<String>>(),
-                ),
-            )
-        });
+    pub(crate) fn build(data: &ParsedData, registry: &TypeRegistry) -> Self {
+        let mut classes_dep_graph = DependencyGraph::<String, ClassType>::new();
+        let mut aliases_dep_graph = DependencyGraph::<String, TypeAlias>::new();
+        let mut union_types_dep_graph = DependencyGraph::<String, UnionType>::new();
 
         let mut enumerations = Vec::new();
 

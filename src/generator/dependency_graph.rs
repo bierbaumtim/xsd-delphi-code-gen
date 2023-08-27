@@ -2,8 +2,17 @@ use core::hash::Hash;
 use std::{
     cmp::{Eq, PartialEq},
     collections::{HashMap, HashSet},
-    fmt::{Debug, Display},
+    fmt::Debug,
 };
+
+pub(crate) trait Dependable<K>
+where
+    K: Eq,
+    K: PartialEq,
+    K: Hash,
+{
+    fn key_and_deps(&self) -> (K, Option<Vec<K>>);
+}
 
 // Dependency Graph for Types
 
@@ -23,21 +32,16 @@ use std::{
 // => List
 // CustomNumber, Alias3, Alias2, Alias1, Alias4, Alias5
 
-pub(crate) struct DependencyGraph<K, T, F>
+pub(crate) struct DependencyGraph<K, T>
 where
-    K: Sized,
     K: Eq,
     K: PartialEq,
     K: Hash,
     K: Clone,
-    K: Debug,
-    K: Display,
     T: Clone,
-    T: Debug,
-    F: Fn(&T) -> (K, Option<Vec<K>>),
+    T: Dependable<K>,
 {
     dependencies: HashMap<K, Node<K, T>>,
-    keys_fn: F,
 }
 
 #[derive(Debug)]
@@ -57,28 +61,24 @@ impl<K, T> Node<K, T> {
     }
 }
 
-impl<K, T, F> DependencyGraph<K, T, F>
+impl<K, T> DependencyGraph<K, T>
 where
-    K: Sized,
+    // K: Sized,
     K: Eq,
     K: PartialEq,
     K: Hash,
     K: Clone,
-    K: Debug,
-    K: Display,
     T: Clone,
-    T: Debug,
-    F: Fn(&T) -> (K, Option<Vec<K>>),
+    T: Dependable<K>,
 {
-    pub(crate) fn new(key: F) -> Self {
+    pub(crate) fn new() -> Self {
         DependencyGraph {
             dependencies: HashMap::new(),
-            keys_fn: key,
         }
     }
 
     pub(crate) fn push(&mut self, item: T) {
-        let (item_key, dep_key) = (self.keys_fn)(&item);
+        let (item_key, dep_key) = item.key_and_deps();
 
         let mut node = Node::empty(item);
 
@@ -94,7 +94,7 @@ where
 
         for value in self.dependencies.values() {
             if value.parents.contains(&item_key) {
-                let (value_key, _) = (self.keys_fn)(&value.item);
+                let (value_key, _) = value.item.key_and_deps();
 
                 if !node.children.contains(&value_key) {
                     node.children.push(value_key);
@@ -112,7 +112,7 @@ where
             .values()
             .filter(|i| i.children.is_empty())
             .flat_map(|node| self.get_node_creation_order(node))
-            .filter(|i| unique.insert((self.keys_fn)(i).0))
+            .filter(|i| unique.insert(i.key_and_deps().0))
             .collect::<Vec<T>>()
     }
 
@@ -137,20 +137,24 @@ mod tests {
         dep: Option<String>,
     }
 
+    impl Dependable<String> for GraphItem {
+        fn key_and_deps(&self) -> (String, Option<Vec<String>>) {
+            (self.key.clone(), self.dep.clone().map(|d| vec![d]))
+        }
+    }
+
     #[test]
     fn get_sorted_elements_with_empty_graph() {
-        let graph = DependencyGraph::<i64, i64, _>::new(|i| (*i, None));
+        let graph = DependencyGraph::<String, GraphItem>::new();
 
         let items = graph.get_sorted_elements();
 
-        assert_eq!(items, vec![]);
+        assert_eq!(items.len(), 0);
     }
 
     #[test]
     fn get_sorted_elements_with_duplicates() {
-        let mut graph = DependencyGraph::<String, GraphItem, _>::new(|i| {
-            (i.key.clone(), i.dep.clone().map(|d| vec![d]))
-        });
+        let mut graph = DependencyGraph::<String, GraphItem>::new();
 
         graph.push(GraphItem {
             key: "Alias3".to_owned(),

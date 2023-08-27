@@ -1,3 +1,5 @@
+use super::dependency_graph::Dependable;
+
 #[derive(Clone, Debug)]
 pub(crate) enum DataType {
     Boolean,
@@ -98,4 +100,40 @@ pub(crate) struct UnionType {
 pub(crate) struct UnionVariant {
     pub(crate) name: String,
     pub(crate) data_type: DataType,
+}
+
+impl Dependable<String> for ClassType {
+    fn key_and_deps(&self) -> (String, Option<Vec<String>>) {
+        (
+            self.name.clone(),
+            self.super_type.as_ref().cloned().map(|s| vec![s]),
+        )
+    }
+}
+
+impl Dependable<String> for TypeAlias {
+    fn key_and_deps(&self) -> (String, Option<Vec<String>>) {
+        match &self.for_type {
+            DataType::Custom(name) => (self.name.clone(), Some(vec![name.clone()])),
+            _ => (self.name.clone(), None),
+        }
+    }
+}
+
+impl Dependable<String> for UnionType {
+    fn key_and_deps(&self) -> (String, Option<Vec<String>>) {
+        (
+            self.name.clone(),
+            Some(
+                self.variants
+                    .iter()
+                    .map(|v| match &v.data_type {
+                        DataType::Union(n) => n.clone(),
+                        _ => String::new(),
+                    })
+                    .filter(|d| !d.is_empty())
+                    .collect::<Vec<String>>(),
+            ),
+        )
+    }
 }
