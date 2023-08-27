@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "xsd-delphi-code-gen"
-version = "0.1.12"
+version = "0.1.14"
 dependencies = [
  "chrono",
  "clap",
