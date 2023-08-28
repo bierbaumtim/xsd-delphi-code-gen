@@ -104,38 +104,38 @@ pub(crate) struct UnionVariant {
 
 impl Dependable<String> for ClassType {
     fn key(&self) -> &String {
-        &self.qualified_name
+        &self.name
     }
 
     fn key_and_deps(&self) -> (&String, Option<Vec<String>>) {
         (
-            &self.qualified_name,
-            self.super_type.as_ref().cloned().map(|(_, qn)| vec![qn]),
+            &self.name,
+            self.super_type.as_ref().cloned().map(|(n, _)| vec![n]),
         )
     }
 }
 
 impl Dependable<String> for TypeAlias {
     fn key(&self) -> &String {
-        &self.qualified_name
+        &self.name
     }
 
     fn key_and_deps(&self) -> (&String, Option<Vec<String>>) {
         match &self.for_type {
-            DataType::Custom(name) => (&self.qualified_name, Some(vec![name.clone()])),
-            _ => (&self.qualified_name, None),
+            DataType::Custom(name) => (&self.name, Some(vec![name.clone()])),
+            _ => (&self.name, None),
         }
     }
 }
 
 impl Dependable<String> for UnionType {
     fn key(&self) -> &String {
-        &self.qualified_name
+        &self.name
     }
 
     fn key_and_deps(&self) -> (&String, Option<Vec<String>>) {
         (
-            &self.qualified_name,
+            &self.name,
             Some(
                 self.variants
                     .iter()
