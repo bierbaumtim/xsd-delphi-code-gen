@@ -599,7 +599,7 @@ impl ClassCodeGenerator {
                             &options.type_prefix,
                         )
                         .as_str(),
-                        variable.required,
+                        true,
                         false,
                         Some(2),
                     )?;
@@ -929,20 +929,19 @@ impl ClassCodeGenerator {
     ) -> Result<(), CodeGenError> {
         let formatted_variable_name = Helper::as_variable_name(&variable.name);
 
-        if variable.required {
-            writer.writeln_fmt(
-                format_args!(
-                    "{} := {}.Create;",
-                    formatted_variable_name,
-                    Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix
-                    ),
+        writer.writeln_fmt(
+            format_args!(
+                "{} := {}.Create;",
+                formatted_variable_name,
+                Helper::get_datatype_language_representation(
+                    &variable.data_type,
+                    &options.type_prefix
                 ),
-                Some(2),
-            )?;
-            writer.newline()?;
-        }
+            ),
+            Some(2),
+        )?;
+        writer.newline()?;
+
         writer.writeln_fmt(
             format_args!(
                 "var __{}Index := node.ChildNodes.IndexOf('{}');",
@@ -954,20 +953,6 @@ impl ClassCodeGenerator {
             format_args!("if __{}Index >= 0 then begin", variable.name),
             Some(2),
         )?;
-
-        if !variable.required {
-            writer.writeln_fmt(
-                format_args!(
-                    "{} := {}.Create;",
-                    formatted_variable_name,
-                    Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix
-                    ),
-                ),
-                Some(2),
-            )?;
-        }
 
         writer.writeln_fmt(
             format_args!(
@@ -1203,18 +1188,19 @@ impl ClassCodeGenerator {
         let mut indentation = 2;
 
         writer.newline()?;
-        if variable.required {
-            writer.writeln_fmt(
-                format_args!(
-                    "{} := {}.Create;",
-                    formatted_variable_name,
-                    Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix
-                    ),
+        writer.writeln_fmt(
+            format_args!(
+                "{} := {}.Create;",
+                formatted_variable_name,
+                Helper::get_datatype_language_representation(
+                    &variable.data_type,
+                    &options.type_prefix
                 ),
-                Some(indentation),
-            )?;
+            ),
+            Some(indentation),
+        )?;
+
+        if variable.required {
             writer.writeln_fmt(
                 format_args!(
                     "for var vPart in node.ChildNodes['{}'].Text.Split([' ']) do begin",
@@ -1233,19 +1219,6 @@ impl ClassCodeGenerator {
             writer.writeln("if Assigned(vOptionalNode) then begin", Some(indentation))?;
 
             indentation = 4;
-
-            writer.writeln_fmt(
-                format_args!(
-                    "{} := {}.Create;",
-                    formatted_variable_name,
-                    Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix
-                    ),
-                ),
-                Some(indentation),
-            )?;
-            writer.newline()?;
             writer.writeln(
                 "for var vPart in vOptionalNode.Text.Split([' ']) do begin",
                 Some(indentation),
@@ -1295,18 +1268,11 @@ impl ClassCodeGenerator {
             )?,
         };
 
-        if variable.required {
-            writer.writeln("end;", Some(2))?;
-        } else {
+        if !variable.required {
             writer.writeln("end;", Some(indentation))?;
-
-            writer.writeln("end else begin", Some(2))?;
-            writer.writeln_fmt(
-                format_args!("{} := nil;", formatted_variable_name),
-                Some(indentation),
-            )?;
-            writer.writeln("end;", Some(2))?;
         }
+
+        writer.writeln("end;", Some(2))?;
 
         Ok(())
     }
@@ -1365,7 +1331,10 @@ impl ClassCodeGenerator {
                             DataType::InlineList(lt) => {
                                 if variable.required {
                                     writer.writeln_fmt(
-                                        format_args!("if Assigned({}) then begin", variable_name),
+                                        format_args!(
+                                            "if Assigned({}) and {}.Count > 0 then begin",
+                                            variable_name, variable_name
+                                        ),
                                         Some(2),
                                     )?;
                                     indentation = 4;
@@ -1491,14 +1460,6 @@ impl ClassCodeGenerator {
                     }
                 }
                 DataType::List(lt) => {
-                    if !variable.required {
-                        writer.writeln_fmt(
-                            format_args!("if Assigned({}) then begin", variable_name),
-                            Some(2),
-                        )?;
-
-                        indentation = 4;
-                    }
                     writer.writeln_fmt(
                         format_args!("for var {} in {} do begin", variable.name, variable_name),
                         Some(indentation),
@@ -1512,9 +1473,6 @@ impl ClassCodeGenerator {
                         indentation + 2,
                     )?;
                     writer.writeln("end;", Some(indentation))?;
-                    if !variable.required {
-                        writer.writeln("end;", Some(2))?;
-                    }
                 }
                 DataType::FixedSizeList(item_type, size) => {
                     for i in 1..size + 1 {
