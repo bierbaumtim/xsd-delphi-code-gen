@@ -46,7 +46,7 @@ impl Helper {
         }
 
         let mut result =
-            String::with_capacity(name.len() + prefix.as_ref().map_or(0, |p| p.len()) + 1);
+            String::with_capacity(name.len() + prefix.as_ref().map_or(0, String::len) + 1);
         result.push('T');
         if let Some(prefix) = prefix {
             result.push_str(prefix.as_str());
@@ -114,9 +114,10 @@ impl Helper {
             DataType::List(lt) | DataType::InlineList(lt) => {
                 let gt = Self::get_datatype_language_representation(lt, prefix);
 
-                match **lt {
-                    DataType::Custom(_) => format!("TObjectList<{}>", gt),
-                    _ => format!("TList<{}>", gt),
+                if let DataType::Custom(_) = **lt {
+                    format!("TObjectList<{gt}>")
+                } else {
+                    format!("TList<{gt}>")
                 }
             }
             DataType::ShortInteger => String::from("ShortInt"),
@@ -137,27 +138,27 @@ impl Helper {
     ) -> String {
         match data_type {
             DataType::Boolean => {
-                format!("IfThen({}, cnXmlTrueValue, cnXmlFalseValue)", variable_name)
+                format!("IfThen({variable_name}, cnXmlTrueValue, cnXmlFalseValue)")
             }
             DataType::DateTime | DataType::Date if pattern.is_some() => format!(
                 "FormatDateTime('{}', {})",
                 pattern.clone().unwrap_or_default(),
                 variable_name,
             ),
-            DataType::DateTime | DataType::Date => format!("DateToISO8601({})", variable_name),
-            DataType::Double => format!("FloatToStr({})", variable_name),
+            DataType::DateTime | DataType::Date => format!("DateToISO8601({variable_name})"),
+            DataType::Double => format!("FloatToStr({variable_name})"),
             DataType::Binary(BinaryEncoding::Base64) => {
-                format!("TNetEncoding.Base64.EncodeStringToBytes({})", variable_name)
+                format!("TNetEncoding.Base64.EncodeStringToBytes({variable_name})")
             }
-            DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({})", variable_name),
+            DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({variable_name})"),
             DataType::String => variable_name.to_string(),
             DataType::Time if pattern.is_some() => format!(
                 "EncodeTime({}, '{}')",
                 variable_name,
                 pattern.clone().unwrap_or_default(),
             ),
-            DataType::Time => format!("TimeToStr({})", variable_name),
-            DataType::Uri => format!("{}.ToString", variable_name),
+            DataType::Time => format!("TimeToStr({variable_name})"),
+            DataType::Uri => format!("{variable_name}.ToString"),
             DataType::SmallInteger
             | DataType::ShortInteger
             | DataType::Integer
@@ -165,7 +166,7 @@ impl Helper {
             | DataType::UnsignedSmallInteger
             | DataType::UnsignedShortInteger
             | DataType::UnsignedInteger
-            | DataType::UnsignedLongInteger => format!("IntToStr({})", variable_name),
+            | DataType::UnsignedLongInteger => format!("IntToStr({variable_name})"),
             _ => "''".to_owned(),
         }
     }
@@ -202,7 +203,7 @@ impl Helper {
         indentation: Option<usize>,
     ) -> Result<(), std::io::Error> {
         writer.writeln_fmt(
-            format_args!("// XML Qualified Name: {}", qualified_name),
+            format_args!("// XML Qualified Name: {qualified_name}"),
             indentation,
         )?;
 

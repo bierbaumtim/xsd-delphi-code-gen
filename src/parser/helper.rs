@@ -48,15 +48,15 @@ impl XmlParserHelper {
             .ok_or(ParserError::MissingAttribute(String::from(name)))
             .and_then(|r| {
                 r.map_err(|e| {
-                    ParserError::MalformedAttribute(String::from(name), Some(format!("{:?}", e)))
+                    ParserError::MalformedAttribute(String::from(name), Some(format!("{e:?}")))
                 })
             })
             .map(|a| match a.value {
                 Cow::Borrowed(v) => String::from_utf8(v.to_vec()).map_err(|e| {
-                    ParserError::MalformedAttribute(String::from(name), Some(format!("{:?}", e)))
+                    ParserError::MalformedAttribute(String::from(name), Some(format!("{e:?}")))
                 }),
                 Cow::Owned(v) => String::from_utf8(v).map_err(|e| {
-                    ParserError::MalformedAttribute(String::from(name), Some(format!("{:?}", e)))
+                    ParserError::MalformedAttribute(String::from(name), Some(format!("{e:?}")))
                 }),
             })
             .and_then(|r| r)
@@ -76,6 +76,7 @@ impl XmlParserHelper {
         node: &BytesStart,
         name: &str,
     ) -> Result<Option<i64>, ParserError> {
+        #![allow(clippy::redundant_closure_for_method_calls)]
         let value = Self::get_attribute_value(node, name)
             .map(|v| match v.parse::<i64>() {
                 Ok(e) => Ok(e),
@@ -83,7 +84,7 @@ impl XmlParserHelper {
                     if v == "unbounded" {
                         Ok(UNBOUNDED_OCCURANCE)
                     } else {
-                        Err(ParserError::MalformedAttribute(v, Some(format!("{:?}", e))))
+                        Err(ParserError::MalformedAttribute(v, Some(format!("{e:?}"))))
                     }
                 }
             })

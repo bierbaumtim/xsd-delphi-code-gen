@@ -1,6 +1,18 @@
-use crate::{parser::types::*, type_registry::TypeRegistry};
+use crate::{
+    parser::types::{
+        CustomTypeDefinition, NodeBaseType, NodeType, OrderIndicator, ParsedData, SimpleType,
+        DEFAULT_OCCURANCE, UNBOUNDED_OCCURANCE,
+    },
+    type_registry::TypeRegistry,
+};
 
-use super::{dependency_graph::DependencyGraph, types::*};
+use super::{
+    dependency_graph::DependencyGraph,
+    types::{
+        BinaryEncoding, ClassType, DataType, Enumeration, EnumerationValue, TypeAlias, UnionType,
+        Variable,
+    },
+};
 
 pub(crate) const DOCUMENT_NAME: &str = "Document";
 
@@ -374,7 +386,7 @@ impl InternalRepresentation {
                         }
                         crate::parser::types::UnionVariant::Standard(t) => Some((
                             Self::node_base_type_to_datatype(t),
-                            format!("Variant{}", i),
+                            format!("Variant{i}"),
                         )),
                     };
 

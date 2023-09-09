@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_lines)]
 use std::{fs::File, io::BufWriter, path::PathBuf, time::Instant};
 
 use clap::{Parser, ValueEnum};
@@ -21,7 +22,7 @@ fn main() {
     let output_path = match resolve_output_path(&args.output) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("{e}");
 
             return;
         }
@@ -30,10 +31,7 @@ fn main() {
     let output_file = match File::create(output_path) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!(
-                "Could not create output file due to following error: \"{:?}\"",
-                e
-            );
+            eprintln!("Could not create output file due to following error: \"{e:?}\"");
             return;
         }
     };
@@ -45,7 +43,7 @@ fn main() {
         match parser.parse_file(args.input.first().unwrap(), &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
-                eprintln!("An error occured: {}", error);
+                eprintln!("An error occured: {error}");
                 return;
             }
         }
@@ -53,14 +51,14 @@ fn main() {
         match parser.parse_files(&args.input, &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
-                eprintln!("An error occured: {}", error);
+                eprintln!("An error occured: {error}");
                 return;
             }
         }
     };
 
     let elapsed_for_parse = instant.elapsed().as_millis();
-    println!("Files parsed in {}ms", elapsed_for_parse);
+    println!("Files parsed in {elapsed_for_parse}ms");
 
     let internal_representation = InternalRepresentation::build(&data, &type_registry);
 
@@ -68,7 +66,7 @@ fn main() {
         .elapsed()
         .as_millis()
         .saturating_sub(elapsed_for_parse);
-    println!("Internal Representation created in {}ms", elapsed_for_ir);
+    println!("Internal Representation created in {elapsed_for_ir}ms");
 
     let buffer = BufWriter::new(Box::new(output_file));
     let mut generator = DelphiCodeGenerator::new(
@@ -84,10 +82,7 @@ fn main() {
             instant.elapsed().as_millis().saturating_sub(elapsed_for_ir),
         ),
         Err(e) => {
-            eprintln!(
-                "Failed to write output to file due to following error: \"{:?}\"",
-                e
-            );
+            eprintln!("Failed to write output to file due to following error: \"{e:?}\"");
         }
     }
 }
@@ -103,23 +98,16 @@ fn build_code_gen_options(args: &Args) -> CodeGenOptions {
 
 fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
     if path.is_relative() {
-        std::env::current_dir().map(|d| d.join(path)).map_err(|e| {
-            format!(
-                "Relative path not supported due to following error: \"{:?}\"",
-                e
-            )
-        })
+        std::env::current_dir()
+            .map(|d| d.join(path))
+            .map_err(|e| format!("Relative path not supported due to following error: \"{e:?}\""))
     } else {
-        path.canonicalize().map_err(|e| {
-            format!(
-                "Could not resolve output path due to following error: \"{:?}\"",
-                e
-            )
-        })
+        path.canonicalize()
+            .map_err(|e| format!("Could not resolve output path due to following error: \"{e:?}\""))
     }
 }
 
-/// XSD2DelphiCodeGen generates Types from XSD-Files
+/// `XSD2DelphiCodeGen` generates Types from XSD-Files
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {

@@ -188,24 +188,23 @@ impl Display for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FailedToResolveNamespace(namespace) => {
-                write!(f, "Namespace \"{}\" could not be resolved", namespace)
+                write!(f, "Namespace \"{namespace}\" could not be resolved")
             }
             Self::MalformedAttribute(name, reason) => write!(
                 f,
-                "Attribute \"{}\" is malformed. Error: \"{:?}\"",
-                name, reason
+                "Attribute \"{name}\" is malformed. Error: \"{reason:?}\""
             ),
             Self::MalformedNamespaceAttribute(message) => {
-                write!(f, "Namespace attribute is malformed: \"{}\"", message)
+                write!(f, "Namespace attribute is malformed: \"{message}\"")
             }
             Self::MissingOrNotSupportedBaseType(value) => {
-                write!(f, "Type is missing or unsupported \"{}\"", value)
+                write!(f, "Type is missing or unsupported \"{value}\"")
             }
-            Self::MissingAttribute(name) => write!(f, "Missing Attribute \"{}\"", name),
+            Self::MissingAttribute(name) => write!(f, "Missing Attribute \"{name}\""),
             Self::UnableToReadFile => write!(f, "Failed to read input file"),
             Self::UnexpectedEndOfFile => write!(f, "File ended to early"),
             Self::UnexpectedError => write!(f, "An unexpected error occured"),
-            Self::UnexpectedStartOfNode(name) => write!(f, "Unexpected start of \"{}\"", name),
+            Self::UnexpectedStartOfNode(name) => write!(f, "Unexpected start of \"{name}\""),
         }
     }
 }

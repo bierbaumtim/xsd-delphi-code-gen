@@ -295,36 +295,43 @@ impl UnionTypeCodeGenerator {
                         match dt {
                             crate::generator::types::DataType::Alias(_) => (),
                             crate::generator::types::DataType::Custom(n) => {
-                                if enumerations.iter().any(|e|e.name == n) {
-                                    writer.writeln_fmt(format_args!(
-                                        "{}.{}: Result := {}.ToXmlValue;",
-                                        Self::ENUM_NAME,
-                                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                                        variable_name,
-                                    ), Some(4))?
+                                if enumerations.iter().any(|e| e.name == n) {
+                                    writer.writeln_fmt(
+                                        format_args!(
+                                            "{}.{}: Result := {}.ToXmlValue;",
+                                            Self::ENUM_NAME,
+                                            Self::get_variant_enum_variant_name(
+                                                &variant_prefix,
+                                                &variant.name,
+                                                i
+                                            ),
+                                            variable_name,
+                                        ),
+                                        Some(4),
+                                    )?;
                                 } else {
                                     return Err(CodeGenError::ComplexTypeInSimpleTypeNotAllowed(
                                         union_type.name.clone(),
                                         variant.name.clone(),
-                                    ))
+                                    ));
                                 }
                             }
-                            crate::generator::types::DataType::Enumeration(_) => {
-                                writer.writeln_fmt(format_args!(
-                                    "{}.{}: Result := {}.ToXmlValue;",
-                                    Self::ENUM_NAME,
-                                    Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                                    variable_name,
-                                ), Some(4))?
-                            }
-                            crate::generator::types::DataType::List(_) => {
-                                writer.writeln_fmt(format_args!(
-                                    "{}.{}: Result := ''; // TODO: CodeGen for this type is currently not supported. Manual implementation required",
-                                    Self::ENUM_NAME,
-                                    Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                                ), Some(4))?;
-                            }
-                            crate::generator::types::DataType::FixedSizeList(_, _) => {
+                            crate::generator::types::DataType::Enumeration(_) => writer
+                                .writeln_fmt(
+                                    format_args!(
+                                        "{}.{}: Result := {}.ToXmlValue;",
+                                        Self::ENUM_NAME,
+                                        Self::get_variant_enum_variant_name(
+                                            &variant_prefix,
+                                            &variant.name,
+                                            i
+                                        ),
+                                        variable_name,
+                                    ),
+                                    Some(4),
+                                )?,
+                            crate::generator::types::DataType::List(_)
+                            | crate::generator::types::DataType::FixedSizeList(_, _) => {
                                 writer.writeln_fmt(format_args!(
                                     "{}.{}: Result := ''; // TODO: CodeGen for this type is currently not supported. Manual implementation required",
                                     Self::ENUM_NAME,
@@ -332,33 +339,79 @@ impl UnionTypeCodeGenerator {
                                 ), Some(4))?;
                             }
                             crate::generator::types::DataType::InlineList(lt) => {
-                                writer.writeln_fmt(format_args!("{}.{}: begin",Self::ENUM_NAME,
-                                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i)), Some(4))?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "{}.{}: begin",
+                                        Self::ENUM_NAME,
+                                        Self::get_variant_enum_variant_name(
+                                            &variant_prefix,
+                                            &variant.name,
+                                            i
+                                        )
+                                    ),
+                                    Some(4),
+                                )?;
                                 writer.writeln("Result := '';", Some(6))?;
                                 writer.newline()?;
-                                writer.writeln_fmt(format_args!("for var I := Low({}) to High({}) do begin", variable_name, variable_name), Some(6))?;
-                                writer.writeln_fmt(format_args!("Result := Result + {};", Helper::get_variable_value_as_string(lt.as_ref(), &format!("{}[I]", variable_name), &None)), Some(8))?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "for var I := Low({variable_name}) to High({variable_name}) do begin"
+                                    ),
+                                    Some(6),
+                                )?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "Result := Result + {};",
+                                        Helper::get_variable_value_as_string(
+                                            lt.as_ref(),
+                                            &format!("{variable_name}[I]"),
+                                            &None
+                                        )
+                                    ),
+                                    Some(8),
+                                )?;
                                 writer.newline()?;
-                                writer.writeln_fmt(format_args!("if I < High({}) then begin", variable_name), Some(8))?;
+                                writer.writeln_fmt(
+                                    format_args!("if I < High({variable_name}) then begin"),
+                                    Some(8),
+                                )?;
                                 writer.writeln("Result := Result + ' ';", Some(10))?;
                                 writer.writeln("end;", Some(8))?;
                                 writer.writeln("end;", Some(6))?;
                                 writer.writeln("end;", Some(4))?;
                             }
                             crate::generator::types::DataType::Union(n) => {
-                                writer.writeln_fmt(format_args!(
-                                    "{}.{}: Result := {}.ToXmlValue;",
-                                    Self::ENUM_NAME,
-                                    Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                                    Helper::as_type_name(&n, &options.type_prefix),
-                                ), Some(4))?;
+                                writer.writeln_fmt(
+                                    format_args!(
+                                        "{}.{}: Result := {}.ToXmlValue;",
+                                        Self::ENUM_NAME,
+                                        Self::get_variant_enum_variant_name(
+                                            &variant_prefix,
+                                            &variant.name,
+                                            i
+                                        ),
+                                        Helper::as_type_name(&n, &options.type_prefix),
+                                    ),
+                                    Some(4),
+                                )?;
                             }
-                            _ => writer.writeln_fmt(format_args!(
-                                "{}.{}: Result := {};",
-                                Self::ENUM_NAME,
-                                Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                                Helper::get_variable_value_as_string(&dt, &variable_name, &pattern),
-                            ), Some(4))?,
+                            _ => writer.writeln_fmt(
+                                format_args!(
+                                    "{}.{}: Result := {};",
+                                    Self::ENUM_NAME,
+                                    Self::get_variant_enum_variant_name(
+                                        &variant_prefix,
+                                        &variant.name,
+                                        i
+                                    ),
+                                    Helper::get_variable_value_as_string(
+                                        &dt,
+                                        &variable_name,
+                                        &pattern
+                                    ),
+                                ),
+                                Some(4),
+                            )?,
                         }
                     }
                     crate::generator::types::DataType::Custom(_) => {
@@ -368,61 +421,93 @@ impl UnionTypeCodeGenerator {
                         ))
                     }
                     crate::generator::types::DataType::Enumeration(_) => {
-                        writer.writeln_fmt(format_args!(
-                            "{}.{}: Result := {}.ToXmlValue;",
-                            Self::ENUM_NAME,
-                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                            variable_name,
-                        ),Some(4))?
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{}.{}: Result := {}.ToXmlValue;",
+                                Self::ENUM_NAME,
+                                Self::get_variant_enum_variant_name(
+                                    &variant_prefix,
+                                    &variant.name,
+                                    i
+                                ),
+                                variable_name,
+                            ),
+                            Some(4),
+                        )?;
                     }
-                    crate::generator::types::DataType::List(_) => {
+                    crate::generator::types::DataType::List(_)
+                    | crate::generator::types::DataType::FixedSizeList(_, _) => {
                         writer.writeln_fmt(format_args!(
                             "{}.{}: Result := ''; // TODO: CodeGen for this type is currently not supported. Manual implementation required",
                             Self::ENUM_NAME,
                             Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                        ), Some(4))?
-                    }
-                    crate::generator::types::DataType::FixedSizeList(_, _) => {
-                        writer.writeln_fmt(format_args!(
-                            "{}.{}: Result := ''; // TODO: CodeGen for this type is currently not supported. Manual implementation required",
-                            Self::ENUM_NAME,
-                            Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                        ), Some(4))?
+                        ), Some(4))?;
                     }
                     crate::generator::types::DataType::InlineList(lt) => {
-                        writer.writeln_fmt(format_args!("{}.{}: begin",Self::ENUM_NAME,
-                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i)), Some(4))?;
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{}.{}: begin",
+                                Self::ENUM_NAME,
+                                Self::get_variant_enum_variant_name(
+                                    &variant_prefix,
+                                    &variant.name,
+                                    i
+                                )
+                            ),
+                            Some(4),
+                        )?;
                         writer.writeln("Result := '';", Some(6))?;
                         writer.newline()?;
-                        writer.writeln_fmt(format_args!("for var I := Low({}) to High({}) do begin", variable_name, variable_name), Some(6))?;
-                        writer.writeln_fmt(format_args!("Result := Result + {};", Helper::get_variable_value_as_string(lt.as_ref(), &format!("{}[I]", variable_name), &None)), Some(8))?;
+                        writer.writeln_fmt(format_args!("for var I := Low({variable_name}) to High({variable_name}) do begin"), Some(6))?;
+                        writer.writeln_fmt(
+                            format_args!(
+                                "Result := Result + {};",
+                                Helper::get_variable_value_as_string(
+                                    lt.as_ref(),
+                                    &format!("{variable_name}[I]"),
+                                    &None
+                                )
+                            ),
+                            Some(8),
+                        )?;
                         writer.newline()?;
-                        writer.writeln_fmt(format_args!("if I < High({}) then begin", variable_name), Some(8))?;
+                        writer.writeln_fmt(
+                            format_args!("if I < High({variable_name}) then begin"),
+                            Some(8),
+                        )?;
                         writer.writeln("Result := Result + ' ';", Some(10))?;
                         writer.writeln("end;", Some(8))?;
                         writer.writeln("end;", Some(6))?;
                         writer.writeln("end;", Some(4))?;
                     }
                     crate::generator::types::DataType::Union(n) => {
-                        writer.writeln_fmt(format_args!(
-                            "{}.{}: Result := {}.ToXmlValue;",
-
+                        writer.writeln_fmt(
+                            format_args!(
+                                "{}.{}: Result := {}.ToXmlValue;",
+                                Self::ENUM_NAME,
+                                Self::get_variant_enum_variant_name(
+                                    &variant_prefix,
+                                    &variant.name,
+                                    i
+                                ),
+                                Helper::as_type_name(n, &options.type_prefix),
+                            ),
+                            Some(4),
+                        )?;
+                    }
+                    _ => writer.writeln_fmt(
+                        format_args!(
+                            "{}.{}: Result := {};",
                             Self::ENUM_NAME,
                             Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                            Helper::as_type_name(n, &options.type_prefix),
-                        ), Some(4))?
-                    }
-                    _ => writer.writeln_fmt(format_args!(
-                        "{}.{}: Result := {};",
-
-                        Self::ENUM_NAME,
-                        Self::get_variant_enum_variant_name(&variant_prefix, &variant.name, i),
-                        Helper::get_variable_value_as_string(
-                            &variant.data_type,
-                            &variable_name,
-                            &None,
+                            Helper::get_variable_value_as_string(
+                                &variant.data_type,
+                                &variable_name,
+                                &None,
+                            ),
                         ),
-                    ), Some(4))?,
+                        Some(4),
+                    )?,
                 }
             }
             writer.writeln("end;", Some(2))?;

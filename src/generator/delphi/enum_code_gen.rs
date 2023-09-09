@@ -140,18 +140,14 @@ impl EnumCodeGenerator {
         let formatted_enum_name = Helper::as_type_name(&enumeration.name, &options.type_prefix);
 
         writer.writeln_fmt(
-            format_args!(
-                "{}Helper = record helper for {}",
-                formatted_enum_name, formatted_enum_name,
-            ),
+            format_args!("{formatted_enum_name}Helper = record helper for {formatted_enum_name}",),
             Some(indentation),
         )?;
 
         if options.generate_from_xml {
             writer.writeln_fmt(
                 format_args!(
-                    "class function FromXmlValue(const pXmlValue: String): {}; static;",
-                    formatted_enum_name,
+                    "class function FromXmlValue(const pXmlValue: String): {formatted_enum_name}; static;"
                 ),
                 Some(indentation + 2),
             )?;
@@ -182,7 +178,7 @@ impl EnumCodeGenerator {
         }
 
         if options.generate_to_xml {
-            Self::generate_helper_to_xml(writer, enumeration, formatted_enum_name)?;
+            Self::generate_helper_to_xml(writer, enumeration, formatted_enum_name.as_str())?;
         }
 
         Ok(())
@@ -195,8 +191,7 @@ impl EnumCodeGenerator {
     ) -> Result<(), CodeGenError> {
         writer.writeln_fmt(
             format_args!(
-                "class function {}Helper.FromXmlValue(const pXmlValue: String): {};",
-                formatted_enum_name, formatted_enum_name,
+                "class function {formatted_enum_name}Helper.FromXmlValue(const pXmlValue: String): {formatted_enum_name};"
             ),
             None,
         )?;
@@ -227,8 +222,7 @@ impl EnumCodeGenerator {
         writer.writeln(" else begin", None)?;
         writer.writeln_fmt(
             format_args!(
-                "raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {}');",
-                formatted_enum_name,
+                "raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {formatted_enum_name}');"
             ),
             Some(4),
         )?;
@@ -240,7 +234,7 @@ impl EnumCodeGenerator {
     fn generate_helper_to_xml<T: Write>(
         writer: &mut CodeWriter<T>,
         enumeration: &Enumeration,
-        formatted_enum_name: String,
+        formatted_enum_name: &str,
     ) -> Result<(), CodeGenError> {
         let max_variant_len = enumeration
             .values
@@ -250,7 +244,7 @@ impl EnumCodeGenerator {
             .unwrap_or(1);
 
         writer.writeln_fmt(
-            format_args!("function {}Helper.ToXmlValue: String;", formatted_enum_name),
+            format_args!("function {formatted_enum_name}Helper.ToXmlValue: String;"),
             None,
         )?;
         writer.writeln("begin", None)?;

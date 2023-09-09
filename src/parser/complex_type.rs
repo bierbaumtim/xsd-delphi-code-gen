@@ -36,7 +36,7 @@ impl ComplexTypeParser {
 
         let qualified_name = qualified_parent.map_or_else(
             || xml_parser.as_qualified_name(name.as_str()),
-            |v| format!("{}.{}", v, name),
+            |v| format!("{v}.{name}"),
         );
 
         loop {
@@ -64,7 +64,7 @@ impl ComplexTypeParser {
                         let name = XmlParserHelper::get_attribute_value(&s, "name")?;
                         let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
 
-                        current_element = Some((name, base_attributes))
+                        current_element = Some((name, base_attributes));
                     }
                     b"xs:complexContent" => {
                         if extends_existing_type {
@@ -167,13 +167,10 @@ impl ComplexTypeParser {
                         let b_type = XmlParserHelper::get_attribute_value(&e, "type")?;
                         let b_type = xml_parser.resolve_namespace(b_type)?;
 
-                        let node_type =
-                            match XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) {
-                                Some(t) => t,
-                                None => {
-                                    return Err(ParserError::MissingOrNotSupportedBaseType(b_type))
-                                }
-                            };
+                        let Some(node_type) = XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) else {
+                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type))
+                        };
+
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
 
                         let node = Node::new(node_type, name, base_attributes);

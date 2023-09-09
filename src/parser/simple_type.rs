@@ -35,14 +35,14 @@ impl SimpleTypeParser {
 
         let qualified_name = qualified_parent.map_or_else(
             || xml_parser.as_qualified_name(name.as_str()),
-            |v| format!("{}.{}", v, name),
+            |v| format!("{v}.{name}"),
         );
 
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(s)) => match s.name().as_ref() {
                     b"xs:restriction" => {
-                        base_type = XmlParserHelper::get_attribute_value(&s, "base")?
+                        base_type = XmlParserHelper::get_attribute_value(&s, "base")?;
                     }
                     b"xs:union" => {
                         if variants.is_some() {
@@ -130,7 +130,7 @@ impl SimpleTypeParser {
                 },
                 Ok(Event::Eof) => return Err(ParserError::UnexpectedEndOfFile),
                 Err(e) => {
-                    println!("{}", e);
+                    println!("{e}");
 
                     return Err(ParserError::UnexpectedError);
                 }
@@ -183,7 +183,7 @@ impl SimpleTypeParser {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(s)) => {
                     if s.name().as_ref() == b"xs:simpleType" {
-                        let variant_name = format!("{}Variant{}", name, variant_count);
+                        let variant_name = format!("{name}Variant{variant_count}");
 
                         let s_type = Self::parse(
                             reader,

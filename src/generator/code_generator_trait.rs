@@ -44,23 +44,19 @@ impl fmt::Debug for CodeGenError {
             Self::IOError(arg0) => f.debug_tuple("IOError").field(arg0).finish(),
             Self::MissingDataType(type_name, variable)  => write!(
                 f,
-                "Required DataType is missing. Class: {}, Variable: {}",
-                type_name, variable
+                "Required DataType is missing. Class: {type_name}, Variable: {variable}"
             ),
             Self::ComplexTypeInSimpleTypeNotAllowed(union_type, variant) => write!(
                 f,
-                "A complex type inside a union type is not supported. Class: {}, Variable: {}",
-                union_type, variant
+                "A complex type inside a union type is not supported. Class: {union_type}, Variable: {variant}"
             ),
             Self::NestedFixedSizeList(class, variable) => write!(
                 f,
-                "Fixed size list inside of a fixed size list is not supported. Class: {}, Variable: {}",
-                class, variable
+                "Fixed size list inside of a fixed size list is not supported. Class: {class}, Variable: {variable}"
             ),
             Self::NestedListInFixedSizeList(class, variable) => write!(
                 f,
-                "Lists inside of a fixed size list is not supported. Class: {}, Variable: {}",
-                class, variable
+                "Lists inside of a fixed size list is not supported. Class: {class}, Variable: {variable}"
             ),
         }
     }

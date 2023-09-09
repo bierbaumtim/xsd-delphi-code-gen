@@ -170,37 +170,23 @@ impl ClassCodeGenerator {
                     if let Some((data_type, _)) =
                         Helper::get_alias_data_type(n.as_str(), type_aliases)
                     {
-                        match data_type {
-                            DataType::InlineList(_) => {
-                                if variable.required {
-                                    Helper::write_required_comment(writer, Some(indentation + 2))?;
-                                }
-
-                                writer.writeln_fmt(
-                                    format_args!(
-                                        "{}: {};",
-                                        variable_name,
-                                        Helper::as_type_name(n, &options.type_prefix)
-                                    ),
-                                    Some(indentation + 2),
-                                )?;
-                            }
-                            _ => {
-                                let lang_rep = Helper::get_datatype_language_representation(
-                                    &variable.data_type,
-                                    &options.type_prefix,
-                                );
-
-                                if variable.required {
-                                    Helper::write_required_comment(writer, Some(indentation + 2))?;
-                                }
-
-                                writer.writeln_fmt(
-                                    format_args!("{}: {};", variable_name, lang_rep),
-                                    Some(indentation + 2),
-                                )?;
-                            }
+                        if variable.required {
+                            Helper::write_required_comment(writer, Some(indentation + 2))?;
                         }
+
+                        let rhs = if let DataType::InlineList(_) = data_type {
+                            Helper::as_type_name(n, &options.type_prefix)
+                        } else {
+                            Helper::get_datatype_language_representation(
+                                &variable.data_type,
+                                &options.type_prefix,
+                            )
+                        };
+
+                        writer.writeln_fmt(
+                            format_args!("{variable_name}: {rhs};"),
+                            Some(indentation + 2),
+                        )?;
                     } else {
                         return Err(CodeGenError::MissingDataType(
                             class_type.name.clone(),
@@ -214,13 +200,13 @@ impl ClassCodeGenerator {
                         &options.type_prefix,
                     );
 
-                    for i in 1..size + 1 {
+                    for i in 1..=*size {
                         if variable.required {
                             Helper::write_required_comment(writer, Some(indentation + 2))?;
                         }
 
                         writer.writeln_fmt(
-                            format_args!("{}{}: {};", variable_name, i, lang_rep),
+                            format_args!("{variable_name}{i}: {lang_rep};"),
                             Some(indentation + 2),
                         )?;
                     }
@@ -236,7 +222,7 @@ impl ClassCodeGenerator {
                     }
 
                     writer.writeln_fmt(
-                        format_args!("{}: {};", variable_name, lang_rep),
+                        format_args!("{variable_name}: {lang_rep};"),
                         Some(indentation + 2),
                     )?;
                 }
@@ -331,41 +317,34 @@ impl ClassCodeGenerator {
         {
             let variable_name = Helper::as_variable_name(&variable.name);
 
-            match &variable.data_type {
-                DataType::FixedSizeList(item_type, size) => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        item_type,
-                        &options.type_prefix,
-                    );
+            if let DataType::FixedSizeList(item_type, size) = &variable.data_type {
+                let lang_rep =
+                    Helper::get_datatype_language_representation(item_type, &options.type_prefix);
 
-                    for i in 1..size + 1 {
-                        writer.writeln_fmt(
-                            format_args!("F{}{}: {};", variable_name, i, lang_rep),
-                            Some(indentation + 2),
-                        )?;
-
-                        setter.push(format!(
-                            "procedure Set{}{}(pValue: TOptional<{}>);",
-                            variable_name, i, lang_rep
-                        ));
-                    }
-                }
-                _ => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix,
-                    );
-
+                for i in 1..=*size {
                     writer.writeln_fmt(
-                        format_args!("F{}: TOptional<{}>;", variable_name, lang_rep),
+                        format_args!("F{variable_name}{i}: {lang_rep};"),
                         Some(indentation + 2),
                     )?;
 
                     setter.push(format!(
-                        "procedure Set{}(pValue: TOptional<{}>);",
-                        variable_name, lang_rep
+                        "procedure Set{variable_name}{i}(pValue: TOptional<{lang_rep}>);"
                     ));
                 }
+            } else {
+                let lang_rep = Helper::get_datatype_language_representation(
+                    &variable.data_type,
+                    &options.type_prefix,
+                );
+
+                writer.writeln_fmt(
+                    format_args!("F{variable_name}: TOptional<{lang_rep}>;"),
+                    Some(indentation + 2),
+                )?;
+
+                setter.push(format!(
+                    "procedure Set{variable_name}(pValue: TOptional<{lang_rep}>);"
+                ));
             }
         }
         writer.newline()?;
@@ -391,42 +370,35 @@ impl ClassCodeGenerator {
         {
             let variable_name = Helper::as_variable_name(&variable.name);
 
-            match &variable.data_type {
-                DataType::FixedSizeList(item_type, size) => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        item_type,
-                        &options.type_prefix,
-                    );
+            if let DataType::FixedSizeList(item_type, size) = &variable.data_type {
+                let lang_rep =
+                    Helper::get_datatype_language_representation(item_type, &options.type_prefix);
 
-                    for i in 1..size + 1 {
-                        writer.writeln_fmt(
-                            format_args!("F{}{}: {};", variable_name, i, lang_rep),
-                            Some(indentation + 2),
-                        )?;
-
-                        writer.writeln_fmt(
-                            format_args!(
-                                "property {}{}: TOptional<{}> read F{}{} write Set{}{};",
-                                variable_name, i, lang_rep, variable_name, i, variable_name, i
-                            ),
-                            Some(indentation + 2),
-                        )?;
-                    }
-                }
-                _ => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix,
-                    );
+                for i in 1..=*size {
+                    writer.writeln_fmt(
+                        format_args!("F{variable_name}{i}: {lang_rep};"),
+                        Some(indentation + 2),
+                    )?;
 
                     writer.writeln_fmt(
                         format_args!(
-                            "property {}: TOptional<{}> read F{} write Set{};",
-                            variable_name, lang_rep, variable_name, variable_name
+                            "property {variable_name}{i}: TOptional<{lang_rep}> read F{variable_name}{i} write Set{variable_name}{i};"
                         ),
                         Some(indentation + 2),
                     )?;
                 }
+            } else {
+                let lang_rep = Helper::get_datatype_language_representation(
+                    &variable.data_type,
+                    &options.type_prefix,
+                );
+
+                writer.writeln_fmt(
+                    format_args!(
+                        "property {variable_name}: TOptional<{lang_rep}> read F{variable_name} write Set{variable_name};"
+                    ),
+                    Some(indentation + 2),
+                )?;
             }
         }
 
@@ -445,7 +417,7 @@ impl ClassCodeGenerator {
             .iter()
             .any(|v| v.requires_free || !v.required);
 
-        writer.writeln_fmt(format_args!("{{ {} }}", formated_name), None)?;
+        writer.writeln_fmt(format_args!("{{ {formated_name} }}"), None)?;
 
         if options.generate_to_xml {
             Self::generate_constructor_implementation(
@@ -485,7 +457,7 @@ impl ClassCodeGenerator {
 
         if needs_destroy {
             writer.newline()?;
-            writer.writeln_fmt(format_args!("destructor {}.Destroy;", formated_name), None)?;
+            writer.writeln_fmt(format_args!("destructor {formated_name}.Destroy;"), None)?;
 
             writer.writeln("begin", None)?;
 
@@ -496,7 +468,7 @@ impl ClassCodeGenerator {
             {
                 match &variable.data_type {
                     DataType::FixedSizeList(_, size) => {
-                        for i in 1..size + 1 {
+                        for i in 1..=*size {
                             writer.writeln_fmt(
                                 format_args!(
                                     "{}{}.Free;",
@@ -531,7 +503,7 @@ impl ClassCodeGenerator {
         type_aliases: &[TypeAlias],
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
-        writer.writeln_fmt(format_args!("constructor {}.Create;", formated_name), None)?;
+        writer.writeln_fmt(format_args!("constructor {formated_name}.Create;"), None)?;
         writer.writeln("begin", None)?;
 
         if class_type.super_type.is_some() {
@@ -614,8 +586,8 @@ impl ClassCodeGenerator {
 
                                 match data_type {
                                     DataType::Custom(_) => String::from("nil"),
-                                    _ if variable.required => format!("Default({})", type_name),
-                                    _ => format!("TNone<{}>.Create", type_name),
+                                    _ if variable.required => format!("Default({type_name})"),
+                                    _ => format!("TNone<{type_name}>.Create"),
                                 }
                             } else {
                                 return Err(CodeGenError::MissingDataType(
@@ -628,9 +600,9 @@ impl ClassCodeGenerator {
                             let type_name = Helper::as_type_name(name, &options.type_prefix);
 
                             if variable.required {
-                                format!("Default({})", type_name)
+                                format!("Default({type_name})")
                             } else {
-                                format!("TNone<{}>.Create", type_name)
+                                format!("TNone<{type_name}>.Create")
                             }
                         }
                         DataType::Custom(name) => {
@@ -662,29 +634,27 @@ impl ClassCodeGenerator {
                             );
 
                             if variable.required {
-                                format!("Default({})", lang_rep)
+                                format!("Default({lang_rep})")
                             } else {
-                                format!("TNone<{}>.Create", lang_rep)
+                                format!("TNone<{lang_rep}>.Create")
                             }
                         }
                     };
 
-                    for i in 1..size + 1 {
-                        writer.writeln_fmt(
-                            format_args!("{}{} := {};", variable_name, i, rhs),
-                            Some(2),
-                        )?;
+                    for i in 1..=*size {
+                        writer
+                            .writeln_fmt(format_args!("{variable_name}{i} := {rhs};"), Some(2))?;
                     }
                 }
                 DataType::Uri => {
                     if variable.required {
                         writer.writeln_fmt(
-                            format_args!("{} := TURI.Create('');", variable_name),
+                            format_args!("{variable_name} := TURI.Create('');"),
                             Some(2),
                         )?;
                     } else {
                         writer.writeln_fmt(
-                            format_args!("{} := TNone<TURI>.Create;", variable_name),
+                            format_args!("{variable_name} := TNone<TURI>.Create;"),
                             Some(2),
                         )?;
                     }
@@ -718,7 +688,7 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
     ) -> Result<(), CodeGenError> {
         writer.writeln_fmt(
-            format_args!("constructor {}.FromXml(node: IXMLNode);", formated_name),
+            format_args!("constructor {formated_name}.FromXml(node: IXMLNode);"),
             None,
         )?;
         writer.writeln("begin", None)?;
@@ -788,14 +758,13 @@ impl ClassCodeGenerator {
                         writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
                         writer.writeln_fmt(
                             format_args!(
-                                "{} := TSome<{}>.Create({}.FromXmlValue(vOptionalNode.Text));",
-                                variable_name, type_name, type_name,
+                                "{variable_name} := TSome<{type_name}>.Create({type_name}.FromXmlValue(vOptionalNode.Text));"
                             ),
                             Some(4),
                         )?;
                         writer.writeln("end else begin", Some(2))?;
                         writer.writeln_fmt(
-                            format_args!("{} := TNone<{}>.Create", variable_name, type_name),
+                            format_args!("{variable_name} := TNone<{type_name}>.Create"),
                             Some(4),
                         )?;
                         writer.writeln("end;", Some(2))?;
@@ -823,14 +792,11 @@ impl ClassCodeGenerator {
                         )?;
                         writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
                         writer.writeln_fmt(
-                            format_args!(
-                                "{} := {}.FromXml(vOptionalNode);",
-                                variable_name, type_name,
-                            ),
+                            format_args!("{variable_name} := {type_name}.FromXml(vOptionalNode);"),
                             Some(4),
                         )?;
                         writer.writeln("end else begin", Some(2))?;
-                        writer.writeln_fmt(format_args!("{} := nil;", variable_name), Some(4))?;
+                        writer.writeln_fmt(format_args!("{variable_name} := nil;"), Some(4))?;
                         writer.writeln("end;", Some(2))?;
                         writer.newline()?;
                     }
@@ -851,7 +817,7 @@ impl ClassCodeGenerator {
                         options,
                         variable,
                         item_type,
-                        size,
+                        *size,
                     )?;
                 }
                 DataType::InlineList(lt) => {
@@ -906,7 +872,7 @@ impl ClassCodeGenerator {
                         )?;
                         writer.writeln("end else begin", Some(2))?;
                         writer.writeln_fmt(
-                            format_args!("{} := TNone<{}>.Create", variable_name, lang_rep),
+                            format_args!("{variable_name} := TNone<{lang_rep}>.Create"),
                             Some(4),
                         )?;
                         writer.writeln("end;", Some(2))?;
@@ -1005,10 +971,7 @@ impl ClassCodeGenerator {
                         Some(6),
                     )?;
                     writer.writeln_fmt(
-                        format_args!(
-                            "{}.Add(__{});",
-                            formatted_variable_name, formatted_variable_name
-                        ),
+                        format_args!("{formatted_variable_name}.Add(__{formatted_variable_name});"),
                         Some(6),
                     )?;
                 }
@@ -1038,10 +1001,7 @@ impl ClassCodeGenerator {
                     Some(6),
                 )?;
                 writer.writeln_fmt(
-                    format_args!(
-                        "{}.Add(__{});",
-                        formatted_variable_name, formatted_variable_name
-                    ),
+                    format_args!("{formatted_variable_name}.Add(__{formatted_variable_name});"),
                     Some(6),
                 )?;
             }
@@ -1059,9 +1019,9 @@ impl ClassCodeGenerator {
         options: &CodeGenOptions,
         variable: &Variable,
         item_type: &DataType,
-        size: &usize,
+        size: usize,
     ) -> Result<(), CodeGenError> {
-        for i in 1..size + 1 {
+        for i in 1..=size {
             writer.writeln_fmt(
                 format_args!(
                     "{}{} := Default({});",
@@ -1105,7 +1065,7 @@ impl ClassCodeGenerator {
         )?;
         writer.newline()?;
         writer.writeln("case I of", Some(6))?;
-        for i in 1..size + 1 {
+        for i in 1..=size {
             match item_type {
                 DataType::Enumeration(name) => {
                     writer.writeln_fmt(
@@ -1282,7 +1242,7 @@ impl ClassCodeGenerator {
         formated_name: &String,
     ) -> Result<(), std::io::Error> {
         writer.writeln_fmt(
-            format_args!("function {}.ToXml: String;", formated_name),
+            format_args!("function {formated_name}.ToXml: String;"),
             None,
         )?;
         writer.writeln("begin", None)?;
@@ -1303,10 +1263,7 @@ impl ClassCodeGenerator {
         type_aliases: &[TypeAlias],
     ) -> Result<(), CodeGenError> {
         writer.writeln_fmt(
-            format_args!(
-                "procedure {}.AppendToXmlRaw(pParent: IXMLNode);",
-                formated_name
-            ),
+            format_args!("procedure {formated_name}.AppendToXmlRaw(pParent: IXMLNode);"),
             None,
         )?;
         writer.writeln("begin", None)?;
@@ -1332,8 +1289,7 @@ impl ClassCodeGenerator {
                                 if variable.required {
                                     writer.writeln_fmt(
                                         format_args!(
-                                            "if Assigned({}) and {}.Count > 0 then begin",
-                                            variable_name, variable_name
+                                            "if Assigned({variable_name}) and {variable_name}.Count > 0 then begin"
                                         ),
                                         Some(2),
                                     )?;
@@ -1349,8 +1305,7 @@ impl ClassCodeGenerator {
                                 )?;
                                 writer.writeln_fmt(
                                     format_args!(
-                                        "for var I := 0 to {}.Count - 1 do begin",
-                                        variable_name
+                                        "for var I := 0 to {variable_name}.Count - 1 do begin"
                                     ),
                                     Some(indentation),
                                 )?;
@@ -1359,7 +1314,7 @@ impl ClassCodeGenerator {
                                         "node.Text := node.Text + {};",
                                         Helper::get_variable_value_as_string(
                                             lt.as_ref(),
-                                            &format!("{}[I]", variable_name),
+                                            &format!("{variable_name}[I]"),
                                             &pattern
                                         )
                                     ),
@@ -1367,7 +1322,7 @@ impl ClassCodeGenerator {
                                 )?;
                                 writer.newline()?;
                                 writer.writeln_fmt(
-                                    format_args!("if I < {}.Count - 1 then begin", variable_name),
+                                    format_args!("if I < {variable_name}.Count - 1 then begin"),
                                     Some(4),
                                 )?;
                                 writer.writeln(
@@ -1393,7 +1348,7 @@ impl ClassCodeGenerator {
                                     }
                                 } else {
                                     writer.writeln_fmt(
-                                        format_args!("if {}.IsSome then begin", variable_name),
+                                        format_args!("if {variable_name}.IsSome then begin"),
                                         Some(2),
                                     )?;
                                     for arg in Self::generate_standard_type_to_xml(
@@ -1418,12 +1373,12 @@ impl ClassCodeGenerator {
                         )?;
 
                         writer.writeln_fmt(
-                            format_args!("node.Text := {}.ToXmlValue;", variable_name),
+                            format_args!("node.Text := {variable_name}.ToXmlValue;"),
                             Some(indentation),
                         )?;
                     } else {
                         writer.writeln_fmt(
-                            format_args!("if {}.IsSome then begin", variable_name),
+                            format_args!("if {variable_name}.IsSome then begin"),
                             Some(2),
                         )?;
                         writer.writeln_fmt(
@@ -1432,7 +1387,7 @@ impl ClassCodeGenerator {
                         )?;
 
                         writer.writeln_fmt(
-                            format_args!("node.Text := {}.Unwrap.ToXmlValue;", variable_name),
+                            format_args!("node.Text := {variable_name}.Unwrap.ToXmlValue;"),
                             Some(indentation + 2),
                         )?;
                         writer.writeln("end;", Some(2))?;
@@ -1441,7 +1396,7 @@ impl ClassCodeGenerator {
                 DataType::Custom(_) => {
                     if !variable.required {
                         writer.writeln_fmt(
-                            format_args!("if Assigned({}) then begin", variable_name),
+                            format_args!("if Assigned({variable_name}) then begin"),
                             Some(2),
                         )?;
 
@@ -1452,7 +1407,7 @@ impl ClassCodeGenerator {
                         Some(indentation),
                     )?;
                     writer.writeln_fmt(
-                        format_args!("{}.AppendToXmlRaw(node);", variable_name),
+                        format_args!("{variable_name}.AppendToXmlRaw(node);"),
                         Some(indentation),
                     )?;
                     if !variable.required {
@@ -1475,7 +1430,7 @@ impl ClassCodeGenerator {
                     writer.writeln("end;", Some(indentation))?;
                 }
                 DataType::FixedSizeList(item_type, size) => {
-                    for i in 1..size + 1 {
+                    for i in 1..=*size {
                         // TODO: Abhängig vom DataType Assigned oder Unwrap
                         Self::generate_list_to_xml(
                             writer,
@@ -1504,7 +1459,7 @@ impl ClassCodeGenerator {
                         }
                     } else {
                         writer.writeln_fmt(
-                            format_args!("if {}.IsSome then begin", variable_name),
+                            format_args!("if {variable_name}.IsSome then begin"),
                             Some(2),
                         )?;
                         for arg in Self::generate_standard_type_to_xml(
@@ -1539,12 +1494,12 @@ impl ClassCodeGenerator {
         match data_type {
             DataType::Enumeration(_) => {
                 writer.writeln_fmt(
-                    format_args!("node := pParent.AddChild('{}');", xml_name),
+                    format_args!("node := pParent.AddChild('{xml_name}');"),
                     Some(indentation),
                 )?;
 
                 writer.writeln_fmt(
-                    format_args!("node.Text := {}.ToXmlValue;", variable_name),
+                    format_args!("node.Text := {variable_name}.ToXmlValue;"),
                     Some(indentation),
                 )?;
             }
@@ -1564,11 +1519,11 @@ impl ClassCodeGenerator {
             }
             DataType::Custom(_) => {
                 writer.writeln_fmt(
-                    format_args!("node := pParent.AddChild('{}');", xml_name),
+                    format_args!("node := pParent.AddChild('{xml_name}');"),
                     Some(indentation),
                 )?;
                 writer.writeln_fmt(
-                    format_args!("{}.AppendToXmlRaw(node);", variable_name),
+                    format_args!("{variable_name}.AppendToXmlRaw(node);"),
                     Some(indentation),
                 )?;
             }
@@ -1613,66 +1568,52 @@ impl ClassCodeGenerator {
         {
             let variable_name = Helper::as_variable_name(&variable.name);
 
-            match &variable.data_type {
-                DataType::FixedSizeList(item_type, size) => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        item_type,
-                        &options.type_prefix,
-                    );
+            if let DataType::FixedSizeList(item_type, size) = &variable.data_type {
+                let lang_rep =
+                    Helper::get_datatype_language_representation(item_type, &options.type_prefix);
 
-                    for i in 1..size + 1 {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "procedure {}.Set{}{}(pValue: TOptional<{}>);",
-                                class_type_name, variable_name, i, lang_rep
-                            ),
-                            None,
-                        )?;
-                        writer.writeln("begin", None)?;
-                        writer.writeln_fmt(
-                            format_args!(
-                                "if F{}{} <> pValue then F{}.Free;",
-                                variable_name, i, variable_name
-                            ),
-                            Some(2),
-                        )?;
-                        writer.newline()?;
-                        writer.writeln_fmt(
-                            format_args!("F{}{} := pValue;", variable_name, i),
-                            Some(2),
-                        )?;
-                        writer.writeln("end;", None)?;
-
-                        if i < *size {
-                            writer.newline()?;
-                        }
-                    }
-                }
-                _ => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix,
-                    );
-
+                for i in 1..=*size {
                     writer.writeln_fmt(
                         format_args!(
-                            "procedure {}.Set{}(pValue: TOptional<{}>);",
-                            class_type_name, variable_name, lang_rep
+                            "procedure {class_type_name}.Set{variable_name}{i}(pValue: TOptional<{lang_rep}>);"
                         ),
                         None,
                     )?;
                     writer.writeln("begin", None)?;
                     writer.writeln_fmt(
                         format_args!(
-                            "if F{} <> pValue then F{}.Free;",
-                            variable_name, variable_name
+                            "if F{variable_name}{i} <> pValue then F{variable_name}.Free;"
                         ),
                         Some(2),
                     )?;
                     writer.newline()?;
-                    writer.writeln_fmt(format_args!("F{} := pValue;", variable_name), Some(2))?;
+                    writer.writeln_fmt(format_args!("F{variable_name}{i} := pValue;"), Some(2))?;
                     writer.writeln("end;", None)?;
+
+                    if i < *size {
+                        writer.newline()?;
+                    }
                 }
+            } else {
+                let lang_rep = Helper::get_datatype_language_representation(
+                    &variable.data_type,
+                    &options.type_prefix,
+                );
+
+                writer.writeln_fmt(
+                    format_args!(
+                        "procedure {class_type_name}.Set{variable_name}(pValue: TOptional<{lang_rep}>);"
+                    ),
+                    None,
+                )?;
+                writer.writeln("begin", None)?;
+                writer.writeln_fmt(
+                    format_args!("if F{variable_name} <> pValue then F{variable_name}.Free;"),
+                    Some(2),
+                )?;
+                writer.newline()?;
+                writer.writeln_fmt(format_args!("F{variable_name} := pValue;"), Some(2))?;
+                writer.writeln("end;", None)?;
             }
 
             if i < optional_variables_count - 1 {
@@ -1689,26 +1630,26 @@ impl ClassCodeGenerator {
         pattern: Option<String>,
     ) -> String {
         match data_type {
-            DataType::Boolean => format!("({} = cnXmlTrueValue) or ({} = '1')", value, value),
+            DataType::Boolean => format!("({value} = cnXmlTrueValue) or ({value} = '1')"),
             DataType::DateTime | DataType::Date if pattern.is_some() => format!(
                 "DecodeDateTime({}, '{}')",
                 value,
                 pattern.unwrap_or_default(),
             ),
-            DataType::DateTime | DataType::Date => format!("ISO8601ToDate({})", value),
-            DataType::Double => format!("StrToFloat({})", value),
+            DataType::DateTime | DataType::Date => format!("ISO8601ToDate({value})"),
+            DataType::Double => format!("StrToFloat({value})"),
             DataType::Binary(BinaryEncoding::Base64) => {
-                format!("TNetEncoding.Base64.DecodeStringToBytes({})", value)
+                format!("TNetEncoding.Base64.DecodeStringToBytes({value})")
             }
-            DataType::Binary(BinaryEncoding::Hex) => format!("HexStrToBin({})", value),
+            DataType::Binary(BinaryEncoding::Hex) => format!("HexStrToBin({value})"),
             DataType::String => value,
             DataType::Time if pattern.is_some() => format!(
                 "TimeOf(DecodeDateTime({}, '{}'))",
                 value,
                 pattern.unwrap_or_default(),
             ),
-            DataType::Time => format!("TimeOf(ISO8601ToDate({}))", value),
-            DataType::Uri => format!("TURI.Create({})", value),
+            DataType::Time => format!("TimeOf(ISO8601ToDate({value}))"),
+            DataType::Uri => format!("TURI.Create({value})"),
             DataType::SmallInteger
             | DataType::ShortInteger
             | DataType::Integer
@@ -1717,7 +1658,7 @@ impl ClassCodeGenerator {
             | DataType::UnsignedShortInteger
             | DataType::UnsignedInteger
             | DataType::UnsignedLongInteger => {
-                format!("StrToInt({})", value)
+                format!("StrToInt({value})")
             }
             _ => String::new(),
         }

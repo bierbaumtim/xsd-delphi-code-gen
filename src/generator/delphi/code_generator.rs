@@ -4,7 +4,7 @@ use std::io::{BufWriter, Write};
 use crate::generator::{
     code_generator_trait::{CodeGenError, CodeGenOptions, CodeGenerator},
     internal_representation::InternalRepresentation,
-    types::*,
+    types::{BinaryEncoding, DataType},
 };
 
 use super::{

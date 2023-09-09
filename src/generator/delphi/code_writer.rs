@@ -83,7 +83,7 @@ impl<T: Write> CodeWriter<T> {
     ) -> Result<(), std::io::Error> {
         for documentation in documentations {
             for line in documentation.split('\n') {
-                self.writeln_fmt(format_args!("// {}", line), indentation)?;
+                self.writeln_fmt(format_args!("// {line}"), indentation)?;
             }
         }
 
@@ -122,8 +122,7 @@ impl<T: Write> CodeWriter<T> {
             self.buffer.write_all(" ".repeat(indentation).as_bytes())?;
         }
 
-        self.buffer
-            .write_fmt(format_args!("constructor {}", name))?;
+        self.buffer.write_fmt(format_args!("constructor {name}"))?;
 
         if let Some(parameters) = parameters {
             self.buffer.write_all(b"(")?;
@@ -195,7 +194,7 @@ impl<T: Write> CodeWriter<T> {
         }
 
         if let FunctionType::Function(return_type) = f_type {
-            self.buffer.write_fmt(format_args!(": {};", return_type))?;
+            self.buffer.write_fmt(format_args!(": {return_type};"))?;
         } else {
             self.buffer.write_all(b";")?;
         }
@@ -225,19 +224,17 @@ impl<T: Write> CodeWriter<T> {
         indentation: Option<usize>,
     ) -> Result<(), std::io::Error> {
         match (is_required, is_value_type) {
-            (false, false) => self.writeln_fmt(format_args!("{} := nil;", name), indentation)?,
+            (false, false) => self.writeln_fmt(format_args!("{name} := nil;"), indentation)?,
             (false, true) => self.writeln_fmt(
-                format_args!("{} := TNone<{}>.Create;", name, type_name),
+                format_args!("{name} := TNone<{type_name}>.Create;"),
                 indentation,
             )?,
-            (true, false) => self.writeln_fmt(
-                format_args!("{} := {}.Create;", name, type_name),
-                indentation,
-            )?,
-            (true, true) => self.writeln_fmt(
-                format_args!("{} := Default({});", name, type_name),
-                indentation,
-            )?,
+            (true, false) => {
+                self.writeln_fmt(format_args!("{name} := {type_name}.Create;"), indentation)?;
+            }
+            (true, true) => {
+                self.writeln_fmt(format_args!("{name} := Default({type_name});"), indentation)?;
+            }
         }
 
         Ok(())

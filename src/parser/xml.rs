@@ -3,10 +3,13 @@ use std::{borrow::Cow, collections::HashMap, fs::File, io::BufReader, path::Path
 use quick_xml::{events::BytesStart, events::Event, Reader};
 
 use super::{
-    annotations::AnnotationsParser, complex_type::ComplexTypeParser, helper::XmlParserHelper,
-    simple_type::SimpleTypeParser, types::*,
+    annotations::AnnotationsParser,
+    complex_type::ComplexTypeParser,
+    helper::XmlParserHelper,
+    simple_type::SimpleTypeParser,
+    types::{BaseAttributes, CustomTypeDefinition, Node, NodeType, ParsedData, ParserError},
 };
-use crate::type_registry::*;
+use crate::type_registry::TypeRegistry;
 
 #[derive(Default)]
 pub(crate) struct XmlParser {
@@ -20,9 +23,8 @@ impl XmlParser {
         path: P,
         registry: &mut TypeRegistry,
     ) -> Result<ParsedData, ParserError> {
-        let mut reader = match Reader::from_file(path) {
-            Ok(r) => r,
-            Err(_) => return Err(ParserError::UnableToReadFile),
+        let Ok(mut reader) = Reader::from_file(path) else {
+            return Err(ParserError::UnableToReadFile);
         };
 
         self.parse_nodes(&mut reader, registry)
@@ -37,10 +39,7 @@ impl XmlParser {
         let mut documentations = Vec::new();
 
         for path in paths {
-            let mut reader = match Reader::from_file(path) {
-                Ok(r) => r,
-                Err(_) => return Err(ParserError::UnableToReadFile),
-            };
+            let Ok(mut reader) = Reader::from_file(path) else { return Err(ParserError::UnableToReadFile) };
 
             self.current_namespace = None;
             self.namespace_aliases.clear();
@@ -83,7 +82,7 @@ impl XmlParser {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")?;
                             let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
 
-                            current_element = Some((name, base_attributes))
+                            current_element = Some((name, base_attributes));
                         }
                         b"xs:complexType" => {
                             if let Some((name, base_attributes)) = &current_element {
@@ -152,7 +151,7 @@ impl XmlParser {
                 }
                 Ok(Event::End(e)) => {
                     if let b"xs:element" = e.name().as_ref() {
-                        current_element = None
+                        current_element = None;
                     }
                 }
                 Ok(Event::Empty(e)) => {
@@ -160,13 +159,10 @@ impl XmlParser {
                         let name = XmlParserHelper::get_attribute_value(&e, "name")?;
                         let b_type = XmlParserHelper::get_attribute_value(&e, "type")?;
                         let b_type = self.resolve_namespace(b_type)?;
-                        let node_type =
-                            match XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) {
-                                Some(t) => t,
-                                None => {
-                                    return Err(ParserError::MissingOrNotSupportedBaseType(b_type))
-                                }
-                            };
+                        let Some(node_type) = XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) else {
+                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type))
+                        };
+
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
                         let node = Node::new(node_type, name, base_attributes);
                         nodes.push(node);
@@ -241,20 +237,19 @@ impl XmlParser {
                         Err(e) => {
                             return Some(ParserError::MalformedAttribute(
                                 "unknown".to_owned(),
-                                Some(format!("{:?}", e)),
+                                Some(format!("{e:?}")),
                             ))
                         }
                     };
 
                     let value = match a.value {
-                        Cow::Borrowed(v) => std::str::from_utf8(v).map(|s| s.to_owned()).ok(),
+                        Cow::Borrowed(v) => std::str::from_utf8(v)
+                            .map(std::borrow::ToOwned::to_owned)
+                            .ok(),
                         Cow::Owned(v) => String::from_utf8(v).ok(),
                     };
 
-                    let value = match value {
-                        Some(v) => v,
-                        None => return Some(ParserError::MalformedAttribute(alias, None)),
-                    };
+                    let Some(value) = value else { return Some(ParserError::MalformedAttribute(alias, None)) };
 
                     self.namespace_aliases.insert(alias, value);
                 }
