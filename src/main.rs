@@ -77,7 +77,7 @@ fn main() {
     );
 
     match generator.generate() {
-        Ok(_) => println!(
+        Ok(()) => println!(
             "Completed successfully within {}ms",
             instant.elapsed().as_millis().saturating_sub(elapsed_for_ir),
         ),

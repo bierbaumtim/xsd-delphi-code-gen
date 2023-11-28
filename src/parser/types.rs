@@ -1,25 +1,25 @@
 use std::{error::Error, fmt::Display};
 
-pub(crate) const UNBOUNDED_OCCURANCE: i64 = -1;
-pub(crate) const DEFAULT_OCCURANCE: i64 = 1;
+pub const UNBOUNDED_OCCURANCE: i64 = -1;
+pub const DEFAULT_OCCURANCE: i64 = 1;
 
 #[derive(Debug)]
-pub(crate) struct ParsedData {
-    pub(crate) nodes: Vec<Node>,
-    pub(crate) documentations: Vec<String>,
+pub struct ParsedData {
+    pub nodes: Vec<Node>,
+    pub documentations: Vec<String>,
 }
 
 // xs:element
 #[derive(Debug)]
-pub(crate) struct Node {
-    pub(crate) node_type: NodeType,
-    pub(crate) name: String,
-    pub(crate) base_attributes: BaseAttributes,
+pub struct Node {
+    pub node_type: NodeType,
+    pub name: String,
+    pub base_attributes: BaseAttributes,
 }
 
 impl Node {
-    pub(crate) fn new(node_type: NodeType, name: String, base_attributes: BaseAttributes) -> Node {
-        Node {
+    pub const fn new(node_type: NodeType, name: String, base_attributes: BaseAttributes) -> Self {
+        Self {
             node_type,
             name,
             base_attributes,
@@ -28,7 +28,7 @@ impl Node {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum NodeType {
+pub enum NodeType {
     Standard(NodeBaseType),
     /// Contains qualified name of the type
     Custom(String),
@@ -36,7 +36,7 @@ pub(crate) enum NodeType {
 
 /// base="" or type=""
 #[derive(Debug, Clone)]
-pub(crate) enum NodeBaseType {
+pub enum NodeBaseType {
     Boolean,
     DateTime,
     Date,
@@ -67,48 +67,48 @@ pub(crate) enum NodeBaseType {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct BaseAttributes {
-    pub(crate) min_occurs: Option<i64>,
-    pub(crate) max_occurs: Option<i64>,
+pub struct BaseAttributes {
+    pub min_occurs: Option<i64>,
+    pub max_occurs: Option<i64>,
 }
 
 #[derive(Debug)]
-pub(crate) enum CustomTypeDefinition {
+pub enum CustomTypeDefinition {
     Simple(SimpleType),
     Complex(ComplexType),
 }
 
 impl CustomTypeDefinition {
-    pub(crate) fn get_name(&self) -> String {
+    pub fn get_name(&self) -> String {
         match self {
-            CustomTypeDefinition::Simple(t) => t.name.clone(),
-            CustomTypeDefinition::Complex(t) => t.name.clone(),
+            Self::Simple(t) => t.name.clone(),
+            Self::Complex(t) => t.name.clone(),
         }
     }
 
-    pub(crate) fn get_qualified_name(&self) -> String {
+    pub fn get_qualified_name(&self) -> String {
         match self {
-            CustomTypeDefinition::Simple(t) => t.qualified_name.clone(),
-            CustomTypeDefinition::Complex(t) => t.qualified_name.clone(),
+            Self::Simple(t) => t.qualified_name.clone(),
+            Self::Complex(t) => t.qualified_name.clone(),
         }
     }
 }
 
 impl From<SimpleType> for CustomTypeDefinition {
     fn from(value: SimpleType) -> Self {
-        CustomTypeDefinition::Simple(value)
+        Self::Simple(value)
     }
 }
 
 impl From<ComplexType> for CustomTypeDefinition {
     fn from(value: ComplexType) -> Self {
-        CustomTypeDefinition::Complex(value)
+        Self::Complex(value)
     }
 }
 
 /// types in xs:union
 #[derive(Debug, Clone)]
-pub(crate) enum UnionVariant {
+pub enum UnionVariant {
     Standard(NodeBaseType),
     Named(String),
     Simple(SimpleType),
@@ -116,63 +116,63 @@ pub(crate) enum UnionVariant {
 
 /// xs:simpleType
 #[derive(Debug, Clone)]
-pub(crate) struct SimpleType {
+pub struct SimpleType {
     /// name-attribute
-    pub(crate) name: String,
+    pub name: String,
     /// namespace + name
-    pub(crate) qualified_name: String,
+    pub qualified_name: String,
 
     /// Documentation
-    pub(crate) documentations: Vec<String>,
+    pub documentations: Vec<String>,
 
-    pub(crate) base_type: Option<NodeType>,
+    pub base_type: Option<NodeType>,
     /// possible values for an enumeration
-    pub(crate) enumeration: Option<Vec<EnumerationVariant>>,
+    pub enumeration: Option<Vec<EnumerationVariant>>,
     /// type of items in a list
-    pub(crate) list_type: Option<NodeType>,
+    pub list_type: Option<NodeType>,
     /// type of items in a list
-    pub(crate) pattern: Option<String>,
+    pub pattern: Option<String>,
     /// variants of union type
-    pub(crate) variants: Option<Vec<UnionVariant>>,
+    pub variants: Option<Vec<UnionVariant>>,
 }
 
 /// xs:enumeration
 #[derive(Debug, Clone)]
-pub(crate) struct EnumerationVariant {
+pub struct EnumerationVariant {
     /// Variant name
-    pub(crate) name: String,
+    pub name: String,
     /// Documentation
-    pub(crate) documentations: Vec<String>,
+    pub documentations: Vec<String>,
 }
 
 /// xs:complexType
 #[derive(Debug)]
-pub(crate) struct ComplexType {
+pub struct ComplexType {
     /// name-attribute
-    pub(crate) name: String,
+    pub name: String,
     /// namespace + name
-    pub(crate) qualified_name: String,
+    pub qualified_name: String,
 
     /// Documentation
-    pub(crate) documentations: Vec<String>,
+    pub documentations: Vec<String>,
 
     /// qualified name of another complex type
-    pub(crate) base_type: Option<String>,
+    pub base_type: Option<String>,
     /// elements of the complex type
-    pub(crate) children: Vec<Node>,
+    pub children: Vec<Node>,
     /// order of elements
-    pub(crate) order: OrderIndicator,
+    pub order: OrderIndicator,
 }
 
 #[derive(Debug)]
-pub(crate) enum OrderIndicator {
+pub enum OrderIndicator {
     All,
     Choice,
     Sequence,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum ParserError {
+pub enum ParserError {
     FailedToResolveNamespace(String),
     MalformedAttribute(String, Option<String>),
     MalformedNamespaceAttribute(String),

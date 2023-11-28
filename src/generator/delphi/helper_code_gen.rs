@@ -4,10 +4,10 @@ use crate::generator::code_generator_trait::CodeGenOptions;
 
 use super::code_writer::CodeWriter;
 
-pub(crate) struct HelperCodeGenerator;
+pub struct HelperCodeGenerator;
 
 impl HelperCodeGenerator {
-    pub(crate) fn write<T: Write>(
+    pub fn write<T: Write>(
         writer: &mut CodeWriter<T>,
         options: &CodeGenOptions,
         generate_date_time_helper: bool,

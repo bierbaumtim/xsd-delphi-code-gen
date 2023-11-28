@@ -14,10 +14,10 @@ use super::{
     xml::XmlParser,
 };
 
-pub(crate) struct SimpleTypeParser;
+pub struct SimpleTypeParser;
 
 impl SimpleTypeParser {
-    pub(crate) fn parse(
+    pub fn parse(
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,
         xml_parser: &XmlParser,

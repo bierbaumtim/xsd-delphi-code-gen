@@ -14,7 +14,7 @@ use super::{
     union_type_code_gen::UnionTypeCodeGenerator,
 };
 
-pub(crate) struct DelphiCodeGenerator<T: Write> {
+pub struct DelphiCodeGenerator<T: Write> {
     writer: CodeWriter<T>,
     options: CodeGenOptions,
     internal_representation: InternalRepresentation,
@@ -241,7 +241,7 @@ where
         internal_representation: InternalRepresentation,
         documentations: Vec<String>,
     ) -> Self {
-        DelphiCodeGenerator {
+        Self {
             writer: CodeWriter { buffer },
             options,
             documentations,

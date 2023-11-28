@@ -1,6 +1,6 @@
 mod alias_code_gen;
 mod class_code_gen;
-pub(crate) mod code_generator;
+pub mod code_generator;
 mod code_writer;
 mod const_code_gen;
 mod enum_code_gen;

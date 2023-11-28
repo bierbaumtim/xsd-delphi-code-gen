@@ -1,5 +1,5 @@
-pub(crate) mod code_generator_trait;
-pub(crate) mod delphi;
-pub(crate) mod dependency_graph;
-pub(crate) mod internal_representation;
-pub(crate) mod types;
+pub mod code_generator_trait;
+pub mod delphi;
+pub mod dependency_graph;
+pub mod internal_representation;
+pub mod types;

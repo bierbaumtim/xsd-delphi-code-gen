@@ -5,7 +5,7 @@ use std::{
 
 use super::internal_representation::InternalRepresentation;
 
-pub(crate) trait CodeGenerator<T: Write> {
+pub trait CodeGenerator<T: Write> {
     fn new(
         buffer: BufWriter<T>,
         options: CodeGenOptions,
@@ -17,14 +17,14 @@ pub(crate) trait CodeGenerator<T: Write> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct CodeGenOptions {
-    pub(crate) generate_from_xml: bool,
-    pub(crate) generate_to_xml: bool,
-    pub(crate) unit_name: String,
-    pub(crate) type_prefix: Option<String>,
+pub struct CodeGenOptions {
+    pub generate_from_xml: bool,
+    pub generate_to_xml: bool,
+    pub unit_name: String,
+    pub type_prefix: Option<String>,
 }
 
-pub(crate) enum CodeGenError {
+pub enum CodeGenError {
     IOError(std::io::Error),
     ComplexTypeInSimpleTypeNotAllowed(String, String),
     MissingDataType(String, String),
@@ -34,7 +34,7 @@ pub(crate) enum CodeGenError {
 
 impl From<std::io::Error> for CodeGenError {
     fn from(value: std::io::Error) -> Self {
-        CodeGenError::IOError(value)
+        Self::IOError(value)
     }
 }
 

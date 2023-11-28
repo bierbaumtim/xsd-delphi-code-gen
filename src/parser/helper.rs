@@ -6,10 +6,10 @@ use crate::parser::types::UNBOUNDED_OCCURANCE;
 
 use super::types::{BaseAttributes, NodeBaseType, NodeType, ParserError};
 
-pub(crate) struct XmlParserHelper;
+pub struct XmlParserHelper;
 
 impl XmlParserHelper {
-    pub(crate) fn base_type_str_to_node_type(base_type: &str) -> Option<NodeType> {
+    pub fn base_type_str_to_node_type(base_type: &str) -> Option<NodeType> {
         match base_type {
             "xs:base64Binary" => Some(NodeType::Standard(NodeBaseType::Base64Binary)),
             "xs:boolean" => Some(NodeType::Standard(NodeBaseType::Boolean)),
@@ -39,13 +39,10 @@ impl XmlParserHelper {
         }
     }
 
-    pub(crate) fn get_attribute_value(
-        node: &BytesStart,
-        name: &str,
-    ) -> Result<String, ParserError> {
+    pub fn get_attribute_value(node: &BytesStart, name: &str) -> Result<String, ParserError> {
         node.attributes()
             .find(|a| a.as_ref().is_ok_and(|v| v.key.0 == name.as_bytes()))
-            .ok_or(ParserError::MissingAttribute(String::from(name)))
+            .ok_or_else(|| ParserError::MissingAttribute(String::from(name)))
             .and_then(|r| {
                 r.map_err(|e| {
                     ParserError::MalformedAttribute(String::from(name), Some(format!("{e:?}")))
@@ -62,7 +59,7 @@ impl XmlParserHelper {
             .and_then(|r| r)
     }
 
-    pub(crate) fn get_base_attributes(node: &BytesStart) -> Result<BaseAttributes, ParserError> {
+    pub fn get_base_attributes(node: &BytesStart) -> Result<BaseAttributes, ParserError> {
         let min_occurs = Self::get_occurance_value(node, "minOccurs")?;
         let max_occurs = Self::get_occurance_value(node, "maxOccurs")?;
 
@@ -72,10 +69,7 @@ impl XmlParserHelper {
         })
     }
 
-    pub(crate) fn get_occurance_value(
-        node: &BytesStart,
-        name: &str,
-    ) -> Result<Option<i64>, ParserError> {
+    pub fn get_occurance_value(node: &BytesStart, name: &str) -> Result<Option<i64>, ParserError> {
         #![allow(clippy::redundant_closure_for_method_calls)]
         let value = Self::get_attribute_value(node, name)
             .map(|v| match v.parse::<i64>() {

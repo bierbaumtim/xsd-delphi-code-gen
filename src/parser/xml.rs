@@ -12,13 +12,13 @@ use super::{
 use crate::type_registry::TypeRegistry;
 
 #[derive(Default)]
-pub(crate) struct XmlParser {
-    pub(crate) current_namespace: Option<String>,
-    pub(crate) namespace_aliases: HashMap<String, String>,
+pub struct XmlParser {
+    pub current_namespace: Option<String>,
+    pub namespace_aliases: HashMap<String, String>,
 }
 
 impl XmlParser {
-    pub(crate) fn parse_file<P: AsRef<Path>>(
+    pub fn parse_file<P: AsRef<Path>>(
         &mut self,
         path: P,
         registry: &mut TypeRegistry,
@@ -30,7 +30,7 @@ impl XmlParser {
         self.parse_nodes(&mut reader, registry)
     }
 
-    pub(crate) fn parse_files<P: AsRef<Path>>(
+    pub fn parse_files<P: AsRef<Path>>(
         &mut self,
         paths: &Vec<P>,
         registry: &mut TypeRegistry,
@@ -39,7 +39,9 @@ impl XmlParser {
         let mut documentations = Vec::new();
 
         for path in paths {
-            let Ok(mut reader) = Reader::from_file(path) else { return Err(ParserError::UnableToReadFile) };
+            let Ok(mut reader) = Reader::from_file(path) else {
+                return Err(ParserError::UnableToReadFile);
+            };
 
             self.current_namespace = None;
             self.namespace_aliases.clear();
@@ -150,17 +152,19 @@ impl XmlParser {
                     //
                 }
                 Ok(Event::End(e)) => {
-                    if let b"xs:element" = e.name().as_ref() {
+                    if e.name().as_ref() == b"xs:element" {
                         current_element = None;
                     }
                 }
                 Ok(Event::Empty(e)) => {
-                    if let b"xs:element" = e.name().as_ref() {
+                    if e.name().as_ref() == b"xs:element" {
                         let name = XmlParserHelper::get_attribute_value(&e, "name")?;
                         let b_type = XmlParserHelper::get_attribute_value(&e, "type")?;
                         let b_type = self.resolve_namespace(b_type)?;
-                        let Some(node_type) = XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) else {
-                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type))
+                        let Some(node_type) =
+                            XmlParserHelper::base_type_str_to_node_type(b_type.as_str())
+                        else {
+                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
                         };
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
@@ -188,23 +192,24 @@ impl XmlParser {
     }
 
     #[inline]
-    pub(crate) fn as_qualified_name(&self, name: &str) -> String {
-        let mut qualified_name = match self.current_namespace.clone() {
-            Some(mut current_namespace) => {
-                if !current_namespace.ends_with('/') {
-                    current_namespace.push('/');
-                }
+    pub fn as_qualified_name(&self, name: &str) -> String {
+        let mut qualified_name =
+            self.current_namespace
+                .clone()
+                .map_or_else(String::new, |mut current_namespace| {
+                    if !current_namespace.ends_with('/') {
+                        current_namespace.push('/');
+                    }
 
-                current_namespace
-            }
-            None => String::new(),
-        };
+                    current_namespace
+                });
+
         qualified_name.push_str(name);
 
         qualified_name
     }
 
-    pub(crate) fn resolve_namespace(&self, b_type: String) -> Result<String, ParserError> {
+    pub fn resolve_namespace(&self, b_type: String) -> Result<String, ParserError> {
         if b_type.is_empty() || b_type.starts_with("xs:") {
             return Ok(b_type);
         }
@@ -213,10 +218,9 @@ impl XmlParser {
             Some(position) => {
                 let alias = b_type[..position].to_string();
 
-                match self.lookup_namespace(&alias) {
-                    Some(n) => Ok(n.clone()),
-                    None => Err(ParserError::FailedToResolveNamespace(alias)),
-                }
+                self.lookup_namespace(&alias)
+                    .ok_or(ParserError::FailedToResolveNamespace(alias))
+                    .map(std::clone::Clone::clone)
             }
             None => Ok(self.as_qualified_name(b_type.as_str())),
         }
@@ -249,7 +253,9 @@ impl XmlParser {
                         Cow::Owned(v) => String::from_utf8(v).ok(),
                     };
 
-                    let Some(value) = value else { return Some(ParserError::MalformedAttribute(alias, None)) };
+                    let Some(value) = value else {
+                        return Some(ParserError::MalformedAttribute(alias, None));
+                    };
 
                     self.namespace_aliases.insert(alias, value);
                 }

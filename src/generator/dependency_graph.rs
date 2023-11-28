@@ -5,11 +5,9 @@ use std::{
     fmt::Debug,
 };
 
-pub(crate) trait Dependable<K>
+pub trait Dependable<K>
 where
-    K: Eq,
-    K: PartialEq,
-    K: Hash,
+    K: Eq + PartialEq + Hash,
 {
     fn key(&self) -> &K;
     fn key_and_deps(&self) -> (&K, Option<Vec<K>>);
@@ -33,14 +31,10 @@ where
 // => List
 // CustomNumber, Alias3, Alias2, Alias1, Alias4, Alias5
 
-pub(crate) struct DependencyGraph<K, T>
+pub struct DependencyGraph<K, T>
 where
-    K: Eq,
-    K: PartialEq,
-    K: Hash,
-    K: Clone,
-    T: Clone,
-    T: Dependable<K>,
+    K: Eq + PartialEq + Hash + Clone,
+    T: Clone + Dependable<K>,
 {
     dependencies: HashMap<K, Node<K, T>>,
 }
@@ -54,7 +48,7 @@ struct Node<K, T> {
 
 impl<K, T> Node<K, T> {
     fn empty(item: T) -> Self {
-        Node {
+        Self {
             item,
             parents: Vec::new(),
             children: Vec::new(),
@@ -65,20 +59,16 @@ impl<K, T> Node<K, T> {
 impl<K, T> DependencyGraph<K, T>
 where
     // K: Sized,
-    K: Eq,
-    K: PartialEq,
-    K: Hash,
-    K: Clone,
-    T: Clone,
-    T: Dependable<K>,
+    K: Eq + PartialEq + Hash + Clone,
+    T: Clone + Dependable<K>,
 {
-    pub(crate) fn new() -> Self {
-        DependencyGraph {
+    pub fn new() -> Self {
+        Self {
             dependencies: HashMap::new(),
         }
     }
 
-    pub(crate) fn push(&mut self, item: T) {
+    pub fn push(&mut self, item: T) {
         let mut node = Node::empty(item);
 
         let (item_key, dep_keys) = node.item.key_and_deps();
@@ -106,7 +96,7 @@ where
         self.dependencies.insert(item_key.clone(), node);
     }
 
-    pub(crate) fn get_sorted_elements(&self) -> Vec<T> {
+    pub fn get_sorted_elements(&self) -> Vec<T> {
         let mut unique = HashSet::new();
 
         self.dependencies

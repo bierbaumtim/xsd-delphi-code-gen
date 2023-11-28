@@ -10,12 +10,12 @@ use super::{
     helper::Helper,
 };
 
-pub(crate) struct UnionTypeCodeGenerator {}
+pub struct UnionTypeCodeGenerator {}
 
 impl UnionTypeCodeGenerator {
     const ENUM_NAME: &'static str = "Variants";
 
-    pub(crate) fn write_declarations<T: Write>(
+    pub fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         union_types: &[UnionType],
         type_aliases: &[TypeAlias],
@@ -50,7 +50,7 @@ impl UnionTypeCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_implementations<T: Write>(
+    pub fn write_implementations<T: Write>(
         writer: &mut CodeWriter<T>,
         union_types: &[UnionType],
         enumerations: &[Enumeration],
@@ -288,8 +288,13 @@ impl UnionTypeCodeGenerator {
 
                 match &variant.data_type {
                     crate::generator::types::DataType::Alias(n) => {
-                        let Some((dt, pattern)) = Helper::get_alias_data_type(n.as_str(), type_aliases) else {
-                            return Err(CodeGenError::MissingDataType(union_type.name.clone(), variable_name));
+                        let Some((dt, pattern)) =
+                            Helper::get_alias_data_type(n.as_str(), type_aliases)
+                        else {
+                            return Err(CodeGenError::MissingDataType(
+                                union_type.name.clone(),
+                                variable_name,
+                            ));
                         };
 
                         match dt {

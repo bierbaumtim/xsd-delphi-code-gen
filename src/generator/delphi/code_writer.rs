@@ -1,38 +1,38 @@
 use std::io::{BufWriter, Write};
 
-pub(crate) type FunctionParameter<'a> = (&'a str, &'a str);
+pub type FunctionParameter<'a> = (&'a str, &'a str);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FunctionType {
+pub enum FunctionType {
     Procedure,
     Function(String),
 }
 
 impl FunctionType {
-    fn as_text(&self) -> &str {
+    const fn as_text(&self) -> &str {
         match self {
-            FunctionType::Procedure => "procedure",
-            FunctionType::Function(_) => "function",
+            Self::Procedure => "procedure",
+            Self::Function(_) => "function",
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FunctionModifier {
+pub enum FunctionModifier {
     Virtual,
     Override,
 }
 
 impl FunctionModifier {
-    fn as_text(&self) -> &str {
+    const fn as_text(&self) -> &str {
         match self {
-            FunctionModifier::Virtual => "virtual",
-            FunctionModifier::Override => "override",
+            Self::Virtual => "virtual",
+            Self::Override => "override",
         }
     }
 }
 
-pub(crate) struct CodeWriter<T: Write> {
+pub struct CodeWriter<T: Write> {
     pub(crate) buffer: BufWriter<T>,
 }
 

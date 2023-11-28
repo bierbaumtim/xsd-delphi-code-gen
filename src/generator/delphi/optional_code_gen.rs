@@ -3,10 +3,10 @@ use std::io::Write;
 use super::code_writer::CodeWriter;
 
 /// Generates a Delphi implementation for Option
-pub(crate) struct OptionalCodeGenerator;
+pub struct OptionalCodeGenerator;
 
 impl OptionalCodeGenerator {
-    pub(crate) fn write_declarations<T: Write>(
+    pub fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         indentation: usize,
     ) -> Result<(), std::io::Error> {
@@ -79,7 +79,7 @@ impl OptionalCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_implementationw<T: Write>(
+    pub fn write_implementationw<T: Write>(
         writer: &mut CodeWriter<T>,
     ) -> Result<(), std::io::Error> {
         writer.writeln("{$REGION 'Optional Helper'}", None)?;

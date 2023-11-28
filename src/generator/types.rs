@@ -1,7 +1,7 @@
 use super::dependency_graph::Dependable;
 
 #[derive(Clone, Debug)]
-pub(crate) enum DataType {
+pub enum DataType {
     Boolean,
     DateTime,
     Date,
@@ -38,68 +38,68 @@ pub(crate) enum DataType {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum BinaryEncoding {
+pub enum BinaryEncoding {
     Hex,
     Base64,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Enumeration {
-    pub(crate) name: String,
-    pub(crate) qualified_name: String,
-    pub(crate) values: Vec<EnumerationValue>,
-    pub(crate) documentations: Vec<String>,
+pub struct Enumeration {
+    pub name: String,
+    pub qualified_name: String,
+    pub values: Vec<EnumerationValue>,
+    pub documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct EnumerationValue {
-    pub(crate) variant_name: String,
-    pub(crate) xml_value: String,
-    pub(crate) documentations: Vec<String>,
+pub struct EnumerationValue {
+    pub variant_name: String,
+    pub xml_value: String,
+    pub documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct TypeAlias {
-    pub(crate) name: String,
-    pub(crate) qualified_name: String,
-    pub(crate) for_type: DataType,
-    pub(crate) pattern: Option<String>,
-    pub(crate) documentations: Vec<String>,
+pub struct TypeAlias {
+    pub name: String,
+    pub qualified_name: String,
+    pub for_type: DataType,
+    pub pattern: Option<String>,
+    pub documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ClassType {
-    pub(crate) name: String,
-    pub(crate) qualified_name: String,
-    pub(crate) super_type: Option<(String, String)>,
-    pub(crate) variables: Vec<Variable>,
-    pub(crate) documentations: Vec<String>,
+pub struct ClassType {
+    pub name: String,
+    pub qualified_name: String,
+    pub super_type: Option<(String, String)>,
+    pub variables: Vec<Variable>,
+    pub documentations: Vec<String>,
     // local_types: Vec<ClassType>,
     // type_aliases: Vec<TypeAlias>,
     // enumerations: Vec<Enumeration>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Variable {
-    pub(crate) name: String,
-    pub(crate) data_type: DataType,
-    pub(crate) xml_name: String,
-    pub(crate) requires_free: bool,
-    pub(crate) required: bool,
+pub struct Variable {
+    pub name: String,
+    pub data_type: DataType,
+    pub xml_name: String,
+    pub requires_free: bool,
+    pub required: bool,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct UnionType {
-    pub(crate) name: String,
-    pub(crate) qualified_name: String,
-    pub(crate) variants: Vec<UnionVariant>,
-    pub(crate) documentations: Vec<String>,
+pub struct UnionType {
+    pub name: String,
+    pub qualified_name: String,
+    pub variants: Vec<UnionVariant>,
+    pub documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct UnionVariant {
-    pub(crate) name: String,
-    pub(crate) data_type: DataType,
+pub struct UnionVariant {
+    pub name: String,
+    pub data_type: DataType,
 }
 
 impl Dependable<String> for ClassType {

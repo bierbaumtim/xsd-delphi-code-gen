@@ -7,10 +7,10 @@ use crate::generator::{
 
 use super::{code_writer::CodeWriter, helper::Helper};
 
-pub(crate) struct EnumCodeGenerator;
+pub struct EnumCodeGenerator;
 
 impl EnumCodeGenerator {
-    pub(crate) fn write_declarations<T: Write>(
+    pub fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,
@@ -44,7 +44,7 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
-    pub(crate) fn write_implementation<T: Write>(
+    pub fn write_implementation<T: Write>(
         writer: &mut CodeWriter<T>,
         enumerations: &Vec<Enumeration>,
         options: &CodeGenOptions,

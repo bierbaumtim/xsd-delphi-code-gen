@@ -6,7 +6,7 @@ use crate::generator::types::{BinaryEncoding, DataType, TypeAlias};
 
 use super::code_writer::CodeWriter;
 
-pub(crate) struct Helper;
+pub struct Helper;
 
 impl Helper {
     #[rustfmt::skip]
@@ -22,10 +22,9 @@ impl Helper {
     pub(crate) fn first_char_uppercase(name: &String) -> String {
         let mut graphemes = name.graphemes(true);
 
-        match graphemes.next() {
-            None => String::new(),
-            Some(c) => c.to_uppercase() + graphemes.as_str(),
-        }
+        graphemes
+            .next()
+            .map_or_else(String::new, |c| c.to_uppercase() + graphemes.as_str())
     }
 
     #[allow(dead_code)]
@@ -33,10 +32,9 @@ impl Helper {
     pub(crate) fn first_char_lowercase(name: &String) -> String {
         let mut graphemes = name.graphemes(true);
 
-        match graphemes.next() {
-            None => String::new(),
-            Some(c) => c.to_lowercase() + graphemes.as_str(),
-        }
+        graphemes
+            .next()
+            .map_or_else(String::new, |c| c.to_lowercase() + graphemes.as_str())
     }
 
     #[inline]

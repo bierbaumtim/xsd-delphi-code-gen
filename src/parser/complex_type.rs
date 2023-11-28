@@ -15,10 +15,10 @@ use super::{
     xml::XmlParser,
 };
 
-pub(crate) struct ComplexTypeParser;
+pub struct ComplexTypeParser;
 
 impl ComplexTypeParser {
-    pub(crate) fn parse(
+    pub fn parse(
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,
         xml_parser: &XmlParser,
@@ -162,13 +162,15 @@ impl ComplexTypeParser {
                     _ => (),
                 },
                 Ok(Event::Empty(e)) => {
-                    if let b"xs:element" = e.name().as_ref() {
+                    if e.name().as_ref() == b"xs:element" {
                         let name = XmlParserHelper::get_attribute_value(&e, "name")?;
                         let b_type = XmlParserHelper::get_attribute_value(&e, "type")?;
                         let b_type = xml_parser.resolve_namespace(b_type)?;
 
-                        let Some(node_type) = XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) else {
-                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type))
+                        let Some(node_type) =
+                            XmlParserHelper::base_type_str_to_node_type(b_type.as_str())
+                        else {
+                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
                         };
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;

@@ -7,7 +7,7 @@ use crate::generator::{
 
 use super::{code_writer::CodeWriter, helper::Helper};
 
-pub(crate) struct TypeAliasCodeGenerator;
+pub struct TypeAliasCodeGenerator;
 
 impl TypeAliasCodeGenerator {
     pub(crate) fn write_declarations<T: Write>(

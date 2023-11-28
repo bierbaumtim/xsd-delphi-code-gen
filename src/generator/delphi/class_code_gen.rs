@@ -14,16 +14,16 @@ use super::{
 impl DataType {
     fn is_reference_type(&self, type_aliases: &[TypeAlias]) -> bool {
         match self {
-            DataType::Alias(n) => Helper::get_alias_data_type(n.as_str(), type_aliases)
+            Self::Alias(n) => Helper::get_alias_data_type(n.as_str(), type_aliases)
                 .map_or(true, |(dt, _)| dt.is_reference_type(type_aliases)),
-            DataType::Custom(_) | DataType::List(_) | DataType::InlineList(_) => true,
-            DataType::FixedSizeList(dt, _) => dt.as_ref().is_reference_type(type_aliases),
+            Self::Custom(_) | Self::List(_) | Self::InlineList(_) => true,
+            Self::FixedSizeList(dt, _) => dt.as_ref().is_reference_type(type_aliases),
             _ => false,
         }
     }
 }
 
-pub(crate) struct ClassCodeGenerator;
+pub struct ClassCodeGenerator;
 
 impl ClassCodeGenerator {
     pub(crate) fn write_forward_declerations<T: Write>(

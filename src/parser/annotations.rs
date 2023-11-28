@@ -4,10 +4,10 @@ use quick_xml::{events::Event, Reader};
 
 use super::types::ParserError;
 
-pub(crate) struct AnnotationsParser;
+pub struct AnnotationsParser;
 
 impl AnnotationsParser {
-    pub(crate) fn parse(reader: &mut Reader<BufReader<File>>) -> Result<Vec<String>, ParserError> {
+    pub fn parse(reader: &mut Reader<BufReader<File>>) -> Result<Vec<String>, ParserError> {
         let mut values = Vec::new();
         let mut buf = Vec::new();
         let mut current_value = String::new();

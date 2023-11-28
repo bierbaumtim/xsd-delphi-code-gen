@@ -7,10 +7,10 @@ use crate::generator::{
 
 use super::code_writer::CodeWriter;
 
-pub(crate) struct ConstCodeGenerator;
+pub struct ConstCodeGenerator;
 
 impl ConstCodeGenerator {
-    pub(crate) fn generate<T: Write>(
+    pub fn generate<T: Write>(
         writer: &mut CodeWriter<T>,
         classes: &[ClassType],
     ) -> Result<(), CodeGenError> {

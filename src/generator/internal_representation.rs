@@ -14,19 +14,19 @@ use super::{
     },
 };
 
-pub(crate) const DOCUMENT_NAME: &str = "Document";
+pub const DOCUMENT_NAME: &str = "Document";
 
 #[derive(Debug)]
-pub(crate) struct InternalRepresentation {
-    pub(crate) document: ClassType,
-    pub(crate) classes: Vec<ClassType>,
-    pub(crate) types_aliases: Vec<TypeAlias>,
-    pub(crate) enumerations: Vec<Enumeration>,
-    pub(crate) union_types: Vec<UnionType>,
+pub struct InternalRepresentation {
+    pub document: ClassType,
+    pub classes: Vec<ClassType>,
+    pub types_aliases: Vec<TypeAlias>,
+    pub enumerations: Vec<Enumeration>,
+    pub union_types: Vec<UnionType>,
 }
 
 impl InternalRepresentation {
-    pub(crate) fn build(data: &ParsedData, registry: &TypeRegistry) -> Self {
+    pub fn build(data: &ParsedData, registry: &TypeRegistry) -> Self {
         let mut classes_dep_graph = DependencyGraph::<String, ClassType>::new();
         let mut aliases_dep_graph = DependencyGraph::<String, TypeAlias>::new();
         let mut union_types_dep_graph = DependencyGraph::<String, UnionType>::new();
@@ -189,13 +189,12 @@ impl InternalRepresentation {
                         }
                     }
 
-                    let super_type = match &ct.base_type {
-                        Some(t) => registry
+                    let super_type = ct.base_type.as_ref().and_then(|t| {
+                        registry
                             .types
                             .get(t)
-                            .map(|ct| (ct.get_name(), ct.get_qualified_name())),
-                        None => None,
-                    };
+                            .map(|ct| (ct.get_name(), ct.get_qualified_name()))
+                    });
 
                     let class_type = ClassType {
                         name: ct.name.clone(),
@@ -262,17 +261,10 @@ impl InternalRepresentation {
                 },
                 requires_free: match &node.node_type {
                     NodeType::Standard(_) => false,
-                    NodeType::Custom(c) => {
-                        let c_type = registry.types.get(c);
-
-                        match c_type {
-                            Some(t) => match t {
-                                CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
-                                CustomTypeDefinition::Complex(_) => true,
-                            },
-                            None => false,
-                        }
-                    }
+                    NodeType::Custom(c) => registry.types.get(c).map_or(false, |t| match t {
+                        CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                        CustomTypeDefinition::Complex(_) => true,
+                    }),
                 },
             };
 
@@ -289,7 +281,7 @@ impl InternalRepresentation {
 
         classes_dep_graph.push(document_type.clone());
 
-        InternalRepresentation {
+        Self {
             document: document_type,
             classes: classes_dep_graph.get_sorted_elements(),
             types_aliases: aliases_dep_graph.get_sorted_elements(),
@@ -343,13 +335,17 @@ impl InternalRepresentation {
             name: st.name.clone(),
             qualified_name: st.qualified_name.clone(),
             documentations: st.documentations.clone(),
-            variants: st.variants.as_ref().unwrap()
+            variants: st
+                .variants
+                .as_ref()
+                .unwrap()
                 .iter()
                 .enumerate()
                 .filter_map(|(i, v)| {
                     let d_type = match v {
                         crate::parser::types::UnionVariant::Named(n) => {
-                            let Some(CustomTypeDefinition::Simple(st)) = registry.types.get(n) else {
+                            let Some(CustomTypeDefinition::Simple(st)) = registry.types.get(n)
+                            else {
                                 return None;
                             };
 
@@ -357,15 +353,9 @@ impl InternalRepresentation {
                                 Self::list_type_to_data_type(lt, registry)
                                     .map(|d| (DataType::InlineList(Box::new(d)), st.name.clone()))
                             } else if st.enumeration.is_some() {
-                                Some((
-                                    DataType::Enumeration(st.name.clone()),
-                                    st.name.clone(),
-                                ))
+                                Some((DataType::Enumeration(st.name.clone()), st.name.clone()))
                             } else {
-                                Some((
-                                    DataType::Alias(st.name.clone()),
-                                    st.name.clone(),
-                                ))
+                                Some((DataType::Alias(st.name.clone()), st.name.clone()))
                             }
                         }
                         crate::parser::types::UnionVariant::Simple(st) => {
@@ -373,21 +363,14 @@ impl InternalRepresentation {
                                 Self::list_type_to_data_type(lt, registry)
                                     .map(|d| (DataType::InlineList(Box::new(d)), st.name.clone()))
                             } else if st.enumeration.is_some() {
-                                Some((
-                                    DataType::Enumeration(st.name.clone()),
-                                    st.name.clone(),
-                                ))
+                                Some((DataType::Enumeration(st.name.clone()), st.name.clone()))
                             } else {
-                                Some((
-                                    DataType::Alias(st.name.clone()),
-                                    st.name.clone(),
-                                ))
+                                Some((DataType::Alias(st.name.clone()), st.name.clone()))
                             }
                         }
-                        crate::parser::types::UnionVariant::Standard(t) => Some((
-                            Self::node_base_type_to_datatype(t),
-                            format!("Variant{i}"),
-                        )),
+                        crate::parser::types::UnionVariant::Standard(t) => {
+                            Some((Self::node_base_type_to_datatype(t), format!("Variant{i}")))
+                        }
                     };
 
                     d_type.map(|(dt, name)| super::types::UnionVariant {
@@ -426,7 +409,7 @@ impl InternalRepresentation {
         }
     }
 
-    fn node_base_type_to_datatype(base_type: &NodeBaseType) -> DataType {
+    const fn node_base_type_to_datatype(base_type: &NodeBaseType) -> DataType {
         match base_type {
             NodeBaseType::Boolean => DataType::Boolean,
             NodeBaseType::DateTime => DataType::DateTime,
