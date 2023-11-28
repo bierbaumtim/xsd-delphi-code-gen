@@ -13,7 +13,7 @@ use super::{
 pub(crate) struct UnionTypeCodeGenerator {}
 
 impl UnionTypeCodeGenerator {
-    const ENUM_NAME: &str = "Variants";
+    const ENUM_NAME: &'static str = "Variants";
 
     pub(crate) fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
