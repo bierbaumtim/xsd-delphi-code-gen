@@ -267,6 +267,11 @@ impl XmlParser {
         self.namespace_aliases.get(alias)
     }
 
+    /// Creates a qualified name from a name and the current namespace.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name.
     #[inline]
     pub fn as_qualified_name(&self, name: &str) -> String {
         let mut qualified_name =
@@ -285,6 +290,11 @@ impl XmlParser {
         qualified_name
     }
 
+    /// Resolves a namespace alias to a namespace.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `b_type` - The type to resolve.
     pub fn resolve_namespace(&self, b_type: String) -> Result<String, ParserError> {
         if b_type.is_empty() || b_type.starts_with("xs:") {
             return Ok(b_type);
@@ -302,6 +312,11 @@ impl XmlParser {
         }
     }
 
+    /// Extracts all namespace aliases from a schema element.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `s` - The schema element.
     fn extract_schema_namespace_aliases(&mut self, s: &BytesStart<'_>) -> Option<ParserError> {
         let prefix = b"xmlns:";
 
