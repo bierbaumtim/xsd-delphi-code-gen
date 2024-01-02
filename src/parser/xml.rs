@@ -11,6 +11,25 @@ use super::{
 };
 use crate::type_registry::TypeRegistry;
 
+/// A parser for XML files.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::path::PathBuf;
+///
+/// use xsd_parser::{parser::XmlParser, type_registry::TypeRegistry};
+///
+/// let mut parser = XmlParser::default();
+/// let mut registry = TypeRegistry::new();
+///
+/// let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+/// path.push("tests/test_data/xml_schema.xsd");
+///
+/// let parsed_data = parser.parse_file(path, &mut registry);
+///
+/// assert!(parsed_data.is_ok());
+/// ```
 #[derive(Default)]
 pub struct XmlParser {
     pub current_namespace: Option<String>,
@@ -18,6 +37,34 @@ pub struct XmlParser {
 }
 
 impl XmlParser {
+    /// Parses a single XML file.
+    /// 
+    /// Returns a `ParsedData` struct containing all the parsed data.
+    /// If the parsing fails, a `ParserError` is returned.
+    /// The `TypeRegistry` is used to store all the parsed types.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the XML file.
+    /// * `registry` - The type registry.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::path::PathBuf;
+    ///
+    /// use xsd_parser::{parser::XmlParser, type_registry::TypeRegistry};
+    ///
+    /// let mut parser = XmlParser::default();
+    /// let mut registry = TypeRegistry::new();
+    ///
+    /// let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    /// path.push("tests/test_data/xml_schema.xsd");
+    ///
+    /// let parsed_data = parser.parse_file(path, &mut registry);
+    ///
+    /// assert!(parsed_data.is_ok());
+    /// ```
     pub fn parse_file<P: AsRef<Path>>(
         &mut self,
         path: P,
@@ -30,6 +77,35 @@ impl XmlParser {
         self.parse_nodes(&mut reader, registry)
     }
 
+    /// Parses multiple XML files.
+    /// 
+    /// Returns a `ParsedData` struct containing all the parsed data.
+    /// If the parsing fails, a `ParserError` is returned.
+    /// The `TypeRegistry` is used to store all the parsed types.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `paths` - A vector of paths to the XML files.
+    /// * `registry` - The type registry.
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust
+    /// use std::path::PathBuf;
+    /// 
+    /// use xsd_parser::{parser::XmlParser, type_registry::TypeRegistry};
+    /// 
+    /// let mut parser = XmlParser::default();
+    /// let mut registry = TypeRegistry::new();
+    /// 
+    /// let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    /// path.push("tests/test_data/xml_schema.xsd");
+    /// path.push("tests/test_data/xml_schema2.xsd");
+    /// 
+    /// let parsed_data = parser.parse_file(path, &mut registry);
+    /// 
+    /// assert!(parsed_data.is_ok());
+    /// ```
     pub fn parse_files<P: AsRef<Path>>(
         &mut self,
         paths: &Vec<P>,

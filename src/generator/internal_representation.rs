@@ -14,8 +14,52 @@ use super::{
     },
 };
 
+/// The name of the document class type.
 pub const DOCUMENT_NAME: &str = "Document";
 
+/// This is the internal representation of the XML Schema.
+/// It contains the classes, enumerations, type aliases and union types.
+/// It also contains the document class type.
+/// The document class type is a special class type that contains the root element of the XML document.
+/// The root element is the element that is defined in the XML Schema as the root element of the XML document.
+///
+/// # Fields
+/// * `document` - The document class type.
+/// * `classes` - The class types.
+/// * `types_aliases` - The type aliases.
+/// * `enumerations` - The enumerations.
+/// * `union_types` - The union types.
+///
+/// # Examples
+///
+/// ```rust
+/// use generator::internal_representation::InternalRepresentation;
+/// use generator::parser::types::ParsedData;
+/// use generator::parser::xml::XmlParser;
+/// use generator::type_registry::TypeRegistry;
+///
+/// let xml = r#"
+/// <?xml version="1.0" encoding="utf-8"?>
+/// <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+///     <xs:element name="root">
+///         <xs:complexType>
+///             <xs:sequence>
+///                 <xs:element name="first" type="xs:string"/>
+///                 <xs:element name="second" type="xs:int"/>
+///                 <xs:element name="third" type="xs:string"/>
+///             </xs:sequence>
+///         </xs:complexType>
+///     </xs:element>
+/// </xs:schema>
+/// "#;
+///
+/// let mut parser = XmlParser::default();
+/// let mut type_registry = TypeRegistry::new();
+///
+/// let data: ParsedData = parser.parse(xml, &mut type_registry).unwrap();
+///
+/// let ir = InternalRepresentation::build(&data, &type_registry);
+/// ```
 #[derive(Debug)]
 pub struct InternalRepresentation {
     pub document: ClassType,
@@ -26,6 +70,55 @@ pub struct InternalRepresentation {
 }
 
 impl InternalRepresentation {
+    /// Builds the internal representation from the parsed data and the type registry.
+    /// It also takes care of the dependencies between the types.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The parsed data.
+    /// * `registry` - The type registry.
+    ///
+    /// # Returns
+    ///
+    /// The internal representation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use generator::{
+    ///     internal_representation::InternalRepresentation,
+    ///     parser::{
+    ///         types::{
+    ///             CustomTypeDefinition, EnumerationDefinition, EnumerationValueDefinition,
+    ///             ListTypeDefinition, OrderIndicator, ParsedData, SimpleType,
+    ///         },
+    ///         xml::XmlParser,
+    ///     },
+    ///     type_registry::TypeRegistry,
+    /// };
+    ///
+    /// let xml = r#"
+    /// <?xml version="1.0" encoding="utf-8"?>
+    /// <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    ///     <xs:element name="root">
+    ///         <xs:complexType>
+    ///             <xs:sequence>
+    ///                 <xs:element name="first" type="xs:string"/>
+    ///                 <xs:element name="second" type="xs:int"/>
+    ///                 <xs:element name="third" type="xs:string"/>
+    ///             </xs:sequence>
+    ///         </xs:complexType>
+    ///     </xs:element>
+    /// </xs:schema>
+    /// "#;
+    ///
+    /// let mut parser = XmlParser::default();
+    /// let mut type_registry = TypeRegistry::new();
+    ///
+    /// let data: ParsedData = parser.parse(xml, &mut type_registry).unwrap();
+    ///
+    /// let ir = InternalRepresentation::build(&data, &type_registry);
+    /// ```
     pub fn build(data: &ParsedData, registry: &TypeRegistry) -> Self {
         let mut classes_dep_graph = DependencyGraph::<String, ClassType>::new();
         let mut aliases_dep_graph = DependencyGraph::<String, TypeAlias>::new();
@@ -67,209 +160,14 @@ impl InternalRepresentation {
                 }
                 CustomTypeDefinition::Simple(_) => (),
                 CustomTypeDefinition::Complex(ct) => {
-                    let mut variables = Vec::new();
-
-                    for child in &ct.children {
-                        let min_occurs = match &ct.order {
-                            OrderIndicator::All => child
-                                .base_attributes
-                                .min_occurs
-                                .unwrap_or(DEFAULT_OCCURANCE)
-                                .clamp(0, 1),
-                            _ => child
-                                .base_attributes
-                                .min_occurs
-                                .unwrap_or(DEFAULT_OCCURANCE),
-                        };
-                        let max_occurs = match &ct.order {
-                            OrderIndicator::All => child
-                                .base_attributes
-                                .max_occurs
-                                .unwrap_or(DEFAULT_OCCURANCE)
-                                .clamp(0, 1),
-                            _ => child
-                                .base_attributes
-                                .max_occurs
-                                .unwrap_or(DEFAULT_OCCURANCE),
-                        };
-
-                        match &child.node_type {
-                            NodeType::Standard(s) => {
-                                let d_type = Self::node_base_type_to_datatype(s);
-
-                                let d_type = if max_occurs == UNBOUNDED_OCCURANCE
-                                    || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
-                                {
-                                    DataType::List(Box::new(d_type))
-                                } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE
-                                {
-                                    let size = usize::try_from(max_occurs).unwrap();
-
-                                    DataType::FixedSizeList(Box::new(d_type.clone()), size)
-                                } else {
-                                    d_type
-                                };
-
-                                let variable = Variable {
-                                    name: child.name.clone(),
-                                    xml_name: child.name.clone(),
-                                    requires_free: matches!(
-                                        d_type,
-                                        DataType::List(_) | DataType::Uri
-                                    ),
-                                    data_type: d_type,
-                                    required: min_occurs > 0,
-                                };
-
-                                variables.push(variable);
-                            }
-                            NodeType::Custom(c) => {
-                                let c_type = registry.types.get(c);
-
-                                if let Some(c_type) = c_type {
-                                    let data_type = match c_type {
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.enumeration.is_some() =>
-                                        {
-                                            DataType::Enumeration(s.name.clone())
-                                        }
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.base_type.is_some() =>
-                                        {
-                                            DataType::Alias(s.name.clone())
-                                        }
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.list_type.is_some() =>
-                                        {
-                                            DataType::Alias(s.name.clone())
-                                        }
-                                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
-                                            DataType::Union(s.name.clone())
-                                        }
-                                        _ => DataType::Custom(c_type.get_name()),
-                                    };
-
-                                    let requires_free = match c_type {
-                                        CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
-                                        CustomTypeDefinition::Complex(_) => true,
-                                    };
-
-                                    let data_type = if max_occurs == UNBOUNDED_OCCURANCE
-                                        || (min_occurs != max_occurs
-                                            && max_occurs > DEFAULT_OCCURANCE)
-                                    {
-                                        DataType::List(Box::new(data_type))
-                                    } else if min_occurs == max_occurs
-                                        && max_occurs > DEFAULT_OCCURANCE
-                                    {
-                                        let size = usize::try_from(max_occurs).unwrap();
-
-                                        DataType::FixedSizeList(Box::new(data_type), size)
-                                    } else {
-                                        data_type
-                                    };
-
-                                    let variable = Variable {
-                                        name: child.name.clone(),
-                                        xml_name: child.name.clone(),
-                                        requires_free: requires_free
-                                            || matches!(
-                                                data_type,
-                                                DataType::List(_)
-                                                    | DataType::InlineList(_)
-                                                    | DataType::Uri
-                                            ),
-                                        data_type,
-                                        required: min_occurs > 0,
-                                    };
-
-                                    variables.push(variable);
-                                }
-                            }
-                        }
-                    }
-
-                    let super_type = ct.base_type.as_ref().and_then(|t| {
-                        registry
-                            .types
-                            .get(t)
-                            .map(|ct| (ct.get_name(), ct.get_qualified_name()))
-                    });
-
-                    let class_type = ClassType {
-                        name: ct.name.clone(),
-                        qualified_name: ct.qualified_name.clone(),
-                        super_type,
-                        variables,
-                        documentations: ct.documentations.clone(),
-                    };
+                    let class_type = Self::build_class_type_ir(ct, registry);
 
                     classes_dep_graph.push(class_type);
                 }
             }
         }
 
-        let mut document_variables = Vec::new();
-
-        for node in &data.nodes {
-            let min_occurs = node.base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE);
-            let max_occurs = node.base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE);
-
-            let variable = Variable {
-                name: node.name.clone(),
-                xml_name: node.name.clone(),
-                required: min_occurs > 0,
-                data_type: match &node.node_type {
-                    NodeType::Standard(s) => Self::node_base_type_to_datatype(s),
-                    NodeType::Custom(e) => {
-                        let c_type = registry.types.get(e);
-
-                        match c_type {
-                            Some(c_type) => {
-                                let data_type = match c_type {
-                                    CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
-                                        DataType::Enumeration(s.name.clone())
-                                    }
-                                    CustomTypeDefinition::Simple(s) if s.base_type.is_some() => {
-                                        DataType::Alias(s.name.clone())
-                                    }
-                                    CustomTypeDefinition::Simple(s) if s.list_type.is_some() => {
-                                        DataType::Alias(s.name.clone())
-                                    }
-                                    CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
-                                        DataType::Union(s.name.clone())
-                                    }
-                                    _ => DataType::Custom(c_type.get_name()),
-                                };
-
-                                if max_occurs == UNBOUNDED_OCCURANCE
-                                    || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
-                                {
-                                    DataType::List(Box::new(data_type))
-                                } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE
-                                {
-                                    let size = usize::try_from(max_occurs).unwrap();
-
-                                    DataType::FixedSizeList(Box::new(data_type), size)
-                                } else {
-                                    data_type
-                                }
-                            }
-                            None => todo!(),
-                        }
-                    }
-                },
-                requires_free: match &node.node_type {
-                    NodeType::Standard(_) => false,
-                    NodeType::Custom(c) => registry.types.get(c).map_or(false, |t| match t {
-                        CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
-                        CustomTypeDefinition::Complex(_) => true,
-                    }),
-                },
-            };
-
-            document_variables.push(variable);
-        }
+        let document_variables = Self::get_document_variables(data, registry);
 
         let document_type = ClassType {
             super_type: None,
@@ -290,6 +188,53 @@ impl InternalRepresentation {
         }
     }
 
+    /// Builds the internal representation for an enumeration.
+    ///
+    /// # Arguments
+    ///
+    /// * `st` - The simple type definition of the enumeration.
+    ///
+    /// # Returns
+    ///
+    /// The internal representation of the enumeration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use generator::{
+    ///     internal_representation::InternalRepresentation,
+    ///     parser::{
+    ///         types::{
+    ///             CustomTypeDefinition, EnumerationDefinition, EnumerationValueDefinition,
+    ///             ListTypeDefinition, OrderIndicator, ParsedData, SimpleType,
+    ///         },
+    ///         xml::XmlParser,
+    ///     },
+    ///     type_registry::TypeRegistry,
+    /// };
+    ///
+    /// let xml = r#"
+    /// <?xml version="1.0" encoding="utf-8"?>
+    /// <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    ///     <xs:simpleType name="CustomType">
+    ///         <xs:restriction base="xs:string">
+    ///             <xs:enumeration value="First"/>
+    ///             <xs:enumeration value="Second"/>
+    ///             <xs:enumeration value="Third"/>
+    ///         </xs:restriction>
+    ///     </xs:simpleType>
+    /// </xs:schema>
+    /// "#;
+    ///
+    /// let mut parser = XmlParser::default();
+    /// let mut type_registry = TypeRegistry::new();
+    ///
+    /// let data: ParsedData = parser.parse(xml, &mut type_registry).unwrap();
+    ///
+    /// let ir = InternalRepresentation::build(&data, &type_registry);
+    ///
+    /// assert_eq!(ir.enumerations.len(), 1);
+    /// ```
     fn build_enumeration_ir(st: &SimpleType) -> Enumeration {
         let values = st
             .enumeration
@@ -311,6 +256,49 @@ impl InternalRepresentation {
         }
     }
 
+    /// Builds the internal representation for a type alias.
+    ///
+    /// # Arguments
+    ///
+    /// * `st` - The simple type definition of the type alias.
+    ///
+    /// # Returns
+    ///
+    /// The internal representation of the type alias.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use generator::{
+    ///     internal_representation::InternalRepresentation,
+    ///     parser::{
+    ///         types::{
+    ///             CustomTypeDefinition, EnumerationDefinition, EnumerationValueDefinition,
+    ///             ListTypeDefinition, OrderIndicator, ParsedData, SimpleType,
+    ///         },
+    ///         xml::XmlParser,
+    ///     },
+    ///     type_registry::TypeRegistry,
+    /// };
+    ///
+    /// let xml = r#"
+    /// <?xml version="1.0" encoding="utf-8"?>
+    /// <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    ///     <xs:simpleType name="CustomType">
+    ///         <xs:list itemType="xs:string"/>
+    ///     </xs:simpleType>
+    /// </xs:schema>
+    /// "#;
+    ///
+    /// let mut parser = XmlParser::default();
+    /// let mut type_registry = TypeRegistry::new();
+    ///
+    /// let data: ParsedData = parser.parse(xml, &mut type_registry).unwrap();
+    ///
+    /// let ir = InternalRepresentation::build(&data, &type_registry);
+    ///
+    /// assert_eq!(ir.types_aliases.len(), 1);
+    /// ```
     fn build_type_alias_ir(st: &SimpleType) -> TypeAlias {
         let for_type = match st.base_type.as_ref().unwrap() {
             NodeType::Standard(t) => Self::node_base_type_to_datatype(t),
@@ -330,6 +318,49 @@ impl InternalRepresentation {
         }
     }
 
+    /// Builds the internal representation for a union type.
+    ///
+    /// # Arguments
+    ///
+    /// * `st` - The simple type definition of the union type.
+    ///
+    /// # Returns
+    ///
+    /// The internal representation of the union type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use generator::{
+    ///     internal_representation::InternalRepresentation,
+    ///     parser::{
+    ///         types::{
+    ///             CustomTypeDefinition, EnumerationDefinition, EnumerationValueDefinition,
+    ///             ListTypeDefinition, OrderIndicator, ParsedData, SimpleType,
+    ///         },
+    ///         xml::XmlParser,
+    ///     },
+    ///     type_registry::TypeRegistry,
+    /// };
+    ///
+    /// let xml = r#"
+    /// <?xml version="1.0" encoding="utf-8"?>
+    /// <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    ///     <xs:simpleType name="CustomType">
+    ///         <xs:union memberTypes="xs:string xs:decimal"/>
+    ///     </xs:simpleType>
+    /// </xs:schema>
+    /// "#;
+    ///
+    /// let mut parser = XmlParser::default();
+    /// let mut type_registry = TypeRegistry::new();
+    ///
+    /// let data: ParsedData = parser.parse(xml, &mut type_registry).unwrap();
+    ///
+    /// let ir = InternalRepresentation::build(&data, &type_registry);
+    ///
+    /// assert_eq!(ir.union_types.len(), 1);
+    /// ```
     fn build_union_type_ir(st: &SimpleType, registry: &TypeRegistry) -> UnionType {
         UnionType {
             name: st.name.clone(),
@@ -382,6 +413,262 @@ impl InternalRepresentation {
         }
     }
 
+    /// Builds the internal representation for a class type.
+    ///
+    /// # Arguments
+    ///
+    /// * `ct` - The complex type definition of the class type.
+    ///
+    /// # Returns
+    ///
+    /// The internal representation of the class type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use generator::{
+    ///     internal_representation::InternalRepresentation,
+    ///     parser::{
+    ///         types::{
+    ///             CustomTypeDefinition, EnumerationDefinition, EnumerationValueDefinition,
+    ///             ListTypeDefinition, OrderIndicator, ParsedData, SimpleType,
+    ///         },
+    ///         xml::XmlParser,
+    ///     },
+    ///     type_registry::TypeRegistry,
+    /// };
+    ///
+    /// let xml = r#"
+    /// <?xml version="1.0" encoding="utf-8"?>
+    /// <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    ///     <xs:complexType name="CustomType">
+    ///         <xs:sequence>
+    ///             <xs:element name="first" type="xs:string"/>
+    ///             <xs:element name="second" type="xs:int"/>
+    ///             <xs:element name="third" type="xs:string"/>
+    ///         </xs:sequence>
+    ///     </xs:complexType>
+    /// </xs:schema>
+    /// "#;
+    ///
+    /// let mut parser = XmlParser::default();
+    /// let mut type_registry = TypeRegistry::new();
+    ///
+    /// let data: ParsedData = parser.parse(xml, &mut type_registry).unwrap();
+    ///
+    /// let ir = InternalRepresentation::build(&data, &type_registry);
+    ///
+    /// assert_eq!(ir.classes.len(), 1);
+    /// ```
+    fn build_class_type_ir(
+        ct: &crate::parser::types::ComplexType,
+        registry: &TypeRegistry,
+    ) -> ClassType {
+        let mut variables = Vec::new();
+
+        for child in &ct.children {
+            let min_occurs = match &ct.order {
+                OrderIndicator::All => child
+                    .base_attributes
+                    .min_occurs
+                    .unwrap_or(DEFAULT_OCCURANCE)
+                    .clamp(0, 1),
+                _ => child
+                    .base_attributes
+                    .min_occurs
+                    .unwrap_or(DEFAULT_OCCURANCE),
+            };
+            let max_occurs = match &ct.order {
+                OrderIndicator::All => child
+                    .base_attributes
+                    .max_occurs
+                    .unwrap_or(DEFAULT_OCCURANCE)
+                    .clamp(0, 1),
+                _ => child
+                    .base_attributes
+                    .max_occurs
+                    .unwrap_or(DEFAULT_OCCURANCE),
+            };
+
+            match &child.node_type {
+                NodeType::Standard(s) => {
+                    let d_type = Self::node_base_type_to_datatype(s);
+
+                    let d_type = if max_occurs == UNBOUNDED_OCCURANCE
+                        || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
+                    {
+                        DataType::List(Box::new(d_type))
+                    } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
+                        let size = usize::try_from(max_occurs).unwrap();
+
+                        DataType::FixedSizeList(Box::new(d_type.clone()), size)
+                    } else {
+                        d_type
+                    };
+
+                    let variable = Variable {
+                        name: child.name.clone(),
+                        xml_name: child.name.clone(),
+                        requires_free: matches!(d_type, DataType::List(_) | DataType::Uri),
+                        data_type: d_type,
+                        required: min_occurs > 0,
+                    };
+
+                    variables.push(variable);
+                }
+                NodeType::Custom(c) => {
+                    let c_type = registry.types.get(c);
+
+                    if let Some(c_type) = c_type {
+                        let data_type = match c_type {
+                            CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
+                                DataType::Enumeration(s.name.clone())
+                            }
+                            CustomTypeDefinition::Simple(s)
+                                if s.base_type.is_some() || s.list_type.is_some() =>
+                            {
+                                DataType::Alias(s.name.clone())
+                            }
+                            CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                                DataType::Union(s.name.clone())
+                            }
+                            _ => DataType::Custom(c_type.get_name()),
+                        };
+
+                        let requires_free = match c_type {
+                            CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                            CustomTypeDefinition::Complex(_) => true,
+                        };
+
+                        let data_type = if max_occurs == UNBOUNDED_OCCURANCE
+                            || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
+                        {
+                            DataType::List(Box::new(data_type))
+                        } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
+                            let size = usize::try_from(max_occurs).unwrap();
+
+                            DataType::FixedSizeList(Box::new(data_type), size)
+                        } else {
+                            data_type
+                        };
+
+                        let variable = Variable {
+                            name: child.name.clone(),
+                            xml_name: child.name.clone(),
+                            requires_free: requires_free
+                                || matches!(
+                                    data_type,
+                                    DataType::List(_) | DataType::InlineList(_) | DataType::Uri
+                                ),
+                            data_type,
+                            required: min_occurs > 0,
+                        };
+
+                        variables.push(variable);
+                    }
+                }
+            }
+        }
+
+        let super_type = ct.base_type.as_ref().and_then(|t| {
+            registry
+                .types
+                .get(t)
+                .map(|ct| (ct.get_name(), ct.get_qualified_name()))
+        });
+
+        ClassType {
+            name: ct.name.clone(),
+            qualified_name: ct.qualified_name.clone(),
+            super_type,
+            variables,
+            documentations: ct.documentations.clone(),
+        }
+    }
+
+    /// Gets the variables of the document.
+    /// The document is a special class type that contains the root element of the XML document.
+    /// The variables of the document are the root elements of the XML document.
+    ///
+    /// # Arguments
+    /// * `data` - The parsed data.
+    /// * `registry` - The type registry.
+    /// # Returns
+    /// The variables of the document.
+    fn get_document_variables(data: &ParsedData, registry: &TypeRegistry) -> Vec<Variable> {
+        data.nodes
+            .iter()
+            .map(|node| {
+                let min_occurs = node.base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE);
+                let max_occurs = node.base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE);
+
+                Variable {
+                    name: node.name.clone(),
+                    xml_name: node.name.clone(),
+                    required: min_occurs > 0,
+                    data_type: match &node.node_type {
+                        NodeType::Standard(s) => Self::node_base_type_to_datatype(s),
+                        NodeType::Custom(e) => {
+                            let c_type = registry.types.get(e);
+
+                            match c_type {
+                                Some(c_type) => {
+                                    let data_type = match c_type {
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.enumeration.is_some() =>
+                                        {
+                                            DataType::Enumeration(s.name.clone())
+                                        }
+                                        CustomTypeDefinition::Simple(s)
+                                            if s.base_type.is_some() || s.list_type.is_some() =>
+                                        {
+                                            DataType::Alias(s.name.clone())
+                                        }
+                                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                                            DataType::Union(s.name.clone())
+                                        }
+                                        _ => DataType::Custom(c_type.get_name()),
+                                    };
+
+                                    if max_occurs == UNBOUNDED_OCCURANCE
+                                        || (min_occurs != max_occurs
+                                            && max_occurs > DEFAULT_OCCURANCE)
+                                    {
+                                        DataType::List(Box::new(data_type))
+                                    } else if min_occurs == max_occurs
+                                        && max_occurs > DEFAULT_OCCURANCE
+                                    {
+                                        let size = usize::try_from(max_occurs).unwrap();
+
+                                        DataType::FixedSizeList(Box::new(data_type), size)
+                                    } else {
+                                        data_type
+                                    }
+                                }
+                                None => todo!(),
+                            }
+                        }
+                    },
+                    requires_free: match &node.node_type {
+                        NodeType::Standard(_) => false,
+                        NodeType::Custom(c) => registry.types.get(c).map_or(false, |t| match t {
+                            CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                            CustomTypeDefinition::Complex(_) => true,
+                        }),
+                    },
+                }
+            })
+            .collect::<Vec<Variable>>()
+    }
+
+    /// Converts a list type to a data type.
+    /// This is used to convert the list types of the nodes to the data types of the variables.
+    ///
+    /// # Arguments
+    /// * `list_type` - The list type to convert.
+    /// * `registry` - The type registry.
+    /// # Returns
+    /// The converted data type.
     fn list_type_to_data_type(list_type: &NodeType, registry: &TypeRegistry) -> Option<DataType> {
         match list_type {
             NodeType::Standard(s) => Some(Self::node_base_type_to_datatype(s)),
@@ -409,6 +696,15 @@ impl InternalRepresentation {
         }
     }
 
+    /// Converts a node base type to a data type.
+    /// This is used to convert the base types of the nodes to the data types of the variables.
+    /// The base types are the types that are defined in the XML Schema specification.
+    /// The data types are the types that are used in the generated code.
+    ///
+    /// # Arguments
+    /// * `base_type` - The base type to convert.
+    /// # Returns
+    /// The converted data type.
     const fn node_base_type_to_datatype(base_type: &NodeBaseType) -> DataType {
         match base_type {
             NodeBaseType::Boolean => DataType::Boolean,

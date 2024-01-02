@@ -107,7 +107,44 @@ fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
     }
 }
 
-/// `XSD2DelphiCodeGen` generates Types from XSD-Files
+/// `XSD2DelphiCodeGen` generates Types from XSD-Files for Delphi
+/// # Usage
+///
+/// ```bash
+/// XSD2DelphiCodeGen [FLAGS] [OPTIONS] <input> <output> <unit-name>
+/// ```
+///
+/// # Arguments
+///
+/// * `<input>` - One or multiple paths to xsd files. Paths can be relative or absolut.
+/// * `<output>` - Path to output file. Path can be relative or absolut. File will be created or truncated before write.
+/// * `<unit-name>` - Name of the generated unit
+///
+/// # Options
+///
+/// * `--mode <mode>` - Which code should be generated. Can be one of `All`, `ToXml`, `FromXml`. Default is `All`
+/// * `--type-prefix <type-prefix>` - Optional prefix for type names
+///
+/// # Flags
+///
+/// * `-h, --help` - Prints help information
+/// * `-V, --version` - Prints version information
+///
+/// # Examples
+///
+/// ```bash
+/// # Generate all code
+/// XSD2DelphiCodeGen input.xsd output.pas MyUnit
+///
+/// # Generate only code for xml to type conversion
+/// XSD2DelphiCodeGen --mode ToXml input.xsd output.pas MyUnit
+///
+/// # Generate only code for type to xml conversion
+/// XSD2DelphiCodeGen --mode FromXml input.xsd output.pas MyUnit
+///
+/// # Generate code with prefix
+/// XSD2DelphiCodeGen --type-prefix MyPrefix input.xsd output.pas MyUnit
+/// ```
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
@@ -119,6 +156,7 @@ pub struct Args {
     #[arg(short, long, required(true))]
     pub(crate) output: std::path::PathBuf,
 
+    /// Name of the generated unit
     #[arg(long, required(true))]
     pub(crate) unit_name: String,
 
@@ -126,14 +164,21 @@ pub struct Args {
     #[arg(long, num_args(0..=1))]
     pub(crate) type_prefix: Option<String>,
 
+    /// Which code should be generated. Can be one of `All`, `ToXml`, `FromXml`. Default is `All`
     #[arg(long, value_enum, default_value_t)]
     pub(crate) mode: CodeGenMode,
 }
 
+/// Which code should be generated. Can be one of `All`, `ToXml`, `FromXml`. Default is `All`
 #[derive(Clone, Debug, Default, ValueEnum)]
 enum CodeGenMode {
+    /// Generate all code
     #[default]
     All,
+
+    /// Generate only code for type to xml conversion
     ToXml,
+    
+    /// Generate only code for xml to type conversion
     FromXml,
 }
