@@ -6,6 +6,7 @@ use super::code_writer::CodeWriter;
 pub struct OptionalCodeGenerator;
 
 impl OptionalCodeGenerator {
+    /// Generates declarations for Option
     pub fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         indentation: usize,
@@ -79,6 +80,7 @@ impl OptionalCodeGenerator {
         Ok(())
     }
 
+    /// Generates the implementation for Option
     pub fn write_implementationw<T: Write>(
         writer: &mut CodeWriter<T>,
     ) -> Result<(), std::io::Error> {

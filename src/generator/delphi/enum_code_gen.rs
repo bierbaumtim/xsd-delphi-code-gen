@@ -7,9 +7,114 @@ use crate::generator::{
 
 use super::{code_writer::CodeWriter, helper::Helper};
 
+/// Generates the code for enumerations.
 pub struct EnumCodeGenerator;
 
 impl EnumCodeGenerator {
+    /// Generates declarations for enumerations and their helper types.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `writer` - The writer to write the declarations to.
+    /// * `enumerations` - The enumerations to generate.
+    /// * `options` - The code generation options.
+    /// * `indentation` - The indentation level.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::io::BufWriter;
+    /// 
+    /// use xsd_parser::generator::{
+    ///    code_generator_trait::CodeGenOptions,
+    ///   types::{Enumeration, EnumerationValue},
+    /// };
+    /// 
+    /// use xsd_parser::generator::delphi::code_writer::CodeWriter;
+    /// use xsd_parser::generator::delphi::enum_code_gen::EnumCodeGenerator;
+    /// 
+    /// let enumerations = vec![
+    ///   Enumeration {
+    ///     name: "ItemStatus".to_owned(),
+    ///     qualified_name: "ItemStatus".to_owned(),
+    ///     documentations: vec![],
+    ///     values: vec![
+    ///       EnumerationValue {
+    ///         variant_name: "open".to_owned(),
+    ///         xml_value: "o".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "closed".to_owned(),
+    ///         xml_value: "c".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "unknown".to_owned(),
+    ///         xml_value: "u".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///     ],
+    ///   },
+    ///   Enumeration {
+    ///     name: "Fontsize".to_owned(),
+    ///     qualified_name: "Fontsize".to_owned(),
+    ///     documentations: vec![],
+    ///     values: vec![
+    ///       EnumerationValue {
+    ///         variant_name: "small".to_owned(),
+    ///         xml_value: "s".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "medium".to_owned(),
+    ///         xml_value: "m".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "large".to_owned(),
+    ///         xml_value: "l".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///     ],
+    ///   },
+    /// ];
+    /// 
+    /// let options = CodeGenOptions {
+    /// generate_from_xml: true,
+    /// generate_to_xml: true,
+    /// ..Default::default()
+    /// };
+    /// 
+    /// let buffer = BufWriter::new(Vec::new());
+    /// let mut writer = CodeWriter { buffer };
+    /// EnumCodeGenerator::write_declarations(&mut writer, &enumerations, &options, 2).unwrap();
+    /// 
+    /// let bytes = writer.get_writer().unwrap().clone();
+    /// let content = String::from_utf8(bytes).unwrap();
+    /// 
+    /// let expected = "  {$REGION 'Enumerations'}\n  \
+    ///             // XML Qualified Name: ItemStatus\n  \
+    ///             TItemStatus = (isOpen, isClosed, isUnknown);\n\
+    ///             \n  \
+    ///             // XML Qualified Name: Fontsize\n  \
+    ///             TFontsize = (fSmall, fMedium, fLarge);\n  \
+    ///             {$ENDREGION}\n\
+    ///             \n  \
+    ///             {$REGION 'Enumerations Helper'}\n  \
+    ///             TItemStatusHelper = record helper for TItemStatus\n    \
+    ///             class function FromXmlValue(const pXmlValue: String): TItemStatus; static;\n    \
+    ///             function ToXmlValue: String;\n  \
+    ///             end;\n\
+    ///             \n  \
+    ///             TFontsizeHelper = record helper for TFontsize\n    \
+    ///             class function FromXmlValue(const pXmlValue: String): TFontsize; static;\n    \
+    ///             function ToXmlValue: String;\n  \
+    ///             end;\n  \
+    ///             {$ENDREGION}\n";
+    /// 
+    /// assert_eq!(content, expected);
+    /// ```
     pub fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         enumerations: &Vec<Enumeration>,

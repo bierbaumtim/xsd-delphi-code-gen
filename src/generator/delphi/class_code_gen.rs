@@ -12,6 +12,7 @@ use super::{
 };
 
 impl DataType {
+    /// Determines if the data type is a reference type.
     fn is_reference_type(&self, type_aliases: &[TypeAlias]) -> bool {
         match self {
             Self::Alias(n) => Helper::get_alias_data_type(n.as_str(), type_aliases)
@@ -23,9 +24,62 @@ impl DataType {
     }
 }
 
+/// Code generator for classes.
 pub struct ClassCodeGenerator;
 
 impl ClassCodeGenerator {
+    /// Generates forwards declarations for provided classes.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `writer` - The writer to write the code to.
+    /// * `classes` - The classes to generate the forward declarations for.
+    /// * `options` - The code generation options.
+    /// * `indentation` - The indentation level.
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the code generation fails.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::io::Write;
+    /// use xsd_codegen::generator::{
+    ///   code_generator_trait::CodeGenOptions,
+    ///   internal_representation::{ClassType, DataType},
+    /// };
+    /// use xsd_codegen::generator::delphi::class_code_gen::ClassCodeGenerator;
+    /// use xsd_codegen::generator::delphi::code_writer::CodeWriter;
+    /// 
+    /// let mut writer = CodeWriter::new();
+    /// let classes = vec![
+    ///   ClassType {
+    ///     name: String::from("Test"),
+    ///     qualified_name: String::from("Test"),
+    ///     super_type: None,
+    ///     variables: vec![],
+    ///     documentations: vec![],
+    ///   },
+    /// ];
+    /// let options = CodeGenOptions {
+    ///   type_prefix: String::from("T"),
+    ///   generate_to_xml: true,
+    ///   generate_from_xml: true,
+    /// };
+    /// 
+    /// ClassCodeGenerator::write_forward_declerations(
+    ///   &mut writer,
+    ///   &classes,
+    ///   &options,
+    ///   0,
+    /// ).unwrap();
+    /// 
+    /// assert_eq!(
+    ///  writer.to_string(),
+    /// "  {$REGION 'Forward Declarations}\n  TTest = class;\n  {$ENDREGION}\n"
+    /// );
+    /// ```
     pub(crate) fn write_forward_declerations<T: Write>(
         writer: &mut CodeWriter<T>,
         classes: &Vec<ClassType>,
@@ -51,6 +105,20 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
+    /// Generates the class declarations for provided classes.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `writer` - The writer to write the code to.
+    /// * `classes` - The classes to generate the declarations for.
+    /// * `document` - The document class.
+    /// * `type_aliases` - The type aliases.
+    /// * `options` - The code generation options.
+    /// * `indentation` - The indentation level.
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the code generation fails.
     pub(crate) fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         classes: &Vec<ClassType>,
@@ -81,6 +149,19 @@ impl ClassCodeGenerator {
         Ok(())
     }
 
+    /// Generates the class implementations for provided classes.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `writer` - The writer to write the code to.
+    /// * `classes` - The classes to generate the implementations for.
+    /// * `document` - The document class.
+    /// * `type_aliases` - The type aliases.
+    /// * `options` - The code generation options.
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the code generation fails.
     pub(crate) fn write_implementations<T: Write>(
         writer: &mut CodeWriter<T>,
         classes: &Vec<ClassType>,
@@ -109,7 +190,7 @@ impl ClassCodeGenerator {
 
         Ok(())
     }
-
+    
     fn generate_class_declaration<T: Write>(
         writer: &mut CodeWriter<T>,
         class_type: &ClassType,

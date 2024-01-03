@@ -7,9 +7,13 @@ use crate::generator::{
 
 use super::code_writer::CodeWriter;
 
+/// A helper struct to generate the const section of the code.
 pub struct ConstCodeGenerator;
 
 impl ConstCodeGenerator {
+    /// Generate the const section of the code.
+    /// 
+    /// At the moment this only generates the boolean constants.
     pub fn generate<T: Write>(
         writer: &mut CodeWriter<T>,
         classes: &[ClassType],

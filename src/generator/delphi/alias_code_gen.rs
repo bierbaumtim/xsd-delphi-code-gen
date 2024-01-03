@@ -7,9 +7,54 @@ use crate::generator::{
 
 use super::{code_writer::CodeWriter, helper::Helper};
 
+/// Code generator for type aliases
+///
+/// # Example
+///
+/// ## Input
+///
+/// ```rust
+/// use xsd_types::generator::types::{DataType, TypeAlias};
+///
+/// let type_aliases = vec![
+///     TypeAlias {
+///         pattern: None,
+///         name: String::from("CustomString"),
+///         qualified_name: String::from("CustomString"),
+///         for_type: DataType::String,
+///         documentations: Vec::new(),
+///     },
+///     TypeAlias {
+///         pattern: None,
+///         name: String::from("CustomIntList"),
+///         qualified_name: String::from("CustomIntList"),
+///         for_type: DataType::List(Box::new(DataType::Integer)),
+///         documentations: Vec::new(),
+///     },
+/// ];
+/// ```
+///
+/// ## Output
+///
+/// ```pascal
+/// {$REGION 'Aliases'}
+/// // XML Qualified Name: CustomString
+/// TCustomString = String;
+/// // XML Qualified Name: CustomIntList
+/// TCustomIntList = TList<Integer>;
+/// {$ENDREGION}
+/// ```
 pub struct TypeAliasCodeGenerator;
 
 impl TypeAliasCodeGenerator {
+    /// Writes the type aliases to the given writer
+    /// 
+    /// # Arguments
+    /// 
+    /// * `writer` - The writer to write the type aliases to
+    /// * `type_aliases` - The type aliases to write
+    /// * `options` - The code generation options
+    /// * `indentation` - The indentation level
     pub(crate) fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         type_aliases: &[TypeAlias],

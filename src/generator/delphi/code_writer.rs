@@ -32,16 +32,19 @@ impl FunctionModifier {
     }
 }
 
+/// A helper struct to write code to a buffer.
 pub struct CodeWriter<T: Write> {
     pub(crate) buffer: BufWriter<T>,
 }
 
 impl<T: Write> CodeWriter<T> {
+    /// Write a newline to the buffer.
     #[inline]
     pub(crate) fn newline(&mut self) -> Result<(), std::io::Error> {
         self.buffer.write_all(b"\n")
     }
 
+    /// Write a string to the buffer, and optionally indent it.
     #[inline]
     pub(crate) fn write(
         &mut self,
@@ -55,6 +58,7 @@ impl<T: Write> CodeWriter<T> {
         ))
     }
 
+    /// Write a string to the buffer, and optionally indent it followed by a newline.
     pub(crate) fn writeln(
         &mut self,
         content: &str,
@@ -64,6 +68,7 @@ impl<T: Write> CodeWriter<T> {
         self.newline()
     }
 
+    /// Write a string to the buffer, and optionally indent it followed by a newline.
     pub(crate) fn writeln_fmt(
         &mut self,
         content: std::fmt::Arguments<'_>,
@@ -76,6 +81,7 @@ impl<T: Write> CodeWriter<T> {
         self.newline()
     }
 
+    /// Write a string in a documentation comment to the buffer, and optionally indent it.
     pub(crate) fn write_documentation(
         &mut self,
         documentations: &Vec<String>,
@@ -90,6 +96,7 @@ impl<T: Write> CodeWriter<T> {
         Ok(())
     }
 
+    /// Write default constructor delcaration to the buffer, and optionally indent it.
     pub(crate) fn write_default_constructor(
         &mut self,
         modifier: Option<FunctionModifier>,
@@ -111,6 +118,7 @@ impl<T: Write> CodeWriter<T> {
         Ok(())
     }
 
+    /// Write constructor with parameters declaration to the buffer, and optionally indent it.
     pub fn write_constructor(
         &mut self,
         name: &str,
@@ -151,6 +159,7 @@ impl<T: Write> CodeWriter<T> {
         Ok(())
     }
 
+    /// Write destructor declaration to the buffer, and optionally indent it.
     pub(crate) fn write_destructor(
         &mut self,
         indentation: Option<usize>,
@@ -158,6 +167,16 @@ impl<T: Write> CodeWriter<T> {
         self.writeln("destructor Destroy; override;", indentation)
     }
 
+    /// Write function declaration to the buffer, and optionally indent it.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `f_type` - The type of the function.
+    /// * `name` - The name of the function.
+    /// * `parameters` - The parameters of the function.
+    /// * `is_class_function` - Whether the function is a class function.
+    /// * `modifiers` - The modifiers of the function.
+    /// * `indentation` - The indentation of the function.
     pub(crate) fn write_function_declaration(
         &mut self,
         f_type: FunctionType,
@@ -215,6 +234,15 @@ impl<T: Write> CodeWriter<T> {
         Ok(())
     }
 
+    /// Write a variable initialization to the buffer, and optionally indent it.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the variable.
+    /// * `type_name` - The type of the variable.
+    /// * `is_required` - Whether the variable is required.
+    /// * `is_value_type` - Whether the variable is a value type.
+    /// * `indentation` - The indentation of the variable.
     pub(crate) fn write_variable_initialization(
         &mut self,
         name: &str,

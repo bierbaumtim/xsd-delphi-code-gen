@@ -10,11 +10,59 @@ use super::{
     helper::Helper,
 };
 
+/// Code generator for union types.
+/// 
+/// # Example
+/// 
+/// ## Input
+/// 
+/// ```rust
+/// use xsd_types::generator::types::{DataType, UnionType, UnionTypeVariant};
+/// 
+/// let union_type = UnionType {
+///   name: "UnionType".to_string(),
+///   qualified_name: "UnionType".to_string(),
+///   variants: vec![
+///     UnionTypeVariant {
+///       name: "Variant1".to_string(),
+///       data_type: DataType::Boolean,
+///     },
+///     UnionTypeVariant {
+///       name: "Variant2".to_string(),
+///       data_type: DataType::String,
+///     },
+///   ],
+/// };
+/// ```
+/// 
+/// ## Output
+/// 
+/// ```delphi
+/// {$REGION 'Union Types'}
+/// /// <summary>
+/// /// UnionType
+/// /// </summary>
+/// type TUnionType = record
+///   type Variants = (Variant1, Variant2);
+///   
+///   case Variant: Variants of
+///     Variant1: (Variant1: Boolean);
+///     Variant2: (Variant2: string[255]);
+/// end;
+/// {$ENDREGION}
+/// 
+/// {$REGION 'Union Types Helper'}
+/// type TUnionTypeHelper = record helper for TUnionType
+/// 
+/// end;
+/// {$ENDREGION}
+/// ```
 pub struct UnionTypeCodeGenerator {}
 
 impl UnionTypeCodeGenerator {
     const ENUM_NAME: &'static str = "Variants";
 
+    /// Generate the declaration of the union types and their helper types.
     pub fn write_declarations<T: Write>(
         writer: &mut CodeWriter<T>,
         union_types: &[UnionType],
@@ -50,6 +98,7 @@ impl UnionTypeCodeGenerator {
         Ok(())
     }
 
+    /// Generate the implementation of the union types and their helper types.
     pub fn write_implementations<T: Write>(
         writer: &mut CodeWriter<T>,
         union_types: &[UnionType],
@@ -81,6 +130,7 @@ impl UnionTypeCodeGenerator {
         Ok(())
     }
 
+    /// Generate the declaration of the union type.
     fn generate_declaration<T: Write>(
         writer: &mut CodeWriter<T>,
         union_type: &UnionType,
@@ -205,6 +255,7 @@ impl UnionTypeCodeGenerator {
         Ok(())
     }
 
+    /// Generate the declaration of the union type helper.
     fn generate_helper_declaration<T: Write>(
         writer: &mut CodeWriter<T>,
         union_type: &UnionType,
@@ -246,6 +297,7 @@ impl UnionTypeCodeGenerator {
         Ok(())
     }
 
+    /// Generate the implementation of the union type helper.
     fn generate_helper_implementation<T: Write>(
         writer: &mut CodeWriter<T>,
         union_type: &UnionType,
