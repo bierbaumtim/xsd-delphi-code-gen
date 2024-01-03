@@ -149,6 +149,135 @@ impl EnumCodeGenerator {
         Ok(())
     }
 
+    /// Generates implementations the enumeration helper types.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `writer` - The writer to write the declarations to.
+    /// * `enumerations` - The enumerations to generate.
+    /// * `options` - The code generation options.
+    /// 
+    /// /// # Example
+    /// 
+    /// ```
+    /// use std::io::BufWriter;
+    /// 
+    /// use xsd_parser::generator::{
+    ///    code_generator_trait::CodeGenOptions,
+    ///   types::{Enumeration, EnumerationValue},
+    /// };
+    /// 
+    /// use xsd_parser::generator::delphi::code_writer::CodeWriter;
+    /// use xsd_parser::generator::delphi::enum_code_gen::EnumCodeGenerator;
+    /// 
+    /// let enumerations = vec![
+    ///   Enumeration {
+    ///     name: "ItemStatus".to_owned(),
+    ///     qualified_name: "ItemStatus".to_owned(),
+    ///     documentations: vec![],
+    ///     values: vec![
+    ///       EnumerationValue {
+    ///         variant_name: "open".to_owned(),
+    ///         xml_value: "o".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "closed".to_owned(),
+    ///         xml_value: "c".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "unknown".to_owned(),
+    ///         xml_value: "u".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///     ],
+    ///   },
+    ///   Enumeration {
+    ///     name: "Fontsize".to_owned(),
+    ///     qualified_name: "Fontsize".to_owned(),
+    ///     documentations: vec![],
+    ///     values: vec![
+    ///       EnumerationValue {
+    ///         variant_name: "small".to_owned(),
+    ///         xml_value: "s".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "medium".to_owned(),
+    ///         xml_value: "m".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///       EnumerationValue {
+    ///         variant_name: "large".to_owned(),
+    ///         xml_value: "l".to_owned(),
+    ///         documentations: vec![],
+    ///       },
+    ///     ],
+    ///   },
+    /// ];
+    /// 
+    /// let options = CodeGenOptions {
+    /// generate_from_xml: true,
+    /// generate_to_xml: true,
+    /// ..Default::default()
+    /// };
+    /// 
+    /// let buffer = BufWriter::new(Vec::new());
+    /// let mut writer = CodeWriter { buffer };
+    /// EnumCodeGenerator::write_implementation(&mut writer, &enumerations, &options).unwrap();
+    /// 
+    /// let bytes = writer.get_writer().unwrap().clone();
+    /// let content = String::from_utf8(bytes).unwrap();
+    /// 
+    /// let expected = "{$REGION 'Enumerations Helper'}\n\
+    ///            class function TItemStatusHelper.FromXmlValue(const pXmlValue: String): TItemStatus;\n\
+    ///            begin\n  \
+    ///              if pXmlValue = 'o' then begin\n    \
+    ///                Result := TItemStatus.isOpen;\n  \
+    ///              end else if pXmlValue = 'c' then begin\n    \
+    ///                Result := TItemStatus.isClosed;\n  \
+    ///              end else if pXmlValue = 'u' then begin\n    \
+    ///                Result := TItemStatus.isUnknown;\n  \
+    ///              end else begin\n    \
+    ///                raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for TItemStatus');\n  \
+    ///              end;\n\
+    ///            end;\n\
+    ///            \n\
+    ///            function TItemStatusHelper.ToXmlValue: String;\n\
+    ///            begin\n  \
+    ///              case Self of\n    \
+    ///                TItemStatus.isOpen    : Result := 'o';\n    \
+    ///                TItemStatus.isClosed  : Result := 'c';\n    \
+    ///                TItemStatus.isUnknown : Result := 'u';\n  \
+    ///              end;\n\
+    ///            end;\n\
+    ///            \n\
+    ///            class function TFontsizeHelper.FromXmlValue(const pXmlValue: String): TFontsize;\n\
+    ///            begin\n  \
+    ///              if pXmlValue = 's' then begin\n    \
+    ///                Result := TFontsize.fSmall;\n  \
+    ///              end else if pXmlValue = 'm' then begin\n    \
+    ///                Result := TFontsize.fMedium;\n  \
+    ///              end else if pXmlValue = 'l' then begin\n    \
+    ///                Result := TFontsize.fLarge;\n  \
+    ///              end else begin\n    \
+    ///                raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for TFontsize');\n  \
+    ///              end;\n\
+    ///            end;\n\
+    ///            \n\
+    ///            function TFontsizeHelper.ToXmlValue: String;\n\
+    ///            begin\n  \
+    ///              case Self of\n    \
+    ///                TFontsize.fSmall  : Result := 's';\n    \
+    ///                TFontsize.fMedium : Result := 'm';\n    \
+    ///                TFontsize.fLarge  : Result := 'l';\n  \
+    ///              end;\n\
+    ///            end;\n\
+    ///            {$ENDREGION}\n";
+    /// 
+    /// assert_eq!(content, expected);
+    /// ```
     pub fn write_implementation<T: Write>(
         writer: &mut CodeWriter<T>,
         enumerations: &Vec<Enumeration>,

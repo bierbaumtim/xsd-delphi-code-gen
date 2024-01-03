@@ -5,6 +5,7 @@ use std::{
 
 use super::internal_representation::InternalRepresentation;
 
+/// Trait for code generators
 pub trait CodeGenerator<T: Write> {
     fn new(
         buffer: BufWriter<T>,
@@ -16,19 +17,31 @@ pub trait CodeGenerator<T: Write> {
     fn generate(&mut self) -> Result<(), CodeGenError>;
 }
 
+/// Options for the code generator
 #[derive(Debug, Default)]
 pub struct CodeGenOptions {
+    /// Generate the `from_xml` function
     pub generate_from_xml: bool,
+
+    /// Generate the `to_xml` function
     pub generate_to_xml: bool,
+
+    /// The name of the unit
     pub unit_name: String,
+
+    /// The prefix for the type
     pub type_prefix: Option<String>,
 }
 
+/// Errors that can occur during code generation
 pub enum CodeGenError {
     IOError(std::io::Error),
     ComplexTypeInSimpleTypeNotAllowed(String, String),
+    /// A required data type is missing
     MissingDataType(String, String),
+    /// A fixed size list inside of a fixed size list is not supported
     NestedFixedSizeList(String, String),
+    /// A list inside of a fixed size list is not supported
     NestedListInFixedSizeList(String, String),
 }
 

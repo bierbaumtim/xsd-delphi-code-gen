@@ -1,6 +1,8 @@
 use std::{error::Error, fmt::Display};
 
+/// xsd value for unbounded occurance is represented as -1
 pub const UNBOUNDED_OCCURANCE: i64 = -1;
+/// xsd default occurance is 1
 pub const DEFAULT_OCCURANCE: i64 = 1;
 
 #[derive(Debug)]
@@ -122,7 +124,7 @@ pub struct SimpleType {
     /// namespace + name
     pub qualified_name: String,
 
-    /// Documentation
+    /// Documentation extracted from xs:annotation
     pub documentations: Vec<String>,
 
     pub base_type: Option<NodeType>,
@@ -153,7 +155,7 @@ pub struct ComplexType {
     /// namespace + name
     pub qualified_name: String,
 
-    /// Documentation
+    /// Documentation extracted from xs:annotation
     pub documentations: Vec<String>,
 
     /// qualified name of another complex type

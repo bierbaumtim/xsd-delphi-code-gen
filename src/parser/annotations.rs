@@ -4,9 +4,13 @@ use quick_xml::{events::Event, Reader};
 
 use super::types::ParserError;
 
+/// Parser for xs:annotation elements
 pub struct AnnotationsParser;
 
 impl AnnotationsParser {
+    /// Parses the content of an xs:annotation element
+    /// 
+    /// Has support for xs:appinfo and xs:documentation elements
     pub fn parse(reader: &mut Reader<BufReader<File>>) -> Result<Vec<String>, ParserError> {
         let mut values = Vec::new();
         let mut buf = Vec::new();

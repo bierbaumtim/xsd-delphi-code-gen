@@ -9,6 +9,7 @@ use super::types::{BaseAttributes, NodeBaseType, NodeType, ParserError};
 pub struct XmlParserHelper;
 
 impl XmlParserHelper {
+    /// Converts a base type string to a node type
     pub fn base_type_str_to_node_type(base_type: &str) -> Option<NodeType> {
         match base_type {
             "xs:base64Binary" => Some(NodeType::Standard(NodeBaseType::Base64Binary)),
@@ -39,6 +40,11 @@ impl XmlParserHelper {
         }
     }
 
+    /// Returns the value of the attribute with the given name
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the attribute is missing or malformed
     pub fn get_attribute_value(node: &BytesStart, name: &str) -> Result<String, ParserError> {
         node.attributes()
             .find(|a| a.as_ref().is_ok_and(|v| v.key.0 == name.as_bytes()))
@@ -59,6 +65,7 @@ impl XmlParserHelper {
             .and_then(|r| r)
     }
 
+    /// Parses the base attributes of a node
     pub fn get_base_attributes(node: &BytesStart) -> Result<BaseAttributes, ParserError> {
         let min_occurs = Self::get_occurance_value(node, "minOccurs")?;
         let max_occurs = Self::get_occurance_value(node, "maxOccurs")?;
@@ -69,6 +76,7 @@ impl XmlParserHelper {
         })
     }
 
+    /// Parses the occurance value of an attribute
     pub fn get_occurance_value(node: &BytesStart, name: &str) -> Result<Option<i64>, ParserError> {
         #![allow(clippy::redundant_closure_for_method_calls)]
         let value = Self::get_attribute_value(node, name)

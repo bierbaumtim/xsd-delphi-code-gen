@@ -14,6 +14,38 @@ use super::{
     union_type_code_gen::UnionTypeCodeGenerator,
 };
 
+
+/// The Delphi code generator.
+/// 
+/// This struct is used to generate Delphi code from the internal representation.
+/// 
+/// # Example
+/// 
+/// ```rust
+/// use std::io::BufWriter;
+/// 
+/// use xsd_codegen::generator::{
+///     code_generator_trait::CodeGenOptions,
+///     internal_representation::InternalRepresentation,
+///     delphi::DelphiCodeGenerator,
+/// };
+/// 
+/// let options = CodeGenOptions {
+///     unit_name: "TestUnit".to_string(),
+///     ..CodeGenOptions::default()
+/// };
+/// 
+/// let internal_representation = InternalRepresentation::default();
+/// 
+/// let mut code_generator = DelphiCodeGenerator::new(
+///     BufWriter::new(Vec::new()),
+///     options,
+///     internal_representation,
+///     Vec::new(),
+/// );
+/// 
+/// code_generator.generate().unwrap();
+/// ```
 pub struct DelphiCodeGenerator<T: Write> {
     writer: CodeWriter<T>,
     options: CodeGenOptions,

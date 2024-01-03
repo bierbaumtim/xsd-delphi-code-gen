@@ -190,7 +190,7 @@ impl ClassCodeGenerator {
 
         Ok(())
     }
-    
+
     fn generate_class_declaration<T: Write>(
         writer: &mut CodeWriter<T>,
         class_type: &ClassType,

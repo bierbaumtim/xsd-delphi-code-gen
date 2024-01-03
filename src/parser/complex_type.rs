@@ -15,9 +15,19 @@ use super::{
     xml::XmlParser,
 };
 
+/// Parser for xs:complexType elements
 pub struct ComplexTypeParser;
 
 impl ComplexTypeParser {
+    /// Parses a xs:complexType element into a ComplexType representation
+    /// 
+    /// # Arguments
+    /// 
+    /// * `reader` - Reader for the input file
+    /// * `registry` - TypeRegistry to register new types
+    /// * `xml_parser` - XmlParser to resolve namespaces
+    /// * `name` - Name of the complex type
+    /// * `qualified_parent` - Qualified name of the parent type. Important for nested types
     pub fn parse(
         reader: &mut Reader<BufReader<File>>,
         registry: &mut TypeRegistry,

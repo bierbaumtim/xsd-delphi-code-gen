@@ -13,23 +13,27 @@ where
     fn key_and_deps(&self) -> (&K, Option<Vec<K>>);
 }
 
-// Dependency Graph for Types
-
-// CustomNumber
-// Alias1 -> Alias2 -> CustomNumber
-// Alias3 -> CustomNumber
-// Alias4 -> Alias1
-// Alias5 -> Alias1
-// => Tree
-//                Alias4   Alias5
-//                   \      /
-//                    Alias1
-//                  /       \
-//      Alias3   Alias2   Alias6
-//          \   /
-//           CustomNumber
-// => List
-// CustomNumber, Alias3, Alias2, Alias1, Alias4, Alias5
+/// Dependency Graph for Types
+/// 
+/// # Example
+/// 
+/// ```
+/// CustomNumber
+/// Alias1 -> Alias2 -> CustomNumber
+/// Alias3 -> CustomNumber
+/// Alias4 -> Alias1
+/// Alias5 -> Alias1
+/// => Tree
+///            Alias4   Alias5
+///               \      /
+///                Alias1
+///              /       \
+///  Alias3   Alias2   Alias6
+///      \   /
+///       CustomNumber
+/// => List
+/// CustomNumber, Alias3, Alias2, Alias1, Alias4, Alias5
+/// ```
 
 pub struct DependencyGraph<K, T>
 where
@@ -68,6 +72,7 @@ where
         }
     }
 
+    /// Adds an item to the dependency graph
     pub fn push(&mut self, item: T) {
         let mut node = Node::empty(item);
 
@@ -96,6 +101,7 @@ where
         self.dependencies.insert(item_key.clone(), node);
     }
 
+    /// Returns a list of the items of the dependency graph sorted by their dependencies
     pub fn get_sorted_elements(&self) -> Vec<T> {
         let mut unique = HashSet::new();
 
