@@ -8,10 +8,8 @@ build = "build.rs"
 
 [dependencies]
 clap = { version = "4.3.14", features = ["derive"] }
-# crossterm = "0.27.0"
-quick-xml = "0.30.0"
+quick-xml = "0.31.0"
 unicode-segmentation = "1.10.1"
-# ratatui = { version = "0.22.0", features = ["all-widgets"] }
 chrono = "0.4.26"
 
 [dev-dependencies]
