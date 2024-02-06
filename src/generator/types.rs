@@ -74,9 +74,6 @@ pub struct ClassType {
     pub super_type: Option<(String, String)>,
     pub variables: Vec<Variable>,
     pub documentations: Vec<String>,
-    // local_types: Vec<ClassType>,
-    // type_aliases: Vec<TypeAlias>,
-    // enumerations: Vec<Enumeration>,
 }
 
 #[derive(Clone, Debug)]
