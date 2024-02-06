@@ -20,9 +20,9 @@ pub struct ComplexTypeParser;
 
 impl ComplexTypeParser {
     /// Parses a xs:complexType element into a ComplexType representation
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `reader` - Reader for the input file
     /// * `registry` - TypeRegistry to register new types
     /// * `xml_parser` - XmlParser to resolve namespaces
@@ -65,7 +65,10 @@ impl ComplexTypeParser {
 
                         match s.name().as_ref() {
                             b"xs:all" => order = OrderIndicator::All,
-                            b"xs:choice" => order = OrderIndicator::Choice,
+                            b"xs:choice" => {
+                                let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
+                                order = OrderIndicator::Choice(base_attributes);
+                            }
                             b"xs:sequence" => order = OrderIndicator::Sequence,
                             _ => (),
                         }

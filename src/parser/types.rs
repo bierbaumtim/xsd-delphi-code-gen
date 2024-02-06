@@ -169,7 +169,7 @@ pub struct ComplexType {
 #[derive(Debug)]
 pub enum OrderIndicator {
     All,
-    Choice,
+    Choice(BaseAttributes),
     Sequence,
 }
 
