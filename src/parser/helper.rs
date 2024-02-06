@@ -28,6 +28,7 @@ impl XmlParserHelper {
             "xs:nonNegativeInteger"
             | "xs:negativeInteger"
             | "xs:int"
+            | "xs:integer"
             | "xs:positiveInteger"
             | "xs:nonPositiveInteger" => Some(NodeType::Standard(NodeBaseType::Integer)),
             "xs:long" => Some(NodeType::Standard(NodeBaseType::Long)),
@@ -41,9 +42,9 @@ impl XmlParserHelper {
     }
 
     /// Returns the value of the attribute with the given name
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the attribute is missing or malformed
     pub fn get_attribute_value(node: &BytesStart, name: &str) -> Result<String, ParserError> {
         node.attributes()
