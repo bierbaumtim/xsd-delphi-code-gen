@@ -68,6 +68,9 @@ pub fn build_class_type_ir(
                 .min_occurs
                 .unwrap_or(DEFAULT_OCCURANCE)
                 .clamp(0, 1),
+            OrderIndicator::Choice(base_attributes) => {
+                base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE)
+            }
             _ => child
                 .base_attributes
                 .min_occurs
@@ -79,10 +82,18 @@ pub fn build_class_type_ir(
                 .max_occurs
                 .unwrap_or(DEFAULT_OCCURANCE)
                 .clamp(0, 1),
+            OrderIndicator::Choice(base_attributes) => {
+                base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE)
+            }
             _ => child
                 .base_attributes
                 .max_occurs
                 .unwrap_or(DEFAULT_OCCURANCE),
+        };
+
+        let required = match &ct.order {
+            OrderIndicator::Choice(_) => false,
+            _ => min_occurs > 0,
         };
 
         match &child.node_type {
@@ -106,7 +117,7 @@ pub fn build_class_type_ir(
                     xml_name: child.name.clone(),
                     requires_free: matches!(d_type, DataType::List(_) | DataType::Uri),
                     data_type: d_type,
-                    required: min_occurs > 0,
+                    required,
                 };
 
                 variables.push(variable);
@@ -156,7 +167,7 @@ pub fn build_class_type_ir(
                                 DataType::List(_) | DataType::InlineList(_) | DataType::Uri
                             ),
                         data_type,
-                        required: min_occurs > 0,
+                        required,
                     };
 
                     variables.push(variable);
