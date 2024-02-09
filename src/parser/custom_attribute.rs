@@ -11,10 +11,7 @@ use super::{
     annotations::AnnotationsParser,
     helper::XmlParserHelper,
     simple_type::SimpleTypeParser,
-    types::{
-        BaseAttributes, ComplexType, CustomAttribute, CustomTypeDefinition, Node, NodeType,
-        OrderIndicator, ParserError,
-    },
+    types::{CustomAttribute, NodeType, ParserError},
     xml::XmlParser,
 };
 
@@ -38,13 +35,6 @@ impl CustomAttributeParser {
             |v| format!("{v}.{name}"),
         );
 
-        let b_type = XmlParserHelper::get_attribute_value(start, "type")?;
-        let b_type = xml_parser.resolve_namespace(b_type)?;
-
-        let Some(node_type) = XmlParserHelper::base_type_str_to_node_type(b_type.as_str()) else {
-            return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
-        };
-
         let default_value = match XmlParserHelper::get_attribute_value(start, "default") {
             Ok(v) => Some(v),
             Err(ParserError::MissingAttribute(_)) => None,
@@ -57,25 +47,39 @@ impl CustomAttributeParser {
             Err(e) => return Err(e),
         };
 
-        let use_value = match XmlParserHelper::get_attribute_value(start, "use") {
-            Ok(v) => v,
-            Err(ParserError::MissingAttribute(_)) => String::from("optional"),
+        let required = match XmlParserHelper::get_attribute_value(start, "use") {
+            Ok(v) => v == "required",
+            Err(ParserError::MissingAttribute(_)) => false,
             Err(e) => return Err(e),
         };
 
-        let required = use_value == "required";
+        let mut node_type = None::<NodeType>;
 
         if has_content {
             let mut buf = Vec::new();
 
             loop {
                 match reader.read_event_into(&mut buf) {
-                    Ok(Event::Start(e)) => {
-                        if e.name().as_ref() == b"xs:annotation" {
+                    Ok(Event::Start(e)) => match e.name().as_ref() {
+                        b"xs:annotation" => {
                             let mut values = AnnotationsParser::parse(reader)?;
                             documentations.append(&mut values);
                         }
-                    }
+                        b"xs:simpleType" => {
+                            let s_type = SimpleTypeParser::parse(
+                                reader,
+                                registry,
+                                xml_parser,
+                                name.clone(),
+                                Some(qualified_name.clone()),
+                            )?;
+
+                            registry.register_type(s_type.into());
+
+                            node_type = Some(NodeType::Custom(qualified_name.clone()));
+                        }
+                        _ => (),
+                    },
                     Ok(Event::End(e)) => {
                         if e.name().as_ref() == b"xs:attribute" {
                             break;
@@ -90,6 +94,16 @@ impl CustomAttributeParser {
                 buf.clear();
             }
         }
+
+        let node_type = match node_type {
+            Some(v) => v,
+            None => XmlParserHelper::get_attribute_value(start, "type")
+                .and_then(|v| xml_parser.resolve_namespace(v))
+                .and_then(|v| {
+                    XmlParserHelper::base_type_str_to_node_type(v.as_str())
+                        .ok_or(ParserError::MissingOrNotSupportedBaseType(v))
+                })?,
+        };
 
         Ok(CustomAttribute {
             name,
