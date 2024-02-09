@@ -6,6 +6,7 @@ use crate::type_registry::TypeRegistry;
 
 use super::{
     annotations::AnnotationsParser,
+    custom_attribute::CustomAttributeParser,
     helper::XmlParserHelper,
     simple_type::SimpleTypeParser,
     types::{
@@ -36,6 +37,7 @@ impl ComplexTypeParser {
         qualified_parent: Option<String>,
     ) -> Result<ComplexType, ParserError> {
         let mut children = Vec::new();
+        let mut custom_attributes = Vec::new();
         let mut buf = Vec::new();
         let mut is_in_compositor = false;
         let mut extends_existing_type = false;
@@ -172,10 +174,22 @@ impl ComplexTypeParser {
                         let mut values = AnnotationsParser::parse(reader)?;
                         annotations.append(&mut values);
                     }
+                    b"xs:attribute" => {
+                        let attr = CustomAttributeParser::parse(
+                            reader,
+                            registry,
+                            xml_parser,
+                            Some(qualified_name.clone()),
+                            &s,
+                            true,
+                        )?;
+
+                        custom_attributes.push(attr);
+                    }
                     _ => (),
                 },
-                Ok(Event::Empty(e)) => {
-                    if e.name().as_ref() == b"xs:element" {
+                Ok(Event::Empty(e)) => match e.name().as_ref() {
+                    b"xs:element" => {
                         let name = XmlParserHelper::get_attribute_value(&e, "name")?;
                         let b_type = XmlParserHelper::get_attribute_value(&e, "type")?;
                         let b_type = xml_parser.resolve_namespace(b_type)?;
@@ -192,7 +206,20 @@ impl ComplexTypeParser {
 
                         children.push(node);
                     }
-                }
+                    b"xs:attribute" => {
+                        let attr = CustomAttributeParser::parse(
+                            reader,
+                            registry,
+                            xml_parser,
+                            Some(qualified_name.clone()),
+                            &e,
+                            false,
+                        )?;
+
+                        custom_attributes.push(attr);
+                    }
+                    _ => (),
+                },
                 Ok(Event::End(e)) => match e.name().as_ref() {
                     b"xs:complexType" => break,
                     b"xs:element" => current_element = None,
@@ -212,6 +239,7 @@ impl ComplexTypeParser {
             qualified_name,
             base_type,
             children,
+            custom_attributes,
             order,
             documentations: annotations,
         })
