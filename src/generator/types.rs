@@ -43,6 +43,12 @@ pub enum BinaryEncoding {
     Base64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum XMLSource {
+    Element,
+    Attribute,
+}
+
 #[derive(Clone, Debug)]
 pub struct Enumeration {
     pub name: String,
@@ -83,6 +89,9 @@ pub struct Variable {
     pub xml_name: String,
     pub requires_free: bool,
     pub required: bool,
+    pub source: XMLSource,
+    pub default_value: Option<String>,
+    pub is_const: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -168,9 +168,9 @@ impl<T: Write> CodeWriter<T> {
     }
 
     /// Write function declaration to the buffer, and optionally indent it.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `f_type` - The type of the function.
     /// * `name` - The name of the function.
     /// * `parameters` - The parameters of the function.
@@ -235,9 +235,9 @@ impl<T: Write> CodeWriter<T> {
     }
 
     /// Write a variable initialization to the buffer, and optionally indent it.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `name` - The name of the variable.
     /// * `type_name` - The type of the variable.
     /// * `is_required` - Whether the variable is required.
@@ -249,20 +249,22 @@ impl<T: Write> CodeWriter<T> {
         type_name: &str,
         is_required: bool,
         is_value_type: bool,
+        default_value: Option<String>,
         indentation: Option<usize>,
     ) -> Result<(), std::io::Error> {
-        match (is_required, is_value_type) {
-            (false, false) => self.writeln_fmt(format_args!("{name} := nil;"), indentation)?,
-            (false, true) => self.writeln_fmt(
+        match (is_required, is_value_type, default_value) {
+            (false, false, _) => self.writeln_fmt(format_args!("{name} := nil;"), indentation)?,
+            (false, true, None) => self.writeln_fmt(
                 format_args!("{name} := TNone<{type_name}>.Create;"),
                 indentation,
             )?,
-            (true, false) => {
+            (true, false, _) => {
                 self.writeln_fmt(format_args!("{name} := {type_name}.Create;"), indentation)?;
             }
-            (true, true) => {
+            (true, true, None) => {
                 self.writeln_fmt(format_args!("{name} := Default({type_name});"), indentation)?;
             }
+            (_, true, Some(v)) => self.writeln_fmt(format_args!("{name} := {v};"), indentation)?,
         }
 
         Ok(())
