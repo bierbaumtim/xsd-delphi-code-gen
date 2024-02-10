@@ -12,7 +12,7 @@ pub struct ConstCodeGenerator;
 
 impl ConstCodeGenerator {
     /// Generate the const section of the code.
-    /// 
+    ///
     /// At the moment this only generates the boolean constants.
     pub fn generate<T: Write>(
         writer: &mut CodeWriter<T>,

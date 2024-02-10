@@ -1,5 +1,5 @@
 use crate::{
-    generator::types::{ClassType, DataType, Variable},
+    generator::types::{ClassType, DataType, Variable, XMLSource},
     parser::types::{
         CustomTypeDefinition, NodeType, OrderIndicator, DEFAULT_OCCURANCE, UNBOUNDED_OCCURANCE,
     },
@@ -118,6 +118,9 @@ pub fn build_class_type_ir(
                     requires_free: matches!(d_type, DataType::List(_) | DataType::Uri),
                     data_type: d_type,
                     required,
+                    default_value: None,
+                    is_const: false,
+                    source: XMLSource::Element,
                 };
 
                 variables.push(variable);
@@ -168,6 +171,75 @@ pub fn build_class_type_ir(
                             ),
                         data_type,
                         required,
+                        default_value: None,
+                        is_const: false,
+                        source: XMLSource::Element,
+                    };
+
+                    variables.push(variable);
+                }
+            }
+        }
+    }
+
+    for attr in &ct.custom_attributes {
+        match &attr.base_type {
+            NodeType::Standard(s) => {
+                let d_type = node_base_type_to_datatype(s);
+
+                let variable = Variable {
+                    name: attr.name.clone(),
+                    xml_name: attr.name.clone(),
+                    requires_free: matches!(
+                        d_type,
+                        DataType::List(_) | DataType::InlineList(_) | DataType::Uri
+                    ),
+                    data_type: d_type,
+                    required: attr.required,
+                    is_const: attr.fixed_value.is_some(),
+                    default_value: attr.fixed_value.clone().or(attr.default_value.clone()),
+                    source: XMLSource::Attribute,
+                };
+
+                variables.push(variable);
+            }
+            NodeType::Custom(c) => {
+                let c_type = registry.types.get(c);
+
+                if let Some(c_type) = c_type {
+                    let data_type = match c_type {
+                        CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
+                            DataType::Enumeration(s.name.clone())
+                        }
+                        CustomTypeDefinition::Simple(s)
+                            if s.base_type.is_some() || s.list_type.is_some() =>
+                        {
+                            DataType::Alias(s.name.clone())
+                        }
+                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                            DataType::Union(s.name.clone())
+                        }
+                        _ => DataType::Custom(c_type.get_name()),
+                    };
+
+                    let requires_free = match c_type {
+                        CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                        CustomTypeDefinition::Complex(_) => true,
+                    };
+
+                    let variable = Variable {
+                        name: attr.name.clone(),
+                        xml_name: attr.name.clone(),
+                        requires_free: requires_free
+                            || matches!(
+                                data_type,
+                                DataType::List(_) | DataType::InlineList(_) | DataType::Uri
+                            ),
+                        data_type,
+                        required: attr.required,
+                        is_const: attr.fixed_value.is_some(),
+                        default_value: attr.fixed_value.clone().or(attr.default_value.clone()),
+                        source: XMLSource::Attribute,
                     };
 
                     variables.push(variable);

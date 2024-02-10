@@ -13,7 +13,7 @@ use crate::{
 
 pub use super::{
     dependency_graph::DependencyGraph,
-    types::{ClassType, DataType, Enumeration, TypeAlias, UnionType, Variable},
+    types::{ClassType, DataType, Enumeration, TypeAlias, UnionType, Variable, XMLSource},
 };
 
 /// The name of the document class type.
@@ -260,6 +260,9 @@ impl InternalRepresentation {
                             CustomTypeDefinition::Complex(_) => true,
                         }),
                     },
+                    default_value: None,
+                    is_const: false,
+                    source: XMLSource::Element,
                 }
             })
             .collect::<Vec<Variable>>()

@@ -178,7 +178,7 @@ enum CodeGenMode {
 
     /// Generate only code for type to xml conversion
     ToXml,
-    
+
     /// Generate only code for xml to type conversion
     FromXml,
 }

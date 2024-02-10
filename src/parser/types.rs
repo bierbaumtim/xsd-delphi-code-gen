@@ -162,6 +162,8 @@ pub struct ComplexType {
     pub base_type: Option<String>,
     /// elements of the complex type
     pub children: Vec<Node>,
+    /// custom attributes of the complex type
+    pub custom_attributes: Vec<CustomAttribute>,
     /// order of elements
     pub order: OrderIndicator,
 }
@@ -171,6 +173,29 @@ pub enum OrderIndicator {
     All,
     Choice(BaseAttributes),
     Sequence,
+}
+
+/// xs:attribute
+#[derive(Debug)]
+pub struct CustomAttribute {
+    /// name-attribute
+    pub name: String,
+    /// namespace + name
+    pub qualified_name: String,
+
+    /// Documentation extracted from xs:annotation
+    pub documentations: Vec<String>,
+
+    pub base_type: NodeType,
+
+    /// default value for the attribute
+    pub default_value: Option<String>,
+
+    /// const value for the attribute
+    pub fixed_value: Option<String>,
+
+    /// use-attribute (required or optional)
+    pub required: bool,
 }
 
 #[derive(Debug, Clone)]

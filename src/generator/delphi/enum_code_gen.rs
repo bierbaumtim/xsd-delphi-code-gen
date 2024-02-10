@@ -12,27 +12,27 @@ pub struct EnumCodeGenerator;
 
 impl EnumCodeGenerator {
     /// Generates declarations for enumerations and their helper types.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `writer` - The writer to write the declarations to.
     /// * `enumerations` - The enumerations to generate.
     /// * `options` - The code generation options.
     /// * `indentation` - The indentation level.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use std::io::BufWriter;
-    /// 
+    ///
     /// use xsd_parser::generator::{
     ///    code_generator_trait::CodeGenOptions,
     ///   types::{Enumeration, EnumerationValue},
     /// };
-    /// 
+    ///
     /// use xsd_parser::generator::delphi::code_writer::CodeWriter;
     /// use xsd_parser::generator::delphi::enum_code_gen::EnumCodeGenerator;
-    /// 
+    ///
     /// let enumerations = vec![
     ///   Enumeration {
     ///     name: "ItemStatus".to_owned(),
@@ -79,20 +79,20 @@ impl EnumCodeGenerator {
     ///     ],
     ///   },
     /// ];
-    /// 
+    ///
     /// let options = CodeGenOptions {
     /// generate_from_xml: true,
     /// generate_to_xml: true,
     /// ..Default::default()
     /// };
-    /// 
+    ///
     /// let buffer = BufWriter::new(Vec::new());
     /// let mut writer = CodeWriter { buffer };
     /// EnumCodeGenerator::write_declarations(&mut writer, &enumerations, &options, 2).unwrap();
-    /// 
+    ///
     /// let bytes = writer.get_writer().unwrap().clone();
     /// let content = String::from_utf8(bytes).unwrap();
-    /// 
+    ///
     /// let expected = "  {$REGION 'Enumerations'}\n  \
     ///             // XML Qualified Name: ItemStatus\n  \
     ///             TItemStatus = (isOpen, isClosed, isUnknown);\n\
@@ -112,7 +112,7 @@ impl EnumCodeGenerator {
     ///             function ToXmlValue: String;\n  \
     ///             end;\n  \
     ///             {$ENDREGION}\n";
-    /// 
+    ///
     /// assert_eq!(content, expected);
     /// ```
     pub fn write_declarations<T: Write>(
@@ -150,26 +150,26 @@ impl EnumCodeGenerator {
     }
 
     /// Generates implementations the enumeration helper types.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `writer` - The writer to write the declarations to.
     /// * `enumerations` - The enumerations to generate.
     /// * `options` - The code generation options.
-    /// 
+    ///
     /// /// # Example
-    /// 
+    ///
     /// ```
     /// use std::io::BufWriter;
-    /// 
+    ///
     /// use xsd_parser::generator::{
     ///    code_generator_trait::CodeGenOptions,
     ///   types::{Enumeration, EnumerationValue},
     /// };
-    /// 
+    ///
     /// use xsd_parser::generator::delphi::code_writer::CodeWriter;
     /// use xsd_parser::generator::delphi::enum_code_gen::EnumCodeGenerator;
-    /// 
+    ///
     /// let enumerations = vec![
     ///   Enumeration {
     ///     name: "ItemStatus".to_owned(),
@@ -216,20 +216,20 @@ impl EnumCodeGenerator {
     ///     ],
     ///   },
     /// ];
-    /// 
+    ///
     /// let options = CodeGenOptions {
     /// generate_from_xml: true,
     /// generate_to_xml: true,
     /// ..Default::default()
     /// };
-    /// 
+    ///
     /// let buffer = BufWriter::new(Vec::new());
     /// let mut writer = CodeWriter { buffer };
     /// EnumCodeGenerator::write_implementation(&mut writer, &enumerations, &options).unwrap();
-    /// 
+    ///
     /// let bytes = writer.get_writer().unwrap().clone();
     /// let content = String::from_utf8(bytes).unwrap();
-    /// 
+    ///
     /// let expected = "{$REGION 'Enumerations Helper'}\n\
     ///            class function TItemStatusHelper.FromXmlValue(const pXmlValue: String): TItemStatus;\n\
     ///            begin\n  \
@@ -275,7 +275,7 @@ impl EnumCodeGenerator {
     ///              end;\n\
     ///            end;\n\
     ///            {$ENDREGION}\n";
-    /// 
+    ///
     /// assert_eq!(content, expected);
     /// ```
     pub fn write_implementation<T: Write>(

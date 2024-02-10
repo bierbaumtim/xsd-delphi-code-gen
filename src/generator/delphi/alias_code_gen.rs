@@ -48,9 +48,9 @@ pub struct TypeAliasCodeGenerator;
 
 impl TypeAliasCodeGenerator {
     /// Writes the type aliases to the given writer
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `writer` - The writer to write the type aliases to
     /// * `type_aliases` - The type aliases to write
     /// * `options` - The code generation options
