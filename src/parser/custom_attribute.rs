@@ -30,7 +30,7 @@ impl CustomAttributeParser {
 
         let name = XmlParserHelper::get_attribute_value(start, "name")?;
 
-        let qualified_name = qualified_parent.map_or_else(
+        let qualified_name = qualified_parent.as_ref().map_or_else(
             || xml_parser.as_qualified_name(name.as_str()),
             |v| format!("{v}.{name}"),
         );
@@ -71,7 +71,7 @@ impl CustomAttributeParser {
                                 registry,
                                 xml_parser,
                                 name.clone(),
-                                Some(qualified_name.clone()),
+                                qualified_parent.clone(),
                             )?;
 
                             registry.register_type(s_type.into());
