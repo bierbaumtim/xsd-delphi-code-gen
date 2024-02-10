@@ -9,11 +9,11 @@ pub struct HelperCodeGenerator;
 
 impl HelperCodeGenerator {
     /// Generate the helper section of the code.
-    /// 
+    ///
     /// At the moment this only generates the date time and hex binary helpers.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `writer` - The writer to write the code to.
     /// * `options` - The options to use when generating the code.
     /// * `generate_date_time_helper` - Whether to generate the date time helper.

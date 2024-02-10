@@ -15,7 +15,7 @@ use super::{
 };
 
 /// Parser for xs:simpleType elements
-/// 
+///
 /// Parses into a [SimpleType] struct
 /// Supports the following elements:
 /// - xs:restriction (partially)
@@ -28,30 +28,30 @@ pub struct SimpleTypeParser;
 
 impl SimpleTypeParser {
     /// Parses a xs:simpleType element into a [SimpleType] struct
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the element is malformed
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use std::fs::File;
     /// use quick_xml::Reader;
-    /// 
+    ///
     /// use xsd_parser::parser::{SimpleTypeParser, types::NodeType};
     /// use xsd_parser::type_registry::TypeRegistry;
     /// use xsd_parser::parser::xml::XmlParser;
-    /// 
+    ///
     /// let mut reader = Reader::from_file("./tests/parser/xsd/simple_type.xsd").unwrap();
     /// let mut buf = Vec::new();
     /// let mut registry = TypeRegistry::new();
     /// let xml_parser = XmlParser::default();
-    /// 
+    ///
     /// reader.read_to_end(&mut buf).unwrap();
-    /// 
+    ///
     /// let simple_type = SimpleTypeParser::parse(&mut reader, &mut registry, &xml_parser, "SimpleType".to_owned(), None).unwrap();
-    /// 
+    ///
     /// assert_eq!(simple_type.name, "SimpleType");
     /// assert_eq!(simple_type.qualified_name, "SimpleType");
     /// assert_eq!(simple_type.base_type, NodeType::Standard(NodeBaseType::String));

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::parser::types::CustomTypeDefinition;
 
 /// Stores all types that have been parsed
-/// 
+///
 /// This is used to resolve types that are referenced by other types
 pub struct TypeRegistry {
     pub types: HashMap<String, CustomTypeDefinition>,

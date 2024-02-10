@@ -11,14 +11,14 @@ use super::{
 };
 
 /// Code generator for union types.
-/// 
+///
 /// # Example
-/// 
+///
 /// ## Input
-/// 
+///
 /// ```rust
 /// use xsd_types::generator::types::{DataType, UnionType, UnionTypeVariant};
-/// 
+///
 /// let union_type = UnionType {
 ///   name: "UnionType".to_string(),
 ///   qualified_name: "UnionType".to_string(),
@@ -34,9 +34,9 @@ use super::{
 ///   ],
 /// };
 /// ```
-/// 
+///
 /// ## Output
-/// 
+///
 /// ```delphi
 /// {$REGION 'Union Types'}
 /// /// <summary>
@@ -50,10 +50,10 @@ use super::{
 ///     Variant2: (Variant2: string[255]);
 /// end;
 /// {$ENDREGION}
-/// 
+///
 /// {$REGION 'Union Types Helper'}
 /// type TUnionTypeHelper = record helper for TUnionType
-/// 
+///
 /// end;
 /// {$ENDREGION}
 /// ```

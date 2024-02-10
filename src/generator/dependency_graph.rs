@@ -14,9 +14,9 @@ where
 }
 
 /// Dependency Graph for Types
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// CustomNumber
 /// Alias1 -> Alias2 -> CustomNumber
