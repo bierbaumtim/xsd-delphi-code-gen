@@ -17,18 +17,26 @@
   {%- endif -%}
 {% endmacro type_name %}
 
-{% macro from_json(base_type, is_list_type, is_reference_type, key) %}
+{% macro from_json(base_type, is_list_type, is_reference_type, is_enum_type, key) %}
   {%- if is_list_type and is_reference_type -%}
   TJsonHelper.DeserializeObjectList<T{{prefix}}{{base_type}}>(
-    vRoot.GetValue<TJSONArray>('{{key}}'),
+    vRoot.GetValue<TJSONArray>({{key}}),
     function (pJson: TJSONValue): T{{prefix}}{{base_type}}
     begin
       Result := T{{prefix}}{{base_type}}.FromJsonRaw(pJson);
     end
   )
+  {%- elif is_list_type and is_enum_type -%}
+  TJsonHelper.DeserializeList<{{base_type}}>(
+    vRoot.GetValue<TJSONArray>({{key}}),
+    function (pJson: TJSONValue): T{{prefix}}{{base_type}}
+    begin
+      Result := T{{prefix}}{{base_type}}.FromString(pJson.Value);
+    end
+  )
   {%- elif is_list_type -%}
   TJsonHelper.DeserializeList<{{base_type}}>(
-    vRoot.GetValue<TJSONArray>('{{key}}'),
+    vRoot.GetValue<TJSONArray>({{key}}),
     function (pJson: TJSONValue): {{base_type}}
     begin
       {%if base_type == "integer" -%}
@@ -44,16 +52,18 @@
       {%- endif %}
     end
   )
+  {%- elif is_enum_type -%}
+  T{{prefix}}{{base_type}}.FromString(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, {{key}}, ''));
   {%- elif base_type == "integer" -%}
-  TJsonHelper.TryGetValueOrDefault<TJSONNumber, Integer>(vRoot, '{{key}}', 0)
+  TJsonHelper.TryGetValueOrDefault<TJSONNumber, Integer>(vRoot, {{key}}, 0)
   {%- elif base_type == "double" -%}
-  TJsonHelper.TryGetValueOrDefault<TJSONNumber, Double>(vRoot, '{{key}}', 0)
+  TJsonHelper.TryGetValueOrDefault<TJSONNumber, Double>(vRoot, {{key}}, 0)
   {%- elif base_type == "string" -%}
-  TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, '{{key}}', '')
+  TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, {{key}}, '')
   {%- elif base_type == "bool" -%}
-  TJsonHelper.TryGetValueOrDefault<TJSONBool, Boolean>(vRoot, '{{key}}', false)
+  TJsonHelper.TryGetValueOrDefault<TJSONBool, Boolean>(vRoot, {{key}}, false)
   {%- else -%}
-  {{ throw(message= "unsupported type" ~ base_type) }}
+  {{ throw(message= "unsupported type " ~ base_type) }}
   {%- endif -%}
 {% endmacro from_json %}
 
@@ -68,7 +78,7 @@ unit u{{unitPrefix}}ApiModels;
 
 interface
 
-uses System.Generics.Collections System.JSON;
+uses System.Generics.Collections, System.JSON;
 
 type
   {$REGION 'Forward Declerations'}
@@ -139,6 +149,12 @@ end;
 
 {$REGION 'Models'}
 {% for classType in classTypes -%}
+{{"{{"}} T{{prefix}}{{classType.name}} {{"}}"}}
+const
+  {% for property in classType.properties -%}
+  cn{{classType.name}}{{property.key}}Key: string = '{{property.key}}';
+  {% endfor -%}
+{{""}}
 constructor T{{prefix}}{{classType.name}}.FromJson(const pJson: String);
 begin
   var vRoot := TJSONObject.ParseJSONValue(pJson);
@@ -153,7 +169,7 @@ end;
 constructor T{{prefix}}{{classType.name}}.FromJsonRaw(pJson: TJSONValue);
 begin
   {%- for property in classType.properties %}
-  F{{property.name}} := {{ self::from_json(base_type=property.type_name, is_list_type=property.is_list_type, is_reference_type=property.is_reference_type, key=property.key) }};
+  F{{property.name}} := {{ self::from_json(base_type=property.type_name, is_list_type=property.is_list_type, is_reference_type=property.is_reference_type, is_enum_type=property.is_enum_type, key="cn" ~ classType.name ~ property.key ~ "Key") }};
   {%- endfor%}
 end;
 
