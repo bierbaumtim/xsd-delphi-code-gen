@@ -1,0 +1,16 @@
+[package]
+name = "xml"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+quick-xml = "0.31.0"
+unicode-segmentation = "1.10.1"
+chrono = "0.4.31"
+
+[dev-dependencies]
+indoc = "2"
+pretty_assertions = "1.4.0"

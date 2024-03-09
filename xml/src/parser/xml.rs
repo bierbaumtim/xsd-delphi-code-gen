@@ -108,7 +108,7 @@ impl XmlParser {
     /// ```
     pub fn parse_files<P: AsRef<Path>>(
         &mut self,
-        paths: &Vec<P>,
+        paths: &[P],
         registry: &mut TypeRegistry,
     ) -> Result<ParsedData, ParserError> {
         let mut nodes = Vec::new();

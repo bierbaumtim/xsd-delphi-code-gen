@@ -1,23 +1,12 @@
 #![allow(clippy::too_many_lines)]
-use std::{fs::File, io::BufWriter, path::PathBuf, time::Instant};
+use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
-mod generator;
-mod parser;
-mod type_registry;
-
-use generator::{
-    code_generator_trait::{CodeGenOptions, CodeGenerator},
-    delphi::code_generator::DelphiCodeGenerator,
-    internal_representation::InternalRepresentation,
-};
-use parser::{types::ParsedData, xml::XmlParser};
-use type_registry::TypeRegistry;
+use xml::{generate_xml, generator::code_generator_trait::CodeGenOptions};
 
 fn main() {
     let args = Args::parse();
-    let instant = Instant::now();
 
     let output_path = match resolve_output_path(&args.output) {
         Ok(p) => p,
@@ -28,61 +17,10 @@ fn main() {
         }
     };
 
-    let output_file = match File::create(output_path) {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("Could not create output file due to following error: \"{e:?}\"");
-            return;
-        }
-    };
-
-    let mut parser = XmlParser::default();
-    let mut type_registry = TypeRegistry::new();
-
-    let data: ParsedData = if args.input.len() == 1 {
-        match parser.parse_file(args.input.first().unwrap(), &mut type_registry) {
-            Ok(n) => n,
-            Err(error) => {
-                eprintln!("An error occured: {error}");
-                return;
-            }
-        }
-    } else {
-        match parser.parse_files(&args.input, &mut type_registry) {
-            Ok(n) => n,
-            Err(error) => {
-                eprintln!("An error occured: {error}");
-                return;
-            }
-        }
-    };
-
-    let elapsed_for_parse = instant.elapsed().as_millis();
-    println!("Files parsed in {elapsed_for_parse}ms");
-
-    let internal_representation = InternalRepresentation::build(&data, &type_registry);
-
-    let elapsed_for_ir = instant
-        .elapsed()
-        .as_millis()
-        .saturating_sub(elapsed_for_parse);
-    println!("Internal Representation created in {elapsed_for_ir}ms");
-
-    let buffer = BufWriter::new(Box::new(output_file));
-    let mut generator = DelphiCodeGenerator::new(
-        buffer,
-        build_code_gen_options(&args),
-        internal_representation,
-        data.documentations,
-    );
-
-    match generator.generate() {
-        Ok(()) => println!(
-            "Completed successfully within {}ms",
-            instant.elapsed().as_millis().saturating_sub(elapsed_for_ir),
-        ),
-        Err(e) => {
-            eprintln!("Failed to write output to file due to following error: \"{e:?}\"");
+    match &args.source_format {
+        SourceFormat::Xml => generate_xml(&args.input, &output_path, build_code_gen_options(&args)),
+        SourceFormat::OpenApi => {
+            println!("OpenApi not supported yet");
         }
     }
 }
@@ -167,6 +105,10 @@ pub struct Args {
     /// Which code should be generated. Can be one of `All`, `ToXml`, `FromXml`. Default is `All`
     #[arg(long, value_enum, default_value_t)]
     pub(crate) mode: CodeGenMode,
+
+    /// Source format of the input files. Can be one of `Xml`, `OpenApi`. Default is `Xml`
+    #[arg(long, value_enum)]
+    pub(crate) source_format: SourceFormat,
 }
 
 /// Which code should be generated. Can be one of `All`, `ToXml`, `FromXml`. Default is `All`
@@ -181,4 +123,11 @@ enum CodeGenMode {
 
     /// Generate only code for xml to type conversion
     FromXml,
+}
+
+/// Source format of the input files. Can be one of `Xml`, `OpenApi`. Default is `Xml`
+#[derive(Clone, Debug, ValueEnum)]
+enum SourceFormat {
+    Xml,
+    OpenApi,
 }
