@@ -63,9 +63,9 @@
     end
   )
   {%- elif is_enum_type -%}
-  T{{prefix}}{{base_type}}.FromString(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, {{key}}, ''));
+  T{{prefix}}{{base_type}}.FromString(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, {{key}}, ''))
   {%- elif is_reference_type -%}
-  {{ self::type_name(base_type=base_type, is_list_type=is_list_type, is_reference_type=is_reference_type, is_enum_type=is_enum_type) }}.FromJsonRaw(vRoot.GetValue<TJSONObject>({{key}}));
+  {{ self::type_name(base_type=base_type, is_list_type=is_list_type, is_reference_type=is_reference_type, is_enum_type=is_enum_type) }}.FromJsonRaw(vRoot.GetValue<TJSONObject>({{key}}))
   {%- elif base_type == "integer" -%}
   TJsonHelper.TryGetValueOrDefault<TJSONNumber, Integer>(vRoot, {{key}}, 0)
   {%- elif base_type == "double" -%}

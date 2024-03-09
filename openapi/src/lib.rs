@@ -132,10 +132,6 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Optio
                     .properties
                     .iter()
                     .filter_map(|(k, v)| {
-                        if k == "VPNSISState" {
-                            println!("{:?}, {}", v.resolve(&openapi_spec), k);
-                        }
-
                         v.resolve(&openapi_spec).ok().map(|s| Property {
                             name: capitalize(k),
                             type_name: s.schema_type.as_ref().map_or("".to_string(), |t| match t {
