@@ -7,7 +7,55 @@
   {%- endfor -%}
 {% endmacro fixed_size_line %}
 
+{% macro type_name(base_type, is_list_type, is_reference_type) %}
+  {%- if is_list_type and is_reference_type -%}
+  TObjectList<{{base_type}}>
+  {%- elif is_list_type -%}
+  TList<{{base_type}}>
+  {%- else -%}
+  {{base_type}}
+  {%- endif -%}
+{% endmacro type_name %}
 
+{% macro from_json(base_type, is_list_type, is_reference_type, key) %}
+  {%- if is_list_type and is_reference_type -%}
+  TJsonHelper.DeserializeObjectList<T{{prefix}}{{base_type}}>(
+    vRoot.GetValue<TJSONArray>('{{key}}'),
+    function (pJson: TJSONValue): T{{prefix}}{{base_type}}
+    begin
+      Result := T{{prefix}}{{base_type}}.FromJsonRaw(pJson);
+    end
+  )
+  {%- elif is_list_type -%}
+  TJsonHelper.DeserializeList<{{base_type}}>(
+    vRoot.GetValue<TJSONArray>('{{key}}'),
+    function (pJson: TJSONValue): {{base_type}}
+    begin
+      {%if base_type == "integer" -%}
+      Result := TJSONNumber(pJson).AsInt;
+      {%- elif base_type == "double" -%}
+      Result := TJSONNumber(pJson).AsDouble;
+      {%- elif base_type == "string" -%}
+      Result := TJSONString(pJson).Value;
+      {%- elif base_type == "bool" -%}
+      Result := TJSONBool(pJson).AsBoolean;
+      {%- else -%}
+      {{ throw(message= "unsupported type" ~ base_type) }}
+      {%- endif %}
+    end
+  )
+  {%- elif base_type == "integer" -%}
+  TJsonHelper.TryGetValueOrDefault<TJSONNumber, Integer>(vRoot, '{{key}}', 0)
+  {%- elif base_type == "double" -%}
+  TJsonHelper.TryGetValueOrDefault<TJSONNumber, Double>(vRoot, '{{key}}', 0)
+  {%- elif base_type == "string" -%}
+  TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, '{{key}}', '')
+  {%- elif base_type == "bool" -%}
+  TJsonHelper.TryGetValueOrDefault<TJSONBool, Boolean>(vRoot, '{{key}}', false)
+  {%- else -%}
+  {{ throw(message= "unsupported type" ~ base_type) }}
+  {%- endif -%}
+{% endmacro from_json %}
 
 {%- set timestamp = now() | date(format="%d.%m.%Y %H:%m:%S") -%}
 // ========================================================================== //
@@ -46,13 +94,7 @@ type
   T{{prefix}}{{classType.name}} = class
   strict private
     {%- for property in classType.properties %}
-    {% if property.is_list_type and property.is_reference_type -%}
-    F{{property.name}}: TObjectList<{{property.type_name}}>;
-    {% elif property.is_list_type -%}
-    F{{property.name}}: TList<{{property.type_name}}>;
-    {% else -%}
-    F{{property.name}}: {{property.type_name}};
-    {%- endif -%}
+    F{{property.name}}: {{ self::type_name(base_type=property.type_name, is_list_type=property.is_list_type, is_reference_type=property.is_reference_type) }};
     {%- endfor -%}{{" "}}
   public
     constructor FromJson(const pJson: String);
@@ -62,13 +104,7 @@ type
     {%- endif -%}
     {{""}}
     {% for property in classType.properties %}
-    {% if property.is_list_type and property.is_reference_type -%}
-    property {{property.name}}: TObjectList<{{property.type_name}}> read F{{property.name}};
-    {% elif property.is_list_type -%}
-    property {{property.name}}: TList<{{property.type_name}}> read F{{property.name}};
-    {% else -%}
-    property {{property.name}}: {{property.type_name}} read F{{property.name}};
-    {%- endif -%}
+    property {{property.name}}: {{ self::type_name(base_type=property.type_name, is_list_type=property.is_list_type, is_reference_type=property.is_reference_type) }} read F{{property.name}};
     {%- endfor %}
   end;
   {%- endfor %}
@@ -117,7 +153,7 @@ end;
 constructor T{{prefix}}{{classType.name}}.FromJsonRaw(pJson: TJSONValue);
 begin
   {%- for property in classType.properties %}
-  F{{property.name}} := '';
+  F{{property.name}} := {{ self::from_json(base_type=property.type_name, is_list_type=property.is_list_type, is_reference_type=property.is_reference_type, key=property.key) }};
   {%- endfor%}
 end;
 
