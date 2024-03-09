@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
+use openapi::generate_openapi_client;
 use xml::{generate_xml, generator::code_generator_trait::CodeGenOptions};
 
 fn main() {
@@ -20,7 +21,7 @@ fn main() {
     match &args.source_format {
         SourceFormat::Xml => generate_xml(&args.input, &output_path, build_code_gen_options(&args)),
         SourceFormat::OpenApi => {
-            println!("OpenApi not supported yet");
+            generate_openapi_client(&args.input, &output_path, args.type_prefix.clone())
         }
     }
 }
