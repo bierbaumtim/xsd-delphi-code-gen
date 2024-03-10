@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
-use serde::Serialize;
-use sw4rm_rs::{from_path, shared::SchemaType};
+use sw4rm_rs::from_path;
 use tera::{Context, Tera};
 
+mod helper;
+mod models;
+mod schema_collector;
 mod type_registry;
 
 pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Option<String>) {
@@ -55,168 +57,13 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Optio
         return;
     }
 
-    // TODO: Add TypeRegistry
-    // TODO: Iterate over all schemas and register classes and enums
-    // TODO: Iterate over all paths and register classes and enums
     // TODO: Iterate over all paths and generate endpoints
     // TODO: Iterate over all types in the TypeRegistry and generate classes and enums
     // TODO: Build context for client template
     // TODO: Build context for client interface template
     // TODO: Build context for models template
 
-    let class_types = vec![ClassType {
-        name: "Test".to_string(),
-        needs_destructor: true,
-        properties: vec![
-            Property {
-                name: "p1".to_string(),
-                type_name: "string".to_string(),
-                key: "p1".to_string(),
-                is_reference_type: false,
-                is_list_type: false,
-                is_enum_type: false,
-            },
-            Property {
-                name: "p2".to_string(),
-                type_name: "integer".to_string(),
-                key: "p2".to_string(),
-                is_reference_type: true,
-                is_list_type: false,
-                is_enum_type: false,
-            },
-            Property {
-                name: "p3".to_string(),
-                type_name: "integer".to_string(),
-                key: "p3".to_string(),
-                is_reference_type: true,
-                is_list_type: true,
-                is_enum_type: false,
-            },
-            Property {
-                name: "p4".to_string(),
-                type_name: "integer".to_string(),
-                key: "p4".to_string(),
-                is_reference_type: false,
-                is_list_type: true,
-                is_enum_type: false,
-            },
-            Property {
-                name: "p5".to_string(),
-                type_name: "Test".to_string(),
-                key: "p5".to_string(),
-                is_reference_type: false,
-                is_list_type: true,
-                is_enum_type: true,
-            },
-            Property {
-                name: "p6".to_string(),
-                type_name: "Test".to_string(),
-                key: "p6".to_string(),
-                is_reference_type: false,
-                is_list_type: false,
-                is_enum_type: true,
-            },
-        ],
-    }];
-
-    let class_types = openapi_spec
-        .schemas()
-        .iter()
-        .filter_map(|(k, v)| {
-            v.resolve(&openapi_spec).ok().and_then(|s| {
-                if !s.schema_type.is_some_and(|t| t == SchemaType::Object) {
-                    return None;
-                }
-
-                let properties = s
-                    .properties
-                    .iter()
-                    .filter_map(|(k, v)| {
-                        v.resolve(&openapi_spec).ok().map(|s| Property {
-                            name: capitalize(k),
-                            type_name: s.schema_type.as_ref().map_or("".to_string(), |t| match t {
-                                SchemaType::String => match &s.format {
-                                    Some(f) => match f.as_str() {
-                                        "date" | "date-time" => "datetime".to_string(),
-                                        _ => "string".to_string(),
-                                    },
-                                    None => "string".to_string(),
-                                },
-                                SchemaType::Integer => "integer".to_string(),
-                                SchemaType::Number => "double".to_string(),
-                                SchemaType::Boolean => "boolean".to_string(),
-                                SchemaType::Array => s
-                                    .items
-                                    .as_ref()
-                                    .expect("Array must have items property set")
-                                    .resolve(&openapi_spec)
-                                    .expect("Type of array items must be resolved")
-                                    .schema_type
-                                    .as_ref()
-                                    .map_or("".to_string(), |t| match t {
-                                        SchemaType::String => match &s.format {
-                                            Some(f) => match f.as_str() {
-                                                "date" | "date-time" => "datetime".to_string(),
-                                                _ => "string".to_string(),
-                                            },
-                                            None => "string".to_string(),
-                                        },
-                                        SchemaType::Integer => "integer".to_string(),
-                                        SchemaType::Number => "double".to_string(),
-                                        SchemaType::Boolean => "boolean".to_string(),
-                                        _ => "".to_string(),
-                                    }),
-                                _ => s.title.clone().unwrap_or(k.to_string()),
-                            }),
-                            key: k.to_owned(),
-                            is_reference_type: s
-                                .schema_type
-                                .is_some_and(|t| t == SchemaType::Object)
-                                || s.items.is_some_and(|i| {
-                                    i.resolve(&openapi_spec).ok().is_some_and(|s| {
-                                        s.schema_type.is_some_and(|t| {
-                                            matches!(t, SchemaType::Object | SchemaType::Array)
-                                        })
-                                    })
-                                }),
-                            is_list_type: s.schema_type.is_some_and(|t| t == SchemaType::Array),
-                            is_enum_type: !s.enum_values.is_empty(),
-                        })
-                    })
-                    .collect::<Vec<Property>>();
-
-                Some(ClassType {
-                    name: capitalize(k),
-                    needs_destructor: properties.iter().any(|p| p.is_reference_type),
-                    properties,
-                })
-            })
-        })
-        .collect::<Vec<ClassType>>();
-
-    let enum_types = openapi_spec
-        .schemas()
-        .iter()
-        .filter_map(|(k, v)| {
-            v.resolve(&openapi_spec).ok().map(|s| {
-                let variants = s
-                    .enum_values
-                    .iter()
-                    .filter_map(|v| {
-                        v.as_str().map(|s| EnumVariant {
-                            name: capitalize(s),
-                            key: s.to_owned(),
-                        })
-                    })
-                    .collect();
-
-                EnumType {
-                    name: capitalize(k),
-                    variants,
-                }
-            })
-        })
-        .collect::<Vec<EnumType>>();
+    let (class_types, enum_types) = schema_collector::collect_types(&openapi_spec, prefix.clone());
 
     let mut context = Context::new();
     context.insert("unitPrefix", &prefix.clone().unwrap_or_default());
@@ -238,42 +85,4 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Optio
         }
         Err(e) => eprintln!("Failed to render model template due to {:?}", e),
     }
-}
-
-fn capitalize(value: &str) -> String {
-    let mut c = value.chars();
-
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-    }
-}
-
-#[derive(Serialize)]
-struct ClassType {
-    name: String,
-    properties: Vec<Property>,
-    needs_destructor: bool,
-}
-
-#[derive(Serialize)]
-struct Property {
-    name: String,
-    type_name: String,
-    key: String,
-    is_reference_type: bool,
-    is_list_type: bool,
-    is_enum_type: bool,
-}
-
-#[derive(Serialize)]
-struct EnumType {
-    name: String,
-    variants: Vec<EnumVariant>,
-}
-
-#[derive(Serialize)]
-struct EnumVariant {
-    name: String,
-    key: String,
 }

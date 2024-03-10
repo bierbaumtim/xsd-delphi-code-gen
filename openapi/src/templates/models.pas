@@ -16,7 +16,7 @@
   TList<T{{prefix}}{{base_type}}>
   {%- elif is_list_type -%}
   TList<{{base_type}}>
-  {%- elif is_reference_type -%}
+  {%- elif is_reference_type or is_enum_type -%}
   T{{prefix}}{{base_type}}
   {%- elif base_type == "datetime" -%}
   TDateTime
@@ -77,8 +77,7 @@
   {%- elif base_type == "datetime" -%}
   ISO8601ToDate(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(vRoot, {{key}}, ''))
   {%- else -%}
-  {{ "" }}
-  
+  {{ throw(message= "unsupported type " ~ base_type) }}
   {%- endif -%}
 {% endmacro from_json -%}
 
@@ -109,7 +108,7 @@ type
   {% for enumType in enumTypes -%}
   T{{prefix}}{{enumType.name}} = ({{enumType.variants | map(attribute="name") | join(sep=", ")}});
   {% endfor -%}
-
+  {{""}}
   {% for enumType in enumTypes -%}
   T{{prefix}}{{enumType.name}}Helper = record helper for T{{prefix}}{{enumType.name}}
     class function FromString(const pValue: String): T{{prefix}}{{enumType.name}}; static;
@@ -164,6 +163,7 @@ class function T{{prefix}}{{enumType.name}}Helper.FromString(const pValue: Strin
     raise Exception.Create('\"' + pValue + '\" is a unknown value for T{{prefix}}{{enumType.name}}');
   end;
 end;
+
 {% endfor -%}
 {$ENDREGION}
 
