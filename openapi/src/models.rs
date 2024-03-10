@@ -32,6 +32,10 @@ pub(crate) struct Endpoint {
     pub(crate) name: String,
     pub(crate) response_type: Type,
     pub(crate) args: Vec<EndpointArg>,
+    pub(crate) method: String,
+    pub(crate) path: String,
+    pub(crate) status_codes: Vec<Response>,
+    pub(crate) request_body: Type,
 }
 
 #[derive(Serialize, Eq, PartialEq)]
@@ -39,6 +43,15 @@ pub(crate) struct EndpointArg {
     pub(crate) name: String,
     pub(crate) type_name: String,
     pub(crate) arg_type: String,
+    pub(crate) is_required: bool,
+    pub(crate) default_value: String,
+}
+
+#[derive(Serialize, Eq, PartialEq)]
+pub(crate) struct Response {
+    pub(crate) status_code: String,
+    pub(crate) type_: Type,
+    pub(crate) is_list_type: bool,
 }
 
 #[derive(Serialize, Eq, PartialEq)]

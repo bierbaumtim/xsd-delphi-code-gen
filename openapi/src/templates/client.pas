@@ -15,30 +15,127 @@ unit u{{unitPrefix}}ApiClient,
 
 interface
 
-uses u{{unitPrefix}}ApiClient;
+uses u{{unitPrefix}}ApiClient,
+     REST.Client;
 
 type  
   T{{prefix}}ApiClient = class(TInterfacedObject, I{{prefix}}ApiClient)
+  strict private
+    FClient: TRESTClient;
+  public
+    constructor Create(const pBaseUrl: string);
+    destructor Destroy; override;
+
     {% for endpoint in endpoints -%}
     {% if endpoint.response_type.name == "none" -%}
-    procedure {{endpoint.name}}({{macros::join_args(args=endpoint.args)}});
+    procedure {{endpoint.name}}({{macros::join_args(args=endpoint.args)}}
+      {%- if not endpoint.request_body.name == "none" -%}
+      {%- set args_length = endpoint.args | length -%}
+      {%- if args_length > 0 -%}; {% endif -%}
+      pBody: {{ macros::type_name(base_type=endpoint.request_body.name, is_list_type=false, is_reference_type=endpoint.request_body.is_class, is_enum_type=endpoint.request_body.is_enum) }}
+      {%- endif -%});
     {% else -%}
-    function {{endpoint.name}}({{macros::join_args(args=endpoint.args)}}): {{ macros::type_name(base_type=endpoint.response_type.name, is_list_type=false, is_reference_type=endpoint.response_type.is_class, is_enum_type=endpoint.response_type.is_enum) }};
+    function {{endpoint.name}}({{macros::join_args(args=endpoint.args)}}
+      {%- if not endpoint.request_body.name == "none" -%}
+      {%- set args_length = endpoint.args | length -%}
+      {%- if args_length > 0 -%}; {% endif -%}
+      pBody: {{ macros::type_name(base_type=endpoint.request_body.name, is_list_type=false, is_reference_type=endpoint.request_body.is_class, is_enum_type=endpoint.request_body.is_enum) }}
+      {%- endif -%}): {{ macros::type_name(base_type=endpoint.response_type.name, is_list_type=false, is_reference_type=endpoint.response_type.is_class, is_enum_type=endpoint.response_type.is_enum) }};
     {% endif -%}
     {% endfor %}
   end;
 
 implementation
 
+uses REST.Types;
+
 { T{{prefix}}ApiClient }
+
+constructor T{{prefix}}ApiClient.Create(const pBaseUrl: string);
+begin
+  inherited;
+
+  FClient := TRESTClient.Create(pBaseUrl);
+end;
+
+destructor T{{prefix}}ApiClient.Destroy;
+begin
+  FreeAndNil(FClient);
+
+  inherited;
+end;
 
 {% for endpoint in endpoints %}
 {% if endpoint.response_type.name == "none" -%}
-procedure T{{prefix}}ApiClient.{{endpoint.name}}({{macros::join_args(args=endpoint.args)}});
+procedure T{{prefix}}ApiClient.{{endpoint.name}}({{macros::join_args(args=endpoint.args)}}
+{%- if not endpoint.request_body.name == "none" -%}
+{%- set args_length = endpoint.args | length -%}
+{%- if args_length > 0 -%}{{"; "}}{% endif -%}
+pBody: {{ macros::type_name(base_type=endpoint.request_body.name, is_list_type=false, is_reference_type=endpoint.request_body.is_class, is_enum_type=endpoint.request_body.is_enum) }}
+{%- endif -%});
 {% else -%}
-function T{{prefix}}ApiClient.{{endpoint.name}}({{macros::join_args(args=endpoint.args)}}): {{ macros::type_name(base_type=endpoint.response_type.name, is_list_type=false, is_reference_type=endpoint.response_type.is_class, is_enum_type=endpoint.response_type.is_enum) }};
+function T{{prefix}}ApiClient.{{endpoint.name}}({{macros::join_args(args=endpoint.args)}}
+{%- if not endpoint.request_body.name == "none" -%}
+{%- set args_length = endpoint.args | length -%}
+{%- if args_length > 0 -%}{{"; "}}{% endif -%}
+pBody: {{ macros::type_name(base_type=endpoint.request_body.name, is_list_type=false, is_reference_type=endpoint.request_body.is_class, is_enum_type=endpoint.request_body.is_enum) }}
+{%- endif -%}): {{ macros::type_name(base_type=endpoint.response_type.name, is_list_type=false, is_reference_type=endpoint.response_type.is_class, is_enum_type=endpoint.response_type.is_enum) }};
 {% endif -%}
 begin
+  var vRequest := TRESTRequest.Create(nil);
+
+  try
+    vRequest.Client := FClient;
+    vRequest.Method := rm{{endpoint.method}};
+    vRequest.Resource := '{{endpoint.path}}';
+    {% for param in endpoint.args -%}
+    {% if param.arg_type == "path" -%}
+    vRequest.AddParameter('{{param.name}}', p{{param.name}}, pkURLSEGMENT);
+    {% elif param.arg_type == "query" -%}
+    {% if param.is_required -%}
+    vRequest.AddParameter('{{param.name}}', p{{param.name}}, pkQUERY);
+    {% else -%}
+    if p{{param.name}} <> Default({{param.type_name}}) then begin
+      vRequest.AddParameter('{{param.name}}', p{{param.name}}, pkQUERY);
+    end;
+    {% endif -%}
+    {% elif param.arg_type == "body" -%}
+    {% if param.is_required -%}
+    vRequest.AddParameter('{{param.name}}', p{{param.name}}, pkBODY);
+    {% else -%}
+    if p{{param.name}} <> Default({{param.type_name}}) then begin
+      vRequest.AddParameter('{{param.name}}', p{{param.name}}, pkBODY);
+    end;
+    {% endif -%}
+    {% endif -%}
+    {% endfor -%}
+    {%- if not endpoint.request_body.name == "none" -%}
+    vRequest.AddBody(pBody.ToJson, ctAPPLICATION_JSON);
+    {% endif -%}
+
+    vRequest.Execute;
+
+    {% if not endpoint.response_type.name == "none" -%}
+    case vRequest.Response.StatusCode of
+      {% for resp in endpoint.status_codes -%}
+      {{resp.status_code}}: begin
+      {%- if resp.status_code is starting_with("2") %}
+        Result := {{ macros::from_json_raw(json_obj_name="vRequest.Response.JSONValue", base_type=resp.type_.name, is_list_type=resp.is_list_type, is_reference_type=resp.type_.is_class, is_enum_type=resp.type_.is_enum) }};
+      {% else %}
+        var vRes := {{ macros::from_json_raw(json_obj_name="vRequest.Response.JSONValue", base_type=resp.type_.name, is_list_type=resp.is_list_type, is_reference_type=resp.type_.is_class, is_enum_type=resp.type_.is_enum) }};
+
+        raise T{{prefix}}ApiException.Create();
+      {% endif -%}
+      end
+      {% endfor -%}
+      else begin
+        raise T{{prefix}}ApiException.Create();
+      end;
+    end;
+    {% endif %}
+  finally
+    FreeAndNil(vRequest);
+  end;
 end;
 {% endfor %}
 

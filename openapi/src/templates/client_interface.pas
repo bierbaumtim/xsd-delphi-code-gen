@@ -24,9 +24,19 @@ type
   I{{prefix}}ApiClient = interface
     {% for endpoint in endpoints -%}
     {% if endpoint.response_type.name == "none" -%}
-    procedure {{endpoint.name}}({{macros::join_args(args=endpoint.args)}});
+    procedure {{endpoint.name}}({{macros::join_args(args=endpoint.args)}}
+      {%- if not endpoint.request_body.name == "none" -%}
+      {%- set args_length = endpoint.args | length -%}
+      {%- if args_length > 0 -%}{{"; "}}{% endif -%}
+      pBody: {{ macros::type_name(base_type=endpoint.request_body.name, is_list_type=false, is_reference_type=endpoint.request_body.is_class, is_enum_type=endpoint.request_body.is_enum) }}
+      {%- endif -%});
     {% else -%}
-    function {{endpoint.name}}({{macros::join_args(args=endpoint.args)}}): {{ self::type_name(base_type=endpoint.response_type.name, is_list_type=false, is_reference_type=endpoint.response_type.is_class, is_enum_type=endpoint.response_type.is_enum) }};
+    function {{endpoint.name}}({{macros::join_args(args=endpoint.args)}}
+      {%- if not endpoint.request_body.name == "none" -%}
+      {%- set args_length = endpoint.args | length -%}
+      {%- if args_length > 0 -%}{{"; "}}{% endif -%}
+      pBody: {{ macros::type_name(base_type=endpoint.request_body.name, is_list_type=false, is_reference_type=endpoint.request_body.is_class, is_enum_type=endpoint.request_body.is_enum) }}
+      {%- endif -%}): {{ macros::type_name(base_type=endpoint.response_type.name, is_list_type=false, is_reference_type=endpoint.response_type.is_class, is_enum_type=endpoint.response_type.is_enum) }};
     {% endif -%}
     {% endfor %}
   end;
