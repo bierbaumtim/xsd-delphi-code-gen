@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           # Replace with the name of your binary
-          binary_name="xsd-delphi-code-gen"
+          binary_name="genphi"
 
           dirname="$binary_name-${{ env.VERSION }}-${{ matrix.target }}"
           mkdir "$dirname"
