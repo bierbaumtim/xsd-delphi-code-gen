@@ -10,3 +10,7 @@ clap = { version = "4.4.12", features = ["derive"] }
 
 openapi = { path = "../openapi" }
 xml ={ path = "../xml" }
+
+[[bin]]
+name = "genphi"
+path = "src/main.rs"
