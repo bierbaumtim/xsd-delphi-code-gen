@@ -30,7 +30,7 @@ fn build_code_gen_options(args: &Args) -> CodeGenOptions {
     CodeGenOptions {
         generate_from_xml: !matches!(&args.mode, CodeGenMode::ToXml),
         generate_to_xml: !matches!(&args.mode, CodeGenMode::FromXml),
-        unit_name: args.unit_name.clone(),
+        unit_name: args.unit_name.clone().expect("Unit name is required"),
         type_prefix: args.type_prefix.clone(),
     }
 }
@@ -96,8 +96,8 @@ pub struct Args {
     pub(crate) output: std::path::PathBuf,
 
     /// Name of the generated unit
-    #[arg(long, required(true))]
-    pub(crate) unit_name: String,
+    #[arg(long)]
+    pub(crate) unit_name: Option<String>,
 
     /// Optional prefix for type names
     #[arg(long, num_args(0..=1))]
