@@ -7,6 +7,7 @@ pub trait TypeRegistryItem {
 /// Stores all types that have been parsed
 ///
 /// This is used to resolve types that are referenced by other types
+#[allow(dead_code)]
 pub struct TypeRegistry<T>
 where
     T: TypeRegistryItem + Sized,
@@ -19,6 +20,7 @@ impl<T> TypeRegistry<T>
 where
     T: TypeRegistryItem + Sized,
 {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             types: HashMap::new(),
@@ -27,6 +29,7 @@ where
     }
 
     /// Registers a custom type
+    #[allow(dead_code)]
     pub fn register_type(&mut self, custom_type: T) {
         let name = custom_type.get_qualified_name();
 
@@ -34,6 +37,7 @@ where
     }
 
     /// Generates a unique type name for a anonymous type
+    #[allow(dead_code)]
     pub fn generate_type_name(&mut self) -> String {
         let name = format!("__Custom_Type_{}__", self.gen_type_count);
 
