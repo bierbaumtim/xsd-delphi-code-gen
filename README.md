@@ -16,11 +16,11 @@
   - Inheritance
   - ComplexContent
   - Sequence
+- Attributes
 - Built-In DataTypes (string, boolean, decimal, float, double, dateTime, time, date, hexBinary, base64Binary)
 - Built-I derived DataTypes (Integer, nonPositiveInteger, negativeInteger, long, int, short, byte, nonNegativeInteger, unsignedLong, unsignedInt, unsignedShort, unsignedByte, positiveInteger)
 
 ### Planned support
-- Attributes
 - xs:choice for xs:complexType
 - xs:element->nillable(xs:nil)
 - xs:list -> currently partially supported
