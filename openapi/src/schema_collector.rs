@@ -4,8 +4,11 @@ use sw4rm_rs::{
 };
 use tera::Value;
 
-use crate::helper::{capitalize, get_enum_variant_prefix, sanitize_name, schema_type_to_base_type};
 use crate::models::{ClassType, EnumType, EnumVariant, Property};
+use crate::{
+    helper::{capitalize, get_enum_variant_prefix, sanitize_name, schema_type_to_base_type},
+    models::Type,
+};
 
 pub(crate) fn collect_types(
     spec: &Spec,
@@ -33,7 +36,7 @@ pub(crate) fn collect_types(
     (class_types, enum_types)
 }
 
-fn schema_to_type(
+pub(crate) fn schema_to_type(
     schema: &Schema,
     name: &str,
     spec: &Spec,
@@ -111,9 +114,11 @@ fn schema_to_type(
                             name: capitalize(k),
                             key: k.to_owned(),
                             is_list_type: s.schema_type.is_some_and(|t| t == SchemaType::Array),
-                            type_name,
-                            is_reference_type,
-                            is_enum_type,
+                            type_: Type {
+                                name: type_name,
+                                is_class: is_reference_type,
+                                is_enum: is_enum_type,
+                            },
                         })
                     })
                 })
@@ -121,7 +126,7 @@ fn schema_to_type(
 
             let class_type = ClassType {
                 name: capitalize(name),
-                needs_destructor: properties.iter().any(|p| p.is_reference_type),
+                needs_destructor: properties.iter().any(|p| p.type_.is_class),
                 properties,
             };
 

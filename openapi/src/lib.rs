@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
 use sw4rm_rs::from_path;
-use tera::{Context, Tera};
+use tera::Tera;
 
+mod endpoint_collector;
 mod helper;
 mod models;
+mod render;
 mod schema_collector;
 mod type_registry;
 
@@ -36,11 +38,17 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Optio
         }
     };
 
+    let macros_template_str = include_str!("templates/macros.pas");
     let client_template_str = include_str!("templates/client.pas");
     let client_interface_template_str = include_str!("templates/client_interface.pas");
     let models_template_str = include_str!("templates/models.pas");
 
     let mut tera = Tera::default();
+    if let Err(e) = tera.add_raw_template("macros.pas", macros_template_str) {
+        eprintln!("Failed to add macros template due to {:?}", e);
+
+        return;
+    }
     if let Err(e) = tera.add_raw_template("client.pas", client_template_str) {
         eprintln!("Failed to add client template due to {:?}", e);
 
@@ -58,31 +66,21 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Optio
     }
 
     // TODO: Iterate over all paths and generate endpoints
-    // TODO: Iterate over all types in the TypeRegistry and generate classes and enums
     // TODO: Build context for client template
-    // TODO: Build context for client interface template
-    // TODO: Build context for models template
 
-    let (class_types, enum_types) = schema_collector::collect_types(&openapi_spec, prefix.clone());
+    let (mut class_types, mut enum_types) =
+        schema_collector::collect_types(&openapi_spec, prefix.clone());
+    let endpoints =
+        endpoint_collector::collect_endpoints(&openapi_spec, &mut class_types, &mut enum_types);
 
-    let mut context = Context::new();
-    context.insert("unitPrefix", &prefix.clone().unwrap_or_default());
-    context.insert("prefix", &prefix.clone().unwrap_or_default());
-    context.insert("crate_version", "0.0.1");
-    context.insert("api_title", &openapi_spec.info.title);
-    context.insert("api_spec_version", &openapi_spec.info.version);
-    context.insert("classTypes", &class_types);
-    context.insert("enumTypes", &enum_types);
-
-    let models = tera.render("models.pas", &context);
-
-    match models {
-        Ok(s) => {
-            let models_path = dest.join(format!("u{}ApiModels.pas", prefix.unwrap_or_default()));
-            if let Err(e) = std::fs::write(models_path, s) {
-                eprintln!("Failed to write models file due to {:?}", e);
-            }
-        }
-        Err(e) => eprintln!("Failed to render model template due to {:?}", e),
-    }
+    render::render_models(
+        &openapi_spec,
+        dest,
+        prefix.clone(),
+        &class_types,
+        &enum_types,
+        &tera,
+    );
+    render::render_client_interface(&openapi_spec, dest, prefix.clone(), &endpoints, &tera);
+    render::render_client(&openapi_spec, dest, prefix.clone(), &endpoints, &tera);
 }
