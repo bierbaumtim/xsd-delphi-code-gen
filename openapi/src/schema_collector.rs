@@ -124,8 +124,11 @@ pub(crate) fn schema_to_type(
                 })
                 .collect::<Vec<Property>>();
 
+            let name = schema.title.clone().unwrap_or(name.to_string());
+            let name = capitalize(&name);
+
             let class_type = ClassType {
-                name: capitalize(name),
+                name: name.clone(),
                 needs_destructor: properties.iter().any(|p| p.type_.is_class),
                 properties,
             };
@@ -134,7 +137,7 @@ pub(crate) fn schema_to_type(
                 class_types.push(class_type);
             }
 
-            Some((capitalize(name), true, false))
+            Some((name, true, false))
         }
         Some(SchemaType::Array) => None,
         Some(t) => Some((schema_type_to_base_type(&t, &schema.format), false, false)),
