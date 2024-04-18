@@ -597,8 +597,7 @@ impl ClassCodeGenerator {
 
                 match &v.data_type {
                     DataType::Alias(name) => {
-                        let (data_type, pattern) =
-                            Helper::get_alias_data_type(name, type_aliases)?;
+                        let (data_type, pattern) = Helper::get_alias_data_type(name, type_aliases)?;
 
                         let from_xml_code = match &data_type {
                             DataType::InlineList(item_type) => match item_type.as_ref() {
