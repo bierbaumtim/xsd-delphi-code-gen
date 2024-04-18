@@ -82,7 +82,7 @@ impl ClassCodeGenerator {
         type_name: &str,
         is_required: bool,
         is_value_type: bool,
-        default_value: Option<String>,
+        default_value: &Option<String>,
     ) -> String {
         match (is_required, is_value_type, default_value) {
             (false, false, _) => format!("{name} := nil;"),
@@ -298,7 +298,7 @@ impl ClassCodeGenerator {
                             };
 
                             Ok(vec![TemplateSerializeVariable {
-                                name: variable_name.clone(),
+                                name: variable_name,
                                 xml_name: &v.xml_name,
                                 is_required: v.required,
                                 is_class: false,
@@ -318,7 +318,7 @@ impl ClassCodeGenerator {
                         }
                     }
                     DataType::Enumeration(_) => Ok(vec![TemplateSerializeVariable {
-                        name: variable_name.clone(),
+                        name: variable_name,
                         xml_name: &v.xml_name,
                         is_required: v.required,
                         is_class: false,
@@ -330,7 +330,7 @@ impl ClassCodeGenerator {
                         to_xml_code: String::new(),
                     }]),
                     DataType::Custom(_) => Ok(vec![TemplateSerializeVariable {
-                        name: variable_name.clone(),
+                        name: variable_name,
                         xml_name: &v.xml_name,
                         is_required: v.required,
                         is_class: true,
@@ -342,7 +342,7 @@ impl ClassCodeGenerator {
                         to_xml_code: String::new(),
                     }]),
                     DataType::List(lt) => Ok(vec![TemplateSerializeVariable {
-                        name: variable_name.clone(),
+                        name: variable_name,
                         xml_name: &v.xml_name,
                         is_required: v.required,
                         is_class: matches!(**lt, DataType::Custom(_)),
@@ -385,7 +385,7 @@ impl ClassCodeGenerator {
                         };
 
                         Ok(vec![TemplateSerializeVariable {
-                            name: variable_name.clone(),
+                            name: variable_name,
                             xml_name: &v.xml_name,
                             is_required: v.required,
                             is_class: false,
@@ -436,14 +436,14 @@ impl ClassCodeGenerator {
                                     ),
                                     v.required,
                                     false,
-                                    v.default_value.clone(),
+                                    &v.default_value,
                                 ),
                                 _ => Self::get_variable_initialization_code(
                                     &variable_name,
                                     &Helper::as_type_name(name, &options.type_prefix),
                                     v.required,
                                     true,
-                                    v.default_value.clone(),
+                                    &v.default_value,
                                 ),
                             }])
                         } else {
@@ -456,7 +456,7 @@ impl ClassCodeGenerator {
                             &Helper::as_type_name(name, &options.type_prefix),
                             v.required,
                             true,
-                            v.default_value.clone(),
+                            &v.default_value,
                         )])
                     }
                     DataType::Custom(name) => Ok(vec![Self::get_variable_initialization_code(
@@ -464,7 +464,7 @@ impl ClassCodeGenerator {
                         &Helper::as_type_name(name, &options.type_prefix),
                         v.required,
                         false,
-                        v.default_value.clone(),
+                        &v.default_value,
                     )]),
                     DataType::List(_) => Ok(vec![Self::get_variable_initialization_code(
                         &variable_name,
@@ -474,7 +474,7 @@ impl ClassCodeGenerator {
                         ),
                         true,
                         false,
-                        v.default_value.clone(),
+                        &v.default_value,
                     )]),
                     DataType::FixedSizeList(dt, size) => {
                         let rhs = match dt.as_ref() {
@@ -559,7 +559,7 @@ impl ClassCodeGenerator {
                             ),
                             true,
                             false,
-                            v.default_value.clone(),
+                            &v.default_value,
                         ),
                         _ => Self::get_variable_initialization_code(
                             &variable_name,
@@ -569,7 +569,7 @@ impl ClassCodeGenerator {
                             ),
                             v.required,
                             true,
-                            v.default_value.clone(),
+                            &v.default_value,
                         ),
                     }]),
                 }
