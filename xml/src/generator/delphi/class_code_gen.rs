@@ -203,6 +203,12 @@ impl ClassCodeGenerator {
                             )
                         };
 
+                        let documentations = v
+                            .documentations
+                            .iter()
+                            .flat_map(|d| d.lines())
+                            .collect::<Vec<&str>>();
+
                         Ok(vec![TemplateVariable {
                             name: Helper::as_variable_name(&v.name),
                             xml_name: &v.xml_name,
@@ -210,6 +216,7 @@ impl ClassCodeGenerator {
                             required: v.required,
                             requires_free: v.requires_free,
                             data_type_repr,
+                            documentations,
                         }])
                     } else {
                         Err(CodeGenError::MissingDataType(
@@ -235,6 +242,12 @@ impl ClassCodeGenerator {
         variable: &'a Variable,
         options: &'a CodeGenOptions,
     ) -> TemplateVariable<'a> {
+        let documentations = variable
+            .documentations
+            .iter()
+            .flat_map(|d| d.lines())
+            .collect::<Vec<&str>>();
+
         TemplateVariable {
             name: Helper::as_variable_name(&variable.name),
             xml_name: &variable.xml_name,
@@ -245,6 +258,7 @@ impl ClassCodeGenerator {
             default_value: &variable.default_value,
             required: variable.required,
             requires_free: variable.requires_free,
+            documentations,
         }
     }
 
@@ -254,6 +268,12 @@ impl ClassCodeGenerator {
         size: usize,
         options: &CodeGenOptions,
     ) -> Vec<TemplateVariable<'a>> {
+        let documentations = variable
+            .documentations
+            .iter()
+            .flat_map(|d| d.lines())
+            .collect::<Vec<&str>>();
+
         (1..size + 1)
             .map(|i| TemplateVariable {
                 name: format!("{}{}", Helper::as_variable_name(&variable.name), i),
@@ -265,6 +285,7 @@ impl ClassCodeGenerator {
                 default_value: &variable.default_value,
                 required: variable.required,
                 requires_free: variable.requires_free,
+                documentations: documentations.clone(),
             })
             .collect::<Vec<TemplateVariable>>()
     }

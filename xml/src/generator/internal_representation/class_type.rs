@@ -121,6 +121,7 @@ pub fn build_class_type_ir(
                     default_value: None,
                     is_const: false,
                     source: XMLSource::Element,
+                    documentations: child.documentations.as_ref().cloned().unwrap_or_default(),
                 };
 
                 variables.push(variable);
@@ -174,6 +175,7 @@ pub fn build_class_type_ir(
                         default_value: None,
                         is_const: false,
                         source: XMLSource::Element,
+                        documentations: child.documentations.as_ref().cloned().unwrap_or_default(),
                     };
 
                     variables.push(variable);
@@ -199,6 +201,7 @@ pub fn build_class_type_ir(
                     is_const: attr.fixed_value.is_some(),
                     default_value: attr.fixed_value.clone().or(attr.default_value.clone()),
                     source: XMLSource::Attribute,
+                    documentations: vec![],
                 };
 
                 variables.push(variable);
@@ -240,6 +243,7 @@ pub fn build_class_type_ir(
                         is_const: attr.fixed_value.is_some(),
                         default_value: attr.fixed_value.clone().or(attr.default_value.clone()),
                         source: XMLSource::Attribute,
+                        documentations: vec![],
                     };
 
                     variables.push(variable);

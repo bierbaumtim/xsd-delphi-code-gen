@@ -37,6 +37,9 @@
     {% if variable.required -%}
     /// <summary>Required</summary>
     {% endif -%}
+    {% for line in variable.documentations -%}
+    // {{line}}
+    {% endfor -%}
     {{variable.name}}: {{variable.data_type_repr}};
     {% endfor %}
     {% endif -%}
@@ -56,6 +59,9 @@
     {%- endif %}
     {% if class.has_optional_fields %}
     {% for variable in class.optional_variables -%}
+    {% for line in variable.documentations -%}
+    // {{line}}
+    {% endfor -%}
     property {{variable.name}}: TOptional<{{variable.data_type_repr}}> read F{{variable.name}} write Set{{variable.name}};
     {% endfor -%}
     {% endif %}

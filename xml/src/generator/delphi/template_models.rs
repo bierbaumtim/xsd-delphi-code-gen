@@ -32,6 +32,7 @@ pub struct Variable<'a> {
     pub requires_free: bool,
     pub required: bool,
     pub default_value: &'a Option<String>,
+    pub documentations: Vec<&'a str>,
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]

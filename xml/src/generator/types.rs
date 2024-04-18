@@ -92,6 +92,7 @@ pub struct Variable {
     pub source: XMLSource,
     pub default_value: Option<String>,
     pub is_const: bool,
+    pub documentations: Vec<String>,
 }
 
 #[derive(Clone, Debug)]

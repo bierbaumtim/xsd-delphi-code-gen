@@ -263,6 +263,7 @@ impl InternalRepresentation {
                     default_value: None,
                     is_const: false,
                     source: XMLSource::Element,
+                    documentations: node.documentations.as_ref().cloned().unwrap_or_default(),
                 }
             })
             .collect::<Vec<Variable>>()
