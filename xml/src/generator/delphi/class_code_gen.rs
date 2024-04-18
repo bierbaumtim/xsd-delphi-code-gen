@@ -1,15 +1,14 @@
-use std::io::Write;
-
 use crate::generator::{
     code_generator_trait::{CodeGenError, CodeGenOptions},
+    delphi::template_models::{
+        AttributeDeserializeVariable, ClassType as TemplateClassType, ElementDeserializeVariable,
+        SerializeVariable as TemplateSerializeVariable, Variable as TemplateVariable,
+    },
     internal_representation::DOCUMENT_NAME,
     types::{BinaryEncoding, ClassType, DataType, TypeAlias, Variable, XMLSource},
 };
 
-use super::{
-    code_writer::{CodeWriter, FunctionModifier, FunctionType},
-    helper::Helper,
-};
+use super::helper::Helper;
 
 impl DataType {
     /// Determines if the data type is a reference type.
@@ -38,1870 +37,6 @@ impl Variable {
 pub struct ClassCodeGenerator;
 
 impl ClassCodeGenerator {
-    /// Generates forwards declarations for provided classes.
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - The writer to write the code to.
-    /// * `classes` - The classes to generate the forward declarations for.
-    /// * `options` - The code generation options.
-    /// * `indentation` - The indentation level.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the code generation fails.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::io::Write;
-    /// use xsd_codegen::generator::{
-    ///   code_generator_trait::CodeGenOptions,
-    ///   internal_representation::{ClassType, DataType},
-    /// };
-    /// use xsd_codegen::generator::delphi::class_code_gen::ClassCodeGenerator;
-    /// use xsd_codegen::generator::delphi::code_writer::CodeWriter;
-    ///
-    /// let mut writer = CodeWriter::new();
-    /// let classes = vec![
-    ///   ClassType {
-    ///     name: String::from("Test"),
-    ///     qualified_name: String::from("Test"),
-    ///     super_type: None,
-    ///     variables: vec![],
-    ///     documentations: vec![],
-    ///   },
-    /// ];
-    /// let options = CodeGenOptions {
-    ///   type_prefix: String::from("T"),
-    ///   generate_to_xml: true,
-    ///   generate_from_xml: true,
-    /// };
-    ///
-    /// ClassCodeGenerator::write_forward_declerations(
-    ///   &mut writer,
-    ///   &classes,
-    ///   &options,
-    ///   0,
-    /// ).unwrap();
-    ///
-    /// assert_eq!(
-    ///  writer.to_string(),
-    /// "  {$REGION 'Forward Declarations}\n  TTest = class;\n  {$ENDREGION}\n"
-    /// );
-    /// ```
-    pub(crate) fn write_forward_declerations<T: Write>(
-        writer: &mut CodeWriter<T>,
-        classes: &Vec<ClassType>,
-        options: &CodeGenOptions,
-        indentation: usize,
-    ) -> Result<(), std::io::Error> {
-        writer.writeln("{$REGION 'Forward Declarations}", Some(indentation))?;
-        for class_type in classes {
-            if class_type.name == DOCUMENT_NAME {
-                continue;
-            }
-
-            writer.writeln_fmt(
-                format_args!(
-                    "{} = class;",
-                    Helper::as_type_name(&class_type.name, &options.type_prefix),
-                ),
-                Some(indentation),
-            )?;
-        }
-        writer.writeln("{$ENDREGION}", Some(indentation))?;
-
-        Ok(())
-    }
-
-    /// Generates the class declarations for provided classes.
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - The writer to write the code to.
-    /// * `classes` - The classes to generate the declarations for.
-    /// * `document` - The document class.
-    /// * `type_aliases` - The type aliases.
-    /// * `options` - The code generation options.
-    /// * `indentation` - The indentation level.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the code generation fails.
-    pub(crate) fn write_declarations<T: Write>(
-        writer: &mut CodeWriter<T>,
-        classes: &Vec<ClassType>,
-        document: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        indentation: usize,
-    ) -> Result<(), CodeGenError> {
-        writer.writeln("{$REGION 'Declarations}", Some(2))?;
-
-        Self::generate_class_declaration(writer, document, type_aliases, options, indentation)?;
-
-        for class_type in classes {
-            if class_type.name == DOCUMENT_NAME {
-                continue;
-            }
-
-            Self::generate_class_declaration(
-                writer,
-                class_type,
-                type_aliases,
-                options,
-                indentation,
-            )?;
-        }
-        writer.writeln("{$ENDREGION}", Some(2))?;
-
-        Ok(())
-    }
-
-    /// Generates the class implementations for provided classes.
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - The writer to write the code to.
-    /// * `classes` - The classes to generate the implementations for.
-    /// * `document` - The document class.
-    /// * `type_aliases` - The type aliases.
-    /// * `options` - The code generation options.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the code generation fails.
-    pub(crate) fn write_implementations<T: Write>(
-        writer: &mut CodeWriter<T>,
-        classes: &Vec<ClassType>,
-        document: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-    ) -> Result<(), CodeGenError> {
-        writer.writeln("{$REGION 'Classes'}", None)?;
-
-        Self::generate_class_implementation(writer, document, type_aliases, options)?;
-
-        writer.newline()?;
-
-        for (i, class_type) in classes.iter().enumerate() {
-            if class_type.name == DOCUMENT_NAME {
-                continue;
-            }
-
-            Self::generate_class_implementation(writer, class_type, type_aliases, options)?;
-
-            if i < classes.len() - 1 {
-                writer.newline()?;
-            }
-        }
-        writer.writeln("{$ENDREGION}", None)?;
-
-        Ok(())
-    }
-
-    fn generate_class_declaration<T: Write>(
-        writer: &mut CodeWriter<T>,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        indentation: usize,
-    ) -> Result<(), CodeGenError> {
-        writer.write_documentation(&class_type.documentations, Some(indentation))?;
-        Helper::write_qualified_name_comment(
-            writer,
-            &class_type.qualified_name,
-            Some(indentation),
-        )?;
-
-        writer.writeln_fmt(
-            format_args!(
-                "{} = class{}",
-                Helper::as_type_name(&class_type.name, &options.type_prefix),
-                class_type.super_type.as_ref().map_or_else(
-                    || "(TObject)".to_owned(),
-                    |(n, _)| format!("({})", Helper::as_type_name(n, &options.type_prefix))
-                )
-            ),
-            Some(indentation),
-        )?;
-
-        let optional_variable_count = class_type
-            .variables
-            .iter()
-            .filter(|v| v.needs_optional_wrapper(type_aliases))
-            .count();
-
-        if optional_variable_count > 0 {
-            writer.writeln("strict private", Some(indentation))?;
-
-            Self::generate_optional_properties_backing_fields_declaration(
-                writer,
-                class_type,
-                type_aliases,
-                options,
-                optional_variable_count,
-                indentation,
-            )?;
-        }
-
-        writer.writeln("public", Some(indentation))?;
-
-        // Constants
-        let constant_variable_count = class_type.variables.iter().filter(|v| v.is_const).count();
-
-        if constant_variable_count > 0 {
-            for variable in class_type.variables.iter().filter(|v| v.is_const) {
-                let variable_name = Helper::as_variable_name(&variable.name);
-                let lang_rep = Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix,
-                );
-
-                writer.writeln_fmt(
-                    format_args!(
-                        "const {}: {} = {};",
-                        variable_name,
-                        lang_rep,
-                        variable
-                            .default_value
-                            .as_ref()
-                            .expect("a constant variable must have a default value"),
-                    ),
-                    Some(indentation + 2),
-                )?;
-            }
-
-            writer.newline()?;
-
-            writer.writeln("var", Some(indentation))?;
-        }
-
-        // Variables
-        for variable in class_type
-            .variables
-            .iter()
-            .filter(|v| !v.is_const && !v.needs_optional_wrapper(type_aliases))
-        {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            match &variable.data_type {
-                DataType::Alias(n) => {
-                    if let Some((data_type, _)) =
-                        Helper::get_alias_data_type(n.as_str(), type_aliases)
-                    {
-                        if variable.required {
-                            Helper::write_required_comment(writer, Some(indentation + 2))?;
-                        }
-
-                        let rhs = if let DataType::InlineList(_) = data_type {
-                            Helper::as_type_name(n, &options.type_prefix)
-                        } else {
-                            Helper::get_datatype_language_representation(
-                                &variable.data_type,
-                                &options.type_prefix,
-                            )
-                        };
-
-                        writer.writeln_fmt(
-                            format_args!("{variable_name}: {rhs};"),
-                            Some(indentation + 2),
-                        )?;
-                    } else {
-                        return Err(CodeGenError::MissingDataType(
-                            class_type.name.clone(),
-                            variable_name,
-                        ));
-                    }
-                }
-                DataType::FixedSizeList(item_type, size) => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        item_type,
-                        &options.type_prefix,
-                    );
-
-                    for i in 1..=*size {
-                        if variable.required {
-                            Helper::write_required_comment(writer, Some(indentation + 2))?;
-                        }
-
-                        writer.writeln_fmt(
-                            format_args!("{variable_name}{i}: {lang_rep};"),
-                            Some(indentation + 2),
-                        )?;
-                    }
-                }
-                _ => {
-                    let lang_rep = Helper::get_datatype_language_representation(
-                        &variable.data_type,
-                        &options.type_prefix,
-                    );
-
-                    if variable.required {
-                        Helper::write_required_comment(writer, Some(indentation + 2))?;
-                    }
-
-                    writer.writeln_fmt(
-                        format_args!("{variable_name}: {lang_rep};"),
-                        Some(indentation + 2),
-                    )?;
-                }
-            }
-        }
-
-        if optional_variable_count < class_type.variables.len() {
-            writer.newline()?;
-        }
-
-        let fn_decorator = class_type
-            .super_type
-            .as_ref()
-            .map_or(FunctionModifier::Virtual, |_| FunctionModifier::Override);
-
-        // constructors and destructors
-        if options.generate_to_xml {
-            writer.write_default_constructor(Some(fn_decorator.clone()), Some(indentation + 2))?;
-        }
-        if options.generate_from_xml {
-            writer.write_constructor(
-                "FromXml",
-                Some(vec![("node", "IXMLNode")]),
-                Some(fn_decorator.clone()),
-                Some(indentation + 2),
-            )?;
-        }
-
-        if class_type
-            .variables
-            .iter()
-            .any(|v| v.requires_free || !v.required)
-        {
-            writer.write_destructor(Some(indentation + 2))?;
-        }
-
-        if options.generate_to_xml {
-            writer.newline()?;
-            writer.write_function_declaration(
-                FunctionType::Procedure,
-                "AppendToXmlRaw",
-                Some(vec![("pParent", "IXMLNode")]),
-                false,
-                Some(vec![fn_decorator.clone()]),
-                indentation + 2,
-            )?;
-
-            if class_type.name == DOCUMENT_NAME {
-                writer.newline()?;
-                writer.write_function_declaration(
-                    FunctionType::Function(String::from("String")),
-                    "ToXml",
-                    None,
-                    false,
-                    Some(vec![fn_decorator]),
-                    indentation + 2,
-                )?;
-            }
-        }
-
-        // Properties for optional value
-        if optional_variable_count > 0 {
-            Self::generate_optional_properties_declaration(
-                writer,
-                class_type,
-                type_aliases,
-                options,
-                indentation,
-            )?;
-        }
-
-        writer.writeln("end;", Some(indentation))?;
-        writer.newline()?;
-
-        Ok(())
-    }
-
-    fn generate_optional_properties_backing_fields_declaration<T: Write>(
-        writer: &mut CodeWriter<T>,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        optional_variable_count: usize,
-        indentation: usize,
-    ) -> Result<(), CodeGenError> {
-        let mut setter = Vec::with_capacity(optional_variable_count);
-
-        for variable in class_type
-            .variables
-            .iter()
-            .filter(|v| v.needs_optional_wrapper(type_aliases))
-        {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            if let DataType::FixedSizeList(item_type, size) = &variable.data_type {
-                let lang_rep =
-                    Helper::get_datatype_language_representation(item_type, &options.type_prefix);
-
-                for i in 1..=*size {
-                    writer.writeln_fmt(
-                        format_args!("F{variable_name}{i}: {lang_rep};"),
-                        Some(indentation + 2),
-                    )?;
-
-                    setter.push(format!(
-                        "procedure Set{variable_name}{i}(pValue: TOptional<{lang_rep}>);"
-                    ));
-                }
-            } else {
-                let lang_rep = Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix,
-                );
-
-                writer.writeln_fmt(
-                    format_args!("F{variable_name}: TOptional<{lang_rep}>;"),
-                    Some(indentation + 2),
-                )?;
-
-                setter.push(format!(
-                    "procedure Set{variable_name}(pValue: TOptional<{lang_rep}>);"
-                ));
-            }
-        }
-        writer.newline()?;
-        for line in setter {
-            writer.writeln(line.as_str(), Some(indentation + 2))?;
-        }
-
-        Ok(())
-    }
-
-    fn generate_optional_properties_declaration<T: Write>(
-        writer: &mut CodeWriter<T>,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        indentation: usize,
-    ) -> Result<(), CodeGenError> {
-        writer.newline()?;
-        for variable in class_type
-            .variables
-            .iter()
-            .filter(|v| v.needs_optional_wrapper(type_aliases))
-        {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            if let DataType::FixedSizeList(item_type, size) = &variable.data_type {
-                let lang_rep =
-                    Helper::get_datatype_language_representation(item_type, &options.type_prefix);
-
-                for i in 1..=*size {
-                    writer.writeln_fmt(
-                        format_args!("F{variable_name}{i}: {lang_rep};"),
-                        Some(indentation + 2),
-                    )?;
-
-                    writer.writeln_fmt(
-                        format_args!(
-                            "property {variable_name}{i}: TOptional<{lang_rep}> read F{variable_name}{i} write Set{variable_name}{i};"
-                        ),
-                        Some(indentation + 2),
-                    )?;
-                }
-            } else {
-                let lang_rep = Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix,
-                );
-
-                writer.writeln_fmt(
-                    format_args!(
-                        "property {variable_name}: TOptional<{lang_rep}> read F{variable_name} write Set{variable_name};"
-                    ),
-                    Some(indentation + 2),
-                )?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn generate_class_implementation<T: Write>(
-        writer: &mut CodeWriter<T>,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-    ) -> Result<(), CodeGenError> {
-        let formated_name = Helper::as_type_name(&class_type.name, &options.type_prefix);
-        let needs_destroy = class_type
-            .variables
-            .iter()
-            .any(|v| v.requires_free || !v.required);
-
-        writer.writeln_fmt(format_args!("{{ {formated_name} }}"), None)?;
-
-        if options.generate_to_xml {
-            Self::generate_constructor_implementation(
-                writer,
-                &formated_name,
-                class_type,
-                type_aliases,
-                options,
-            )?;
-        }
-
-        if options.generate_from_xml {
-            if options.generate_to_xml {
-                writer.newline()?;
-            }
-
-            Self::generate_from_xml_implementation(
-                writer,
-                &formated_name,
-                class_type,
-                type_aliases,
-                options,
-            )?;
-        }
-
-        if options.generate_to_xml {
-            writer.newline()?;
-            Self::generate_to_xml_implementation(writer, &formated_name, class_type, type_aliases)?;
-
-            if class_type.name == DOCUMENT_NAME {
-                writer.newline()?;
-                Self::generate_document_to_xml_implementation(writer, &formated_name)?;
-            }
-        }
-
-        Self::generate_optional_properties_setter(writer, class_type, type_aliases, options)?;
-
-        if needs_destroy {
-            writer.newline()?;
-            writer.writeln_fmt(format_args!("destructor {formated_name}.Destroy;"), None)?;
-
-            writer.writeln("begin", None)?;
-
-            for variable in class_type
-                .variables
-                .iter()
-                .filter(|v| v.requires_free || v.needs_optional_wrapper(type_aliases))
-            {
-                match &variable.data_type {
-                    DataType::FixedSizeList(_, size) => {
-                        for i in 1..=*size {
-                            writer.writeln_fmt(
-                                format_args!(
-                                    "{}{}.Free;",
-                                    Helper::as_variable_name(&variable.name),
-                                    i,
-                                ),
-                                Some(2),
-                            )?;
-                        }
-                    }
-                    _ => {
-                        writer.writeln_fmt(
-                            format_args!("{}.Free;", Helper::as_variable_name(&variable.name)),
-                            Some(2),
-                        )?;
-                    }
-                }
-            }
-
-            writer.newline()?;
-            writer.writeln("inherited;", Some(2))?;
-            writer.writeln("end;", None)?;
-        }
-
-        Ok(())
-    }
-
-    fn generate_constructor_implementation<T: Write>(
-        writer: &mut CodeWriter<T>,
-        formated_name: &String,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-    ) -> Result<(), CodeGenError> {
-        writer.writeln_fmt(format_args!("constructor {formated_name}.Create;"), None)?;
-        writer.writeln("begin", None)?;
-
-        if class_type.super_type.is_some() {
-            writer.writeln("inherited;", Some(2))?;
-            writer.newline()?;
-        }
-
-        for variable in class_type.variables.iter().filter(|v| !v.is_const) {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            match &variable.data_type {
-                DataType::Alias(name) => {
-                    if let Some((data_type, _)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        match data_type {
-                            DataType::InlineList(_) => {
-                                writer.write_variable_initialization(
-                                    variable_name.as_str(),
-                                    Helper::get_datatype_language_representation(
-                                        &variable.data_type,
-                                        &options.type_prefix,
-                                    )
-                                    .as_str(),
-                                    variable.required,
-                                    false,
-                                    variable.default_value.clone(),
-                                    Some(2),
-                                )?;
-                            }
-                            _ => {
-                                writer.write_variable_initialization(
-                                    variable_name.as_str(),
-                                    Helper::as_type_name(&name, &options.type_prefix).as_str(),
-                                    variable.required,
-                                    true,
-                                    variable.default_value.clone(),
-                                    Some(2),
-                                )?;
-                            }
-                        }
-                    }
-                }
-                DataType::Enumeration(name) => {
-                    writer.write_variable_initialization(
-                        variable_name.as_str(),
-                        Helper::as_type_name(&name, &options.type_prefix).as_str(),
-                        variable.required,
-                        true,
-                        variable.default_value.clone(),
-                        Some(2),
-                    )?;
-                }
-                DataType::Custom(name) => {
-                    writer.write_variable_initialization(
-                        variable_name.as_str(),
-                        Helper::as_type_name(&name, &options.type_prefix).as_str(),
-                        variable.required,
-                        false,
-                        variable.default_value.clone(),
-                        Some(2),
-                    )?;
-                }
-                DataType::List(_) | DataType::InlineList(_) => {
-                    writer.write_variable_initialization(
-                        variable_name.as_str(),
-                        Helper::get_datatype_language_representation(
-                            &variable.data_type,
-                            &options.type_prefix,
-                        )
-                        .as_str(),
-                        true,
-                        false,
-                        variable.default_value.clone(),
-                        Some(2),
-                    )?;
-                }
-                DataType::FixedSizeList(item_type, size) => {
-                    let rhs = match item_type.as_ref() {
-                        DataType::Alias(name) => {
-                            if let Some((data_type, _)) =
-                                Helper::get_alias_data_type(name.as_str(), type_aliases)
-                            {
-                                let type_name = Helper::as_type_name(name, &options.type_prefix);
-
-                                match data_type {
-                                    DataType::Custom(_) => String::from("nil"),
-                                    _ if variable.required => format!("Default({type_name})"),
-                                    _ => format!("TNone<{type_name}>.Create"),
-                                }
-                            } else {
-                                return Err(CodeGenError::MissingDataType(
-                                    class_type.name.clone(),
-                                    variable_name,
-                                ));
-                            }
-                        }
-                        DataType::Enumeration(name) => {
-                            let type_name = Helper::as_type_name(name, &options.type_prefix);
-
-                            if variable.required {
-                                format!("Default({type_name})")
-                            } else {
-                                format!("TNone<{type_name}>.Create")
-                            }
-                        }
-                        DataType::Custom(name) => {
-                            if variable.required {
-                                format!(
-                                    "{}.Create",
-                                    Helper::as_type_name(name, &options.type_prefix)
-                                )
-                            } else {
-                                String::from("nil")
-                            }
-                        }
-                        DataType::List(_) => {
-                            return Err(CodeGenError::NestedListInFixedSizeList(
-                                class_type.name.clone(),
-                                variable.name.clone(),
-                            ))
-                        }
-                        DataType::FixedSizeList(_, _) => {
-                            return Err(CodeGenError::NestedFixedSizeList(
-                                class_type.name.clone(),
-                                variable.name.clone(),
-                            ))
-                        }
-                        _ => {
-                            let lang_rep = Helper::get_datatype_language_representation(
-                                item_type.as_ref(),
-                                &options.type_prefix,
-                            );
-
-                            if variable.required {
-                                format!("Default({lang_rep})")
-                            } else {
-                                format!("TNone<{lang_rep}>.Create")
-                            }
-                        }
-                    };
-
-                    for i in 1..=*size {
-                        writer
-                            .writeln_fmt(format_args!("{variable_name}{i} := {rhs};"), Some(2))?;
-                    }
-                }
-                DataType::Uri => {
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!("{variable_name} := TURI.Create('');"),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!("{variable_name} := TNone<TURI>.Create;"),
-                            Some(2),
-                        )?;
-                    }
-                }
-                _ => {
-                    writer.write_variable_initialization(
-                        variable_name.as_str(),
-                        Helper::get_datatype_language_representation(
-                            &variable.data_type,
-                            &options.type_prefix,
-                        )
-                        .as_str(),
-                        variable.required,
-                        true,
-                        variable.default_value.clone(),
-                        Some(2),
-                    )?;
-                }
-            }
-        }
-
-        writer.writeln("end;", None)?;
-
-        Ok(())
-    }
-
-    fn generate_from_xml_implementation<T: Write>(
-        writer: &mut CodeWriter<T>,
-        formated_name: &String,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-    ) -> Result<(), CodeGenError> {
-        writer.writeln_fmt(
-            format_args!("constructor {formated_name}.FromXml(node: IXMLNode);"),
-            None,
-        )?;
-        writer.writeln("begin", None)?;
-
-        if class_type.super_type.is_some() {
-            writer.writeln("inherited;", Some(2))?;
-            writer.newline()?;
-        }
-
-        if class_type
-            .variables
-            .iter()
-            .any(|v| !v.required && !v.is_const && v.source == XMLSource::Element)
-        {
-            writer.writeln("// Variables", Some(2))?;
-            writer.writeln("var vOptionalNode: IXMLNode;", Some(2))?;
-            writer.newline()?;
-        }
-
-        for variable in class_type
-            .variables
-            .iter()
-            .filter(|v| !v.is_const && v.source == XMLSource::Element)
-        {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            match &variable.data_type {
-                DataType::Alias(name) => {
-                    if let Some((data_type, pattern)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        match data_type {
-                            DataType::InlineList(lt) => {
-                                Self::generate_inline_list_from_xml(
-                                    writer,
-                                    type_aliases,
-                                    options,
-                                    variable,
-                                    lt.as_ref(),
-                                )?;
-                            }
-                            _ => writer.writeln_fmt(
-                                format_args!(
-                                    "{} := {};",
-                                    variable_name,
-                                    Self::generate_standard_type_from_xml(
-                                        &data_type,
-                                        format!("node.ChildNodes['{}'].Text", variable.xml_name),
-                                        pattern,
-                                    )
-                                ),
-                                Some(2),
-                            )?,
-                        }
-                    }
-                }
-                DataType::Enumeration(name) => {
-                    let type_name = Helper::as_type_name(name, &options.type_prefix);
-
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := {}.FromXmlValue(node.ChildNodes['{}'].Text);",
-                                variable_name, type_name, variable.xml_name
-                            ),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "vOptionalNode := node.ChildNodes.FindNode('{}');",
-                                variable.xml_name
-                            ),
-                            Some(2),
-                        )?;
-                        writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{variable_name} := TSome<{type_name}>.Create({type_name}.FromXmlValue(vOptionalNode.Text));"
-                            ),
-                            Some(4),
-                        )?;
-                        writer.writeln("end else begin", Some(2))?;
-                        writer.writeln_fmt(
-                            format_args!("{variable_name} := TNone<{type_name}>.Create"),
-                            Some(4),
-                        )?;
-                        writer.writeln("end;", Some(2))?;
-                        writer.newline()?;
-                    }
-                }
-                DataType::Custom(name) => {
-                    let type_name = Helper::as_type_name(name, &options.type_prefix);
-
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := {}.FromXml(node.ChildNodes['{}']);",
-                                variable_name, type_name, variable.xml_name
-                            ),
-                            Some(2),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "vOptionalNode := node.ChildNodes.FindNode('{}');",
-                                variable.xml_name
-                            ),
-                            Some(2),
-                        )?;
-                        writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
-                        writer.writeln_fmt(
-                            format_args!("{variable_name} := {type_name}.FromXml(vOptionalNode);"),
-                            Some(4),
-                        )?;
-                        writer.writeln("end else begin", Some(2))?;
-                        writer.writeln_fmt(format_args!("{variable_name} := nil;"), Some(4))?;
-                        writer.writeln("end;", Some(2))?;
-                        writer.newline()?;
-                    }
-                }
-                DataType::List(item_type) => {
-                    Self::generate_list_from_xml(
-                        writer,
-                        type_aliases,
-                        options,
-                        variable,
-                        item_type,
-                    )?;
-                }
-                DataType::FixedSizeList(item_type, size) => {
-                    Self::generate_fixed_size_list_from_xml(
-                        writer,
-                        type_aliases,
-                        options,
-                        variable,
-                        item_type,
-                        *size,
-                    )?;
-                }
-                DataType::InlineList(lt) => {
-                    Self::generate_inline_list_from_xml(
-                        writer,
-                        type_aliases,
-                        options,
-                        variable,
-                        lt.as_ref(),
-                    )?;
-                }
-                _ => {
-                    if variable.required {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := {};",
-                                variable_name,
-                                Self::generate_standard_type_from_xml(
-                                    &variable.data_type,
-                                    format!("node.ChildNodes['{}'].Text", variable.xml_name),
-                                    None,
-                                )
-                            ),
-                            Some(2),
-                        )?;
-                    } else {
-                        let lang_rep = Helper::get_datatype_language_representation(
-                            &variable.data_type,
-                            &options.type_prefix,
-                        );
-
-                        writer.writeln_fmt(
-                            format_args!(
-                                "vOptionalNode := node.ChildNodes.FindNode('{}');",
-                                variable.xml_name
-                            ),
-                            Some(2),
-                        )?;
-                        writer.writeln("if Assigned(vOptionalNode) then begin", Some(2))?;
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := TSome<{}>.Create({});",
-                                variable_name,
-                                lang_rep,
-                                Self::generate_standard_type_from_xml(
-                                    &variable.data_type,
-                                    "vOptionalNode.Text".to_owned(),
-                                    None,
-                                ),
-                            ),
-                            Some(4),
-                        )?;
-                        writer.writeln("end else begin", Some(2))?;
-                        writer.writeln_fmt(
-                            format_args!("{variable_name} := TNone<{lang_rep}>.Create"),
-                            Some(4),
-                        )?;
-                        writer.writeln("end;", Some(2))?;
-                        writer.newline()?;
-                    }
-                }
-            }
-        }
-
-        if class_type
-            .variables
-            .iter()
-            .any(|v| !v.is_const && v.source == XMLSource::Attribute)
-        {
-            writer.writeln("// Attributes", Some(2))?;
-        }
-
-        for variable in class_type
-            .variables
-            .iter()
-            .filter(|v| !v.is_const && v.source == XMLSource::Attribute)
-        {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            match &variable.data_type {
-                DataType::Alias(name) => {
-                    if let Some((data_type, pattern)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "if node.HasAttribute('{}') then begin",
-                                variable.xml_name
-                            ),
-                            Some(2),
-                        )?;
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{} := {};",
-                                variable_name,
-                                Self::generate_standard_type_from_xml(
-                                    &data_type,
-                                    format!("node.Attributes['{}']", variable.xml_name),
-                                    pattern.clone(),
-                                )
-                            ),
-                            Some(4),
-                        )?;
-                        writer.writeln("end else begin", Some(2))?;
-                        match (variable.required, &variable.default_value) {
-                            (false, None) => {
-                                let lang_rep = Helper::get_datatype_language_representation(
-                                    &data_type,
-                                    &options.type_prefix,
-                                );
-
-                                writer.writeln_fmt(
-                                    format_args!("{variable_name} := TNone<{lang_rep}>.Create"),
-                                    Some(4),
-                                )?;
-                            }
-                            (true, None) => {
-                                writer.writeln_fmt(format_args!("raise Exception.Create('Required attribute \"{}\" is missing');", variable.xml_name), Some(4))?;
-                            }
-                            (_, Some(defval)) => {
-                                writer.writeln_fmt(
-                                    format_args!("{} := {};", variable_name, defval),
-                                    Some(4),
-                                )?;
-                            }
-                        }
-
-                        writer.writeln("end;", Some(2))?;
-                    }
-                }
-                // DataType::Enumeration(name) => {
-                //     writer.writeln_fmt(
-                //         format_args!(
-                //             "{} := {}.FromXmlValue(node.Attributes['{}']);",
-                //             variable_name,
-                //             Helper::as_type_name(name, &options.type_prefix),
-                //             variable.xml_name
-                //         ),
-                //         Some(2),
-                //     )?;
-                // }
-                // DataType::List(item_type) => {
-                //     Self::generate_list_from_xml(
-                //         writer,
-                //         type_aliases,
-                //         options,
-                //         variable,
-                //         item_type,
-                //     )?;
-                // }
-                _ => {
-                    writer.writeln_fmt(
-                        format_args!("if node.HasAttribute('{}') then begin", variable.xml_name),
-                        Some(2),
-                    )?;
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{} := {};",
-                            variable_name,
-                            Self::generate_standard_type_from_xml(
-                                &variable.data_type,
-                                format!("node.Attributes['{}']", variable.xml_name),
-                                None,
-                            )
-                        ),
-                        Some(4),
-                    )?;
-                    writer.writeln("end else begin", Some(2))?;
-                    match (variable.required, &variable.default_value) {
-                        (false, None) => {
-                            let lang_rep = Helper::get_datatype_language_representation(
-                                &variable.data_type,
-                                &options.type_prefix,
-                            );
-
-                            writer.writeln_fmt(
-                                format_args!("{variable_name} := TNone<{lang_rep}>.Create"),
-                                Some(4),
-                            )?;
-                        }
-                        (true, None) => {
-                            writer.writeln_fmt(format_args!("raise Exception.Create('Required attribute \"{}\" is missing');", variable.xml_name), Some(4))?;
-                        }
-                        (_, Some(defval)) => {
-                            writer.writeln_fmt(
-                                format_args!("{} := {};", variable_name, defval),
-                                Some(4),
-                            )?;
-                        }
-                    }
-
-                    writer.writeln("end;", Some(2))?;
-                }
-            }
-        }
-
-        writer.writeln("end;", None)?;
-
-        Ok(())
-    }
-
-    fn generate_list_from_xml<T: Write>(
-        writer: &mut CodeWriter<T>,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        variable: &Variable,
-        item_type: &DataType,
-    ) -> Result<(), CodeGenError> {
-        let formatted_variable_name = Helper::as_variable_name(&variable.name);
-
-        writer.writeln_fmt(
-            format_args!(
-                "{} := {}.Create;",
-                formatted_variable_name,
-                Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix
-                ),
-            ),
-            Some(2),
-        )?;
-        writer.newline()?;
-
-        writer.writeln_fmt(
-            format_args!(
-                "var __{}Index := node.ChildNodes.IndexOf('{}');",
-                variable.name, variable.xml_name
-            ),
-            Some(2),
-        )?;
-        writer.writeln_fmt(
-            format_args!("if __{}Index >= 0 then begin", variable.name),
-            Some(2),
-        )?;
-
-        writer.writeln_fmt(
-            format_args!(
-                "for var I := 0 to node.ChildNodes.Count - __{}Index - 1 do begin",
-                variable.name
-            ),
-            Some(4),
-        )?;
-        writer.writeln_fmt(
-            format_args!(
-                "var __{}Node := node.ChildNodes[__{}Index + I];",
-                variable.name, variable.name,
-            ),
-            Some(6),
-        )?;
-        writer.writeln_fmt(
-            format_args!(
-                "if __{}Node.LocalName <> '{}' then continue;",
-                variable.name, variable.xml_name,
-            ),
-            Some(6),
-        )?;
-
-        match item_type {
-            DataType::Enumeration(name) => {
-                writer.writeln_fmt(
-                    format_args!(
-                        "{}.Add({}.FromXmlValue(__{}Node.Text));",
-                        formatted_variable_name,
-                        Helper::as_type_name(name, &options.type_prefix),
-                        variable.name,
-                    ),
-                    Some(6),
-                )?;
-            }
-            DataType::Alias(name) => {
-                if let Some((data_type, pattern)) =
-                    Helper::get_alias_data_type(name.as_str(), type_aliases)
-                {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "var {} := {};",
-                            Helper::as_variable_name(&variable.name),
-                            Self::generate_standard_type_from_xml(
-                                &data_type,
-                                format!("__{}Node.Text", variable.name),
-                                pattern,
-                            )
-                        ),
-                        Some(6),
-                    )?;
-                    writer.writeln_fmt(
-                        format_args!("{formatted_variable_name}.Add(__{formatted_variable_name});"),
-                        Some(6),
-                    )?;
-                }
-            }
-            DataType::Custom(name) => {
-                writer.writeln_fmt(
-                    format_args!(
-                        "{}.Add({}.FromXml(__{}Node));",
-                        formatted_variable_name,
-                        Helper::as_type_name(name, &options.type_prefix),
-                        variable.name,
-                    ),
-                    Some(6),
-                )?;
-            }
-            _ => {
-                writer.writeln_fmt(
-                    format_args!(
-                        "var __{} := {};",
-                        formatted_variable_name,
-                        Self::generate_standard_type_from_xml(
-                            item_type,
-                            format!("__{}Node.Text", variable.name),
-                            None,
-                        )
-                    ),
-                    Some(6),
-                )?;
-                writer.writeln_fmt(
-                    format_args!("{formatted_variable_name}.Add(__{formatted_variable_name});"),
-                    Some(6),
-                )?;
-            }
-        }
-        writer.writeln("end;", Some(4))?;
-        writer.writeln("end;", Some(2))?;
-        writer.newline()?;
-
-        Ok(())
-    }
-
-    fn generate_fixed_size_list_from_xml<T: Write>(
-        writer: &mut CodeWriter<T>,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        variable: &Variable,
-        item_type: &DataType,
-        size: usize,
-    ) -> Result<(), CodeGenError> {
-        for i in 1..=size {
-            writer.writeln_fmt(
-                format_args!(
-                    "{}{} := Default({});",
-                    Helper::as_variable_name(&variable.name),
-                    i,
-                    Helper::get_datatype_language_representation(item_type, &options.type_prefix),
-                ),
-                Some(2),
-            )?;
-        }
-
-        writer.newline()?;
-        writer.writeln_fmt(
-            format_args!(
-                "var __{}Index := node.ChildNodes.IndexOf('{}');",
-                variable.name, variable.xml_name
-            ),
-            Some(2),
-        )?;
-        writer.writeln_fmt(
-            format_args!("if __{}Index >= 0 then begin", variable.name),
-            Some(2),
-        )?;
-        writer.writeln_fmt(
-            format_args!("for var I := 0 to {} do begin", size - 1),
-            Some(4),
-        )?;
-        writer.writeln_fmt(
-            format_args!(
-                "var __{}Node := node.ChildNodes[__{}Index + I];",
-                variable.name, variable.name,
-            ),
-            Some(6),
-        )?;
-        writer.writeln_fmt(
-            format_args!(
-                "if __{}Node.LocalName <> '{}' then break;",
-                variable.name, variable.xml_name,
-            ),
-            Some(6),
-        )?;
-        writer.newline()?;
-        writer.writeln("case I of", Some(6))?;
-        for i in 1..=size {
-            match item_type {
-                DataType::Enumeration(name) => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{}: {}{} := {}.FromXmlValue(__{}Node.Text);",
-                            i - 1,
-                            Helper::as_variable_name(&variable.name),
-                            i,
-                            Helper::as_type_name(name, &options.type_prefix),
-                            variable.name,
-                        ),
-                        Some(8),
-                    )?;
-                }
-                DataType::Alias(name) => {
-                    if let Some((data_type, pattern)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        writer.writeln_fmt(
-                            format_args!(
-                                "{}: {}{} := {};",
-                                i - 1,
-                                Helper::as_variable_name(&variable.name),
-                                i,
-                                Self::generate_standard_type_from_xml(
-                                    &data_type,
-                                    format!("__{}Node.Text", variable.name),
-                                    pattern,
-                                )
-                            ),
-                            Some(8),
-                        )?;
-                    }
-                }
-                DataType::Custom(name) => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{}: {}{} := {}.FromXml(__{}Node);",
-                            i - 1,
-                            Helper::as_variable_name(&variable.name),
-                            i,
-                            Helper::as_type_name(name, &options.type_prefix),
-                            variable.name,
-                        ),
-                        Some(8),
-                    )?;
-                }
-                _ => {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{}: {}{} := {};",
-                            i - 1,
-                            Helper::as_variable_name(&variable.name),
-                            i,
-                            Self::generate_standard_type_from_xml(
-                                item_type,
-                                format!("__{}Node.Text", variable.name),
-                                None,
-                            ),
-                        ),
-                        Some(8),
-                    )?;
-                }
-            }
-        }
-        writer.writeln("end;", Some(6))?;
-        writer.writeln("end;", Some(4))?;
-        writer.writeln("end;", Some(2))?;
-        Ok(())
-    }
-
-    fn generate_inline_list_from_xml<T: Write>(
-        writer: &mut CodeWriter<T>,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-        variable: &Variable,
-        item_type: &DataType,
-    ) -> Result<(), CodeGenError> {
-        let formatted_variable_name = Helper::as_variable_name(&variable.name);
-        let mut indentation = 2;
-
-        writer.newline()?;
-        writer.writeln_fmt(
-            format_args!(
-                "{} := {}.Create;",
-                formatted_variable_name,
-                Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix
-                ),
-            ),
-            Some(indentation),
-        )?;
-
-        if variable.required {
-            writer.writeln_fmt(
-                format_args!(
-                    "for var vPart in node.ChildNodes['{}'].Text.Split([' ']) do begin",
-                    variable.xml_name,
-                ),
-                Some(indentation),
-            )?;
-        } else {
-            writer.writeln_fmt(
-                format_args!(
-                    "vOptionalNode := node.ChildNodes.FindNode('{}');",
-                    variable.xml_name
-                ),
-                Some(indentation),
-            )?;
-            writer.writeln("if Assigned(vOptionalNode) then begin", Some(indentation))?;
-
-            indentation = 4;
-            writer.writeln(
-                "for var vPart in vOptionalNode.Text.Split([' ']) do begin",
-                Some(indentation),
-            )?;
-        }
-
-        match item_type {
-            DataType::Alias(name) => {
-                if let Some((data_type, pattern)) =
-                    Helper::get_alias_data_type(name.as_str(), type_aliases)
-                {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "{}.Add({});",
-                            formatted_variable_name,
-                            Self::generate_standard_type_from_xml(
-                                &data_type,
-                                "vPart".to_owned(),
-                                pattern,
-                            ),
-                        ),
-                        Some(indentation + 2),
-                    )?;
-                }
-            }
-            DataType::Enumeration(n) | DataType::Union(n) => {
-                writer.writeln_fmt(
-                    format_args!(
-                        "{}.Add({}Helper.FromXmlValue(vPart));",
-                        formatted_variable_name,
-                        Helper::as_type_name(n, &options.type_prefix),
-                    ),
-                    Some(indentation + 2),
-                )?;
-            }
-            DataType::Custom(_)
-            | DataType::List(_)
-            | DataType::FixedSizeList(_, _)
-            | DataType::InlineList(_) => todo!(),
-            _ => writer.writeln_fmt(
-                format_args!(
-                    "{}.Add({});",
-                    formatted_variable_name,
-                    Self::generate_standard_type_from_xml(item_type, "vPart".to_owned(), None),
-                ),
-                Some(indentation + 2),
-            )?,
-        };
-
-        if !variable.required {
-            writer.writeln("end;", Some(indentation))?;
-        }
-
-        writer.writeln("end;", Some(2))?;
-
-        Ok(())
-    }
-
-    fn generate_document_to_xml_implementation<T: Write>(
-        writer: &mut CodeWriter<T>,
-        formated_name: &String,
-    ) -> Result<(), std::io::Error> {
-        writer.writeln_fmt(
-            format_args!("function {formated_name}.ToXml: String;"),
-            None,
-        )?;
-        writer.writeln("begin", None)?;
-        writer.writeln("var vXmlDoc := NewXMLDocument;", Some(2))?;
-        writer.newline()?;
-        writer.writeln("AppendToXmlRaw(vXmlDoc.Node);", Some(2))?;
-        writer.newline()?;
-        writer.writeln("vXmlDoc.SaveToXML(Result);", Some(2))?;
-        writer.writeln("end;", None)?;
-
-        Ok(())
-    }
-
-    fn generate_to_xml_implementation<T: Write>(
-        writer: &mut CodeWriter<T>,
-        formated_name: &String,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-    ) -> Result<(), CodeGenError> {
-        writer.writeln_fmt(
-            format_args!("procedure {formated_name}.AppendToXmlRaw(pParent: IXMLNode);"),
-            None,
-        )?;
-        writer.writeln("begin", None)?;
-
-        if class_type.super_type.is_some() {
-            writer.writeln("inherited;", Some(2))?;
-            writer.newline()?;
-        }
-
-        writer.writeln("var node: IXMLNode;", Some(2))?;
-        writer.newline()?;
-        for (index, variable) in class_type.variables.iter().enumerate() {
-            let variable_name = Helper::as_variable_name(&variable.name);
-            let mut indentation = 2;
-
-            match &variable.data_type {
-                DataType::Alias(name) => {
-                    if let Some((data_type, pattern)) =
-                        Helper::get_alias_data_type(name.as_str(), type_aliases)
-                    {
-                        match data_type {
-                            DataType::InlineList(lt) => {
-                                if variable.required {
-                                    writer.writeln_fmt(
-                                        format_args!(
-                                            "if Assigned({variable_name}) and {variable_name}.Count > 0 then begin"
-                                        ),
-                                        Some(2),
-                                    )?;
-                                    indentation = 4;
-                                }
-
-                                writer.writeln_fmt(
-                                    format_args!(
-                                        "node := pParent.AddChild('{}');",
-                                        variable.xml_name
-                                    ),
-                                    Some(indentation),
-                                )?;
-                                writer.writeln_fmt(
-                                    format_args!(
-                                        "for var I := 0 to {variable_name}.Count - 1 do begin"
-                                    ),
-                                    Some(indentation),
-                                )?;
-                                writer.writeln_fmt(
-                                    format_args!(
-                                        "node.Text := node.Text + {};",
-                                        Helper::get_variable_value_as_string(
-                                            lt.as_ref(),
-                                            &format!("{variable_name}[I]"),
-                                            &pattern
-                                        )
-                                    ),
-                                    Some(indentation + 2),
-                                )?;
-                                writer.newline()?;
-                                writer.writeln_fmt(
-                                    format_args!("if I < {variable_name}.Count - 1 then begin"),
-                                    Some(4),
-                                )?;
-                                writer.writeln(
-                                    "node.Text := node.Text + ' ';",
-                                    Some(indentation + 4),
-                                )?;
-                                writer.writeln("end;", Some(indentation + 2))?;
-                                writer.writeln("end;", Some(indentation))?;
-
-                                if variable.required {
-                                    writer.writeln("end;", Some(2))?;
-                                }
-                            }
-                            _ => {
-                                if !variable.needs_optional_wrapper(type_aliases) {
-                                    for arg in Self::generate_standard_type_to_xml(
-                                        &data_type,
-                                        &variable_name,
-                                        &variable.xml_name,
-                                        &pattern,
-                                        &variable.source,
-                                    ) {
-                                        writer.writeln(arg.as_str(), Some(indentation))?;
-                                    }
-                                } else {
-                                    writer.writeln_fmt(
-                                        format_args!("if {variable_name}.IsSome then begin"),
-                                        Some(2),
-                                    )?;
-                                    for arg in Self::generate_standard_type_to_xml(
-                                        &data_type,
-                                        &(variable_name.clone() + ".Unwrap"),
-                                        &variable.xml_name,
-                                        &pattern,
-                                        &variable.source,
-                                    ) {
-                                        writer.writeln(arg.as_str(), Some(indentation + 2))?;
-                                    }
-                                    writer.writeln("end;", Some(2))?;
-                                }
-                            }
-                        }
-                    }
-                }
-                DataType::Enumeration(_) => {
-                    if !variable.needs_optional_wrapper(type_aliases) {
-                        writer.writeln_fmt(
-                            format_args!("node := pParent.AddChild('{}');", variable.xml_name),
-                            Some(indentation),
-                        )?;
-
-                        writer.writeln_fmt(
-                            format_args!("node.Text := {variable_name}.ToXmlValue;"),
-                            Some(indentation),
-                        )?;
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!("if {variable_name}.IsSome then begin"),
-                            Some(2),
-                        )?;
-                        writer.writeln_fmt(
-                            format_args!("node := pParent.AddChild('{}');", variable.xml_name),
-                            Some(indentation + 2),
-                        )?;
-
-                        writer.writeln_fmt(
-                            format_args!("node.Text := {variable_name}.Unwrap.ToXmlValue;"),
-                            Some(indentation + 2),
-                        )?;
-                        writer.writeln("end;", Some(2))?;
-                    }
-                }
-                DataType::Custom(_) => {
-                    if !variable.required {
-                        writer.writeln_fmt(
-                            format_args!("if Assigned({variable_name}) then begin"),
-                            Some(2),
-                        )?;
-
-                        indentation = 4;
-                    }
-                    writer.writeln_fmt(
-                        format_args!("node := pParent.AddChild('{}');", variable.xml_name),
-                        Some(indentation),
-                    )?;
-                    writer.writeln_fmt(
-                        format_args!("{variable_name}.AppendToXmlRaw(node);"),
-                        Some(indentation),
-                    )?;
-                    if !variable.required {
-                        writer.writeln("end;", Some(2))?;
-                    }
-                }
-                DataType::List(lt) => {
-                    writer.writeln_fmt(
-                        format_args!("for var {} in {} do begin", variable.name, variable_name),
-                        Some(indentation),
-                    )?;
-                    Self::generate_list_to_xml(
-                        writer,
-                        lt,
-                        &variable_name,
-                        &variable.xml_name,
-                        type_aliases,
-                        indentation + 2,
-                    )?;
-                    writer.writeln("end;", Some(indentation))?;
-                }
-                DataType::FixedSizeList(item_type, size) => {
-                    for i in 1..=*size {
-                        // TODO: Abhängig vom DataType Assigned oder Unwrap
-                        Self::generate_list_to_xml(
-                            writer,
-                            item_type,
-                            &(Helper::first_char_uppercase(&variable.name)
-                                + i.to_string().as_str()),
-                            &variable.xml_name,
-                            type_aliases,
-                            indentation,
-                        )?;
-
-                        if i < *size {
-                            writer.newline()?;
-                        }
-                    }
-                }
-                _ => {
-                    if !variable.needs_optional_wrapper(type_aliases) {
-                        for arg in Self::generate_standard_type_to_xml(
-                            &variable.data_type,
-                            &variable_name,
-                            &variable.xml_name,
-                            &None,
-                            &variable.source,
-                        ) {
-                            writer.writeln(arg.as_str(), Some(indentation))?;
-                        }
-                    } else {
-                        writer.writeln_fmt(
-                            format_args!("if {variable_name}.IsSome then begin"),
-                            Some(2),
-                        )?;
-                        for arg in Self::generate_standard_type_to_xml(
-                            &variable.data_type,
-                            &(variable_name.clone() + ".Unwrap"),
-                            &variable.xml_name,
-                            &None,
-                            &variable.source,
-                        ) {
-                            writer.writeln(arg.as_str(), Some(indentation + 2))?;
-                        }
-                        writer.writeln("end;", Some(2))?;
-                    }
-                }
-            }
-
-            if index < class_type.variables.len() - 1 {
-                writer.newline()?;
-            }
-        }
-        writer.writeln("end;", None)?;
-        Ok(())
-    }
-
-    fn generate_list_to_xml<T: Write>(
-        writer: &mut CodeWriter<T>,
-        data_type: &DataType,
-        variable_name: &String,
-        xml_name: &String,
-        type_aliases: &[TypeAlias],
-        indentation: usize,
-    ) -> Result<(), CodeGenError> {
-        match data_type {
-            DataType::Enumeration(_) => {
-                writer.writeln_fmt(
-                    format_args!("node := pParent.AddChild('{xml_name}');"),
-                    Some(indentation),
-                )?;
-
-                writer.writeln_fmt(
-                    format_args!("node.Text := {variable_name}.ToXmlValue;"),
-                    Some(indentation),
-                )?;
-            }
-            DataType::Alias(name) => {
-                if let Some((data_type, pattern)) =
-                    Helper::get_alias_data_type(name.as_str(), type_aliases)
-                {
-                    for arg in Self::generate_standard_type_to_xml(
-                        &data_type,
-                        variable_name,
-                        xml_name,
-                        &pattern,
-                        &XMLSource::Element,
-                    ) {
-                        writer.writeln(arg.as_str(), Some(indentation))?;
-                    }
-                }
-            }
-            DataType::Custom(_) => {
-                writer.writeln_fmt(
-                    format_args!("node := pParent.AddChild('{xml_name}');"),
-                    Some(indentation),
-                )?;
-                writer.writeln_fmt(
-                    format_args!("{variable_name}.AppendToXmlRaw(node);"),
-                    Some(indentation),
-                )?;
-            }
-            DataType::List(_) => (),
-            _ => {
-                for arg in Self::generate_standard_type_to_xml(
-                    data_type,
-                    variable_name,
-                    xml_name,
-                    &None,
-                    &XMLSource::Element,
-                ) {
-                    writer.writeln(arg.as_str(), Some(indentation))?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn generate_optional_properties_setter<T: Write>(
-        writer: &mut CodeWriter<T>,
-        class_type: &ClassType,
-        type_aliases: &[TypeAlias],
-        options: &CodeGenOptions,
-    ) -> Result<(), std::io::Error> {
-        let optional_variables_count = class_type
-            .variables
-            .iter()
-            .filter(|v| v.needs_optional_wrapper(type_aliases))
-            .count();
-
-        if optional_variables_count == 0 {
-            return Ok(());
-        }
-
-        writer.newline()?;
-
-        let class_type_name = Helper::as_type_name(&class_type.name, &options.type_prefix);
-
-        for (i, variable) in class_type
-            .variables
-            .iter()
-            .filter(|v| v.needs_optional_wrapper(type_aliases))
-            .enumerate()
-        {
-            let variable_name = Helper::as_variable_name(&variable.name);
-
-            if let DataType::FixedSizeList(item_type, size) = &variable.data_type {
-                let lang_rep =
-                    Helper::get_datatype_language_representation(item_type, &options.type_prefix);
-
-                for i in 1..=*size {
-                    writer.writeln_fmt(
-                        format_args!(
-                            "procedure {class_type_name}.Set{variable_name}{i}(pValue: TOptional<{lang_rep}>);"
-                        ),
-                        None,
-                    )?;
-                    writer.writeln("begin", None)?;
-                    writer.writeln_fmt(
-                        format_args!(
-                            "if F{variable_name}{i} <> pValue then F{variable_name}.Free;"
-                        ),
-                        Some(2),
-                    )?;
-                    writer.newline()?;
-                    writer.writeln_fmt(format_args!("F{variable_name}{i} := pValue;"), Some(2))?;
-                    writer.writeln("end;", None)?;
-
-                    if i < *size {
-                        writer.newline()?;
-                    }
-                }
-            } else {
-                let lang_rep = Helper::get_datatype_language_representation(
-                    &variable.data_type,
-                    &options.type_prefix,
-                );
-
-                writer.writeln_fmt(
-                    format_args!(
-                        "procedure {class_type_name}.Set{variable_name}(pValue: TOptional<{lang_rep}>);"
-                    ),
-                    None,
-                )?;
-                writer.writeln("begin", None)?;
-                writer.writeln_fmt(
-                    format_args!("if F{variable_name} <> pValue then F{variable_name}.Free;"),
-                    Some(2),
-                )?;
-                writer.newline()?;
-                writer.writeln_fmt(format_args!("F{variable_name} := pValue;"), Some(2))?;
-                writer.writeln("end;", None)?;
-            }
-
-            if i < optional_variables_count - 1 {
-                writer.newline()?;
-            }
-        }
-
-        Ok(())
-    }
-
     fn generate_standard_type_from_xml(
         data_type: &DataType,
         value: String,
@@ -1942,35 +77,842 @@ impl ClassCodeGenerator {
         }
     }
 
-    fn generate_standard_type_to_xml(
-        data_type: &DataType,
-        variable_name: &String,
-        xml_name: &String,
-        pattern: &Option<String>,
-        xml_source: &XMLSource,
-    ) -> Vec<String> {
-        match data_type {
-            DataType::Alias(_)
-            | DataType::Custom(_)
-            | DataType::Enumeration(_)
-            | DataType::List(_)
-            | DataType::FixedSizeList(_, _)
-            | DataType::Union(_) => vec![],
-            _ => match xml_source {
-                XMLSource::Element => vec![
-                    format!("node := pParent.AddChild('{}');", xml_name),
-                    format!(
-                        "node.Text := {};",
-                        Helper::get_variable_value_as_string(data_type, variable_name, pattern),
-                    ),
-                ],
-                XMLSource::Attribute => vec![format!(
-                    "node.Attributes['{}'] := {};",
-                    xml_name,
-                    Helper::get_variable_value_as_string(data_type, variable_name, pattern),
-                )],
-            },
+    fn get_variable_initialization_code(
+        name: &str,
+        type_name: &str,
+        is_required: bool,
+        is_value_type: bool,
+        default_value: Option<String>,
+    ) -> String {
+        match (is_required, is_value_type, default_value) {
+            (false, false, _) => format!("{name} := nil;"),
+            (false, true, None) => format!("{name} := TNone<{type_name}>.Create;"),
+            (true, false, _) => format!("{name} := {type_name}.Create;"),
+            (true, true, None) => format!("{name} := Default({type_name});"),
+            (_, true, Some(v)) => format!("{name} := {v};"),
         }
+    }
+
+    pub(crate) fn build_template_models<'a>(
+        classes: &'a [ClassType],
+        type_aliases: &'a [TypeAlias],
+        options: &'a CodeGenOptions,
+    ) -> Result<Vec<TemplateClassType<'a>>, CodeGenError> {
+        classes
+            .iter()
+            .filter(|c| c.name != DOCUMENT_NAME)
+            .map(|c| Self::build_class_template_model(c, type_aliases, options))
+            .collect::<Result<Vec<TemplateClassType<'a>>, CodeGenError>>()
+    }
+
+    pub(crate) fn build_class_template_model<'a>(
+        class_type: &'a ClassType,
+        type_aliases: &'a [TypeAlias],
+        options: &'a CodeGenOptions,
+    ) -> Result<TemplateClassType<'a>, CodeGenError> {
+        let needs_destructor = class_type
+            .variables
+            .iter()
+            .any(|v| v.requires_free || !v.required);
+
+        let documentations = class_type
+            .documentations
+            .iter()
+            .flat_map(|d| d.lines())
+            .collect::<Vec<&str>>();
+
+        let constant_variables = class_type
+            .variables
+            .iter()
+            .filter(|v| v.is_const)
+            .map(|v| Self::build_standard_template_variable(v, options))
+            .collect::<Vec<TemplateVariable>>();
+
+        let optional_variables = class_type
+            .variables
+            .iter()
+            .filter(|v| v.needs_optional_wrapper(type_aliases))
+            .flat_map(|v| match &v.data_type {
+                DataType::FixedSizeList(dt, size) => {
+                    Self::build_fixed_size_list_template_variable(v, dt, *size, options)
+                }
+                _ => vec![Self::build_standard_template_variable(v, options)],
+            })
+            .collect::<Vec<TemplateVariable>>();
+
+        let variables = Self::build_template_variables(class_type, type_aliases, options)?;
+
+        let serialize_variables = Self::build_serialize_variables(class_type, type_aliases)?;
+
+        let variable_initializer =
+            Self::build_variable_initializer(class_type, type_aliases, options)?;
+
+        let has_optional_element_variables = class_type
+            .variables
+            .iter()
+            .any(|v| !v.required && !v.is_const && v.source == XMLSource::Element);
+
+        let deserialize_element_variables =
+            Self::build_deserialize_element_variables(class_type, type_aliases, options);
+
+        let deserialize_attribute_variables =
+            Self::build_deserialize_attribute_variables(class_type, type_aliases, options);
+
+        Ok(TemplateClassType {
+            name: Helper::as_type_name(&class_type.name, &options.type_prefix),
+            qualified_name: class_type.qualified_name.clone(),
+            super_type: class_type
+                .super_type
+                .as_ref()
+                .map(|(n, _)| Helper::as_type_name(n, &options.type_prefix)),
+            has_optional_fields: !optional_variables.is_empty(),
+            has_constant_fields: !constant_variables.is_empty(),
+            documentations,
+            needs_destructor,
+            variables,
+            constant_variables,
+            optional_variables,
+            serialize_variables,
+            variable_initializer,
+            has_optional_element_variables,
+            deserialize_attribute_variables,
+            deserialize_element_variables,
+        })
+    }
+
+    fn build_template_variables<'a>(
+        class_type: &'a ClassType,
+        type_aliases: &'a [TypeAlias],
+        options: &'a CodeGenOptions,
+    ) -> Result<Vec<TemplateVariable>, CodeGenError> {
+        let variables = class_type
+            .variables
+            .iter()
+            .filter(|v| !v.is_const && !v.needs_optional_wrapper(type_aliases))
+            .map(|v| match &v.data_type {
+                DataType::Alias(n) => {
+                    if let Some((data_type, _)) =
+                        Helper::get_alias_data_type(n.as_str(), type_aliases)
+                    {
+                        let data_type_repr = if let DataType::InlineList(_) = data_type {
+                            Helper::as_type_name(n, &options.type_prefix)
+                        } else {
+                            Helper::get_datatype_language_representation(
+                                &v.data_type,
+                                &options.type_prefix,
+                            )
+                        };
+
+                        Ok(vec![TemplateVariable {
+                            name: Helper::as_variable_name(&v.name),
+                            xml_name: v.xml_name.clone(),
+                            default_value: v.default_value.clone(),
+                            required: v.required,
+                            requires_free: v.requires_free,
+                            data_type_repr,
+                        }])
+                    } else {
+                        Err(CodeGenError::MissingDataType(
+                            class_type.name.clone(),
+                            Helper::as_variable_name(&v.name),
+                        ))
+                    }
+                }
+                DataType::FixedSizeList(dt, size) => Ok(
+                    Self::build_fixed_size_list_template_variable(v, dt, *size, options),
+                ),
+                _ => Ok(vec![Self::build_standard_template_variable(v, options)]),
+            })
+            .collect::<Result<Vec<Vec<TemplateVariable>>, CodeGenError>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<TemplateVariable>>();
+
+        Ok(variables)
+    }
+
+    fn build_standard_template_variable(
+        variable: &Variable,
+        options: &CodeGenOptions,
+    ) -> TemplateVariable {
+        TemplateVariable {
+            name: Helper::as_variable_name(&variable.name),
+            xml_name: variable.xml_name.clone(),
+            data_type_repr: Helper::get_datatype_language_representation(
+                &variable.data_type,
+                &options.type_prefix,
+            ),
+            default_value: variable.default_value.clone(),
+            required: variable.required,
+            requires_free: variable.requires_free,
+        }
+    }
+
+    fn build_fixed_size_list_template_variable(
+        variable: &Variable,
+        data_type: &DataType,
+        size: usize,
+        options: &CodeGenOptions,
+    ) -> Vec<TemplateVariable> {
+        (1..size + 1)
+            .map(|i| TemplateVariable {
+                name: format!("{}{}", Helper::as_variable_name(&variable.name), i),
+                xml_name: variable.xml_name.clone(),
+                data_type_repr: Helper::get_datatype_language_representation(
+                    data_type,
+                    &options.type_prefix,
+                ),
+                default_value: variable.default_value.clone(),
+                required: variable.required,
+                requires_free: variable.requires_free,
+            })
+            .collect::<Vec<TemplateVariable>>()
+    }
+
+    fn build_serialize_variables<'a>(
+        class_type: &'a ClassType,
+        type_aliases: &'a [TypeAlias],
+    ) -> Result<Vec<TemplateSerializeVariable>, CodeGenError> {
+        let variables = class_type
+            .variables
+            .iter()
+            .map(|v| {
+                let variable_name = Helper::as_variable_name(&v.name);
+
+                match &v.data_type {
+                    DataType::Alias(name) => {
+                        if let Some((data_type, pattern)) =
+                            Helper::get_alias_data_type(name.as_str(), type_aliases)
+                        {
+                            let has_optional_wrapper = v.needs_optional_wrapper(type_aliases);
+
+                            let variable_getter = match &data_type {
+                                DataType::InlineList(_) => format!("{variable_name}[I]"),
+                                _ if has_optional_wrapper => variable_name.clone() + ".Unwrap",
+                                _ => variable_name.clone(),
+                            };
+
+                            let getter_data_type = match &data_type {
+                                DataType::InlineList(lt) => lt,
+                                _ => &data_type,
+                            };
+
+                            Ok(vec![TemplateSerializeVariable {
+                                name: variable_name.clone(),
+                                xml_name: v.xml_name.clone(),
+                                is_required: v.required,
+                                is_class: false,
+                                is_enum: false,
+                                is_list: false,
+                                is_inline_list: matches!(data_type, DataType::InlineList(_)),
+                                from_xml_code: String::new(),
+                                to_xml_code: Helper::get_variable_value_as_string(
+                                    &getter_data_type,
+                                    &variable_getter,
+                                    &pattern,
+                                ),
+                                has_optional_wrapper,
+                            }])
+                        } else {
+                            Ok(vec![])
+                        }
+                    }
+                    DataType::Enumeration(_) => Ok(vec![TemplateSerializeVariable {
+                        name: variable_name.clone(),
+                        xml_name: v.xml_name.clone(),
+                        is_required: v.required,
+                        is_class: false,
+                        is_enum: true,
+                        is_list: false,
+                        is_inline_list: false,
+                        has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                        from_xml_code: String::new(),
+                        to_xml_code: String::new(),
+                    }]),
+                    DataType::Custom(_) => Ok(vec![TemplateSerializeVariable {
+                        name: variable_name.clone(),
+                        xml_name: v.xml_name.clone(),
+                        is_required: v.required,
+                        is_class: true,
+                        is_enum: false,
+                        is_list: false,
+                        is_inline_list: false,
+                        has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                        from_xml_code: String::new(),
+                        to_xml_code: String::new(),
+                    }]),
+                    DataType::List(lt) => Ok(vec![TemplateSerializeVariable {
+                        name: variable_name.clone(),
+                        xml_name: v.xml_name.clone(),
+                        is_required: v.required,
+                        is_class: matches!(**lt, DataType::Custom(_)),
+                        is_enum: matches!(**lt, DataType::Enumeration(_)),
+                        is_list: true,
+                        is_inline_list: false,
+                        has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                        from_xml_code: String::new(),
+                        to_xml_code: Helper::get_variable_value_as_string(
+                            &lt,
+                            &String::from("__Item"),
+                            &None,
+                        ),
+                    }]),
+                    DataType::FixedSizeList(dt, size) => Ok((1..size + 1)
+                        .map(|i| TemplateSerializeVariable {
+                            name: format!("{}{}", Helper::as_variable_name(&v.name), i),
+                            xml_name: v.xml_name.clone(),
+                            is_required: v.required,
+                            is_class: matches!(**dt, DataType::Custom(_)),
+                            is_enum: matches!(**dt, DataType::Enumeration(_)),
+                            is_list: false,
+                            is_inline_list: false,
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                            from_xml_code: String::new(),
+                            to_xml_code: Helper::get_variable_value_as_string(
+                                &dt,
+                                &format!("{}{}", Helper::as_variable_name(&v.name), i),
+                                &None,
+                            ),
+                        })
+                        .collect::<Vec<TemplateSerializeVariable>>()),
+                    _ => {
+                        let has_optional_wrapper = v.needs_optional_wrapper(type_aliases);
+
+                        let variable_getter = if has_optional_wrapper {
+                            variable_name.clone() + ".Unwrap"
+                        } else {
+                            variable_name.clone()
+                        };
+
+                        Ok(vec![TemplateSerializeVariable {
+                            name: variable_name.clone(),
+                            xml_name: v.xml_name.clone(),
+                            is_required: v.required,
+                            is_class: false,
+                            is_enum: false,
+                            is_list: false,
+                            is_inline_list: false,
+                            from_xml_code: String::new(),
+                            to_xml_code: Helper::get_variable_value_as_string(
+                                &v.data_type,
+                                &variable_getter,
+                                &None,
+                            ),
+                            has_optional_wrapper,
+                        }])
+                    }
+                }
+            })
+            .collect::<Result<Vec<Vec<TemplateSerializeVariable>>, CodeGenError>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<TemplateSerializeVariable>>();
+
+        Ok(variables)
+    }
+
+    fn build_variable_initializer<'a>(
+        class_type: &'a ClassType,
+        type_aliases: &'a [TypeAlias],
+        options: &'a CodeGenOptions,
+    ) -> Result<Vec<String>, CodeGenError> {
+        let serialize_variables = class_type
+            .variables
+            .iter()
+            .map(|v| {
+                let variable_name = Helper::as_variable_name(&v.name);
+
+                match &v.data_type {
+                    DataType::Alias(name) => {
+                        if let Some((data_type, _)) =
+                            Helper::get_alias_data_type(name.as_str(), type_aliases)
+                        {
+                            Ok(vec![match data_type {
+                                DataType::InlineList(_) => Self::get_variable_initialization_code(
+                                    &variable_name,
+                                    &Helper::get_datatype_language_representation(
+                                        &data_type,
+                                        &options.type_prefix,
+                                    ),
+                                    v.required,
+                                    false,
+                                    v.default_value.clone(),
+                                ),
+                                _ => Self::get_variable_initialization_code(
+                                    &variable_name,
+                                    &Helper::as_type_name(&name, &options.type_prefix),
+                                    v.required,
+                                    true,
+                                    v.default_value.clone(),
+                                ),
+                            }])
+                        } else {
+                            Ok(vec![])
+                        }
+                    }
+                    DataType::Enumeration(name) => {
+                        Ok(vec![Self::get_variable_initialization_code(
+                            &variable_name,
+                            &Helper::as_type_name(&name, &options.type_prefix),
+                            v.required,
+                            true,
+                            v.default_value.clone(),
+                        )])
+                    }
+                    DataType::Custom(name) => Ok(vec![Self::get_variable_initialization_code(
+                        &variable_name,
+                        &Helper::as_type_name(&name, &options.type_prefix),
+                        v.required,
+                        false,
+                        v.default_value.clone(),
+                    )]),
+                    DataType::List(_) => Ok(vec![Self::get_variable_initialization_code(
+                        &variable_name,
+                        &Helper::get_datatype_language_representation(
+                            &v.data_type,
+                            &options.type_prefix,
+                        ),
+                        true,
+                        false,
+                        v.default_value.clone(),
+                    )]),
+                    DataType::FixedSizeList(dt, size) => {
+                        let rhs = match dt.as_ref() {
+                            DataType::Alias(name) => {
+                                if let Some((data_type, _)) =
+                                    Helper::get_alias_data_type(name.as_str(), type_aliases)
+                                {
+                                    let type_name =
+                                        Helper::as_type_name(name, &options.type_prefix);
+
+                                    match data_type {
+                                        DataType::Custom(_) => String::from("nil"),
+                                        _ if v.required => format!("Default({type_name})"),
+                                        _ => format!("TNone<{type_name}>.Create"),
+                                    }
+                                } else {
+                                    return Err(CodeGenError::MissingDataType(
+                                        class_type.name.clone(),
+                                        variable_name,
+                                    ));
+                                }
+                            }
+                            DataType::Enumeration(name) => {
+                                let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                                if v.required {
+                                    format!("Default({type_name})")
+                                } else {
+                                    format!("TNone<{type_name}>.Create")
+                                }
+                            }
+                            DataType::Custom(name) => {
+                                if v.required {
+                                    format!(
+                                        "{}.Create",
+                                        Helper::as_type_name(name, &options.type_prefix)
+                                    )
+                                } else {
+                                    String::from("nil")
+                                }
+                            }
+                            DataType::List(_) => {
+                                return Err(CodeGenError::NestedListInFixedSizeList(
+                                    class_type.name.clone(),
+                                    v.name.clone(),
+                                ));
+                            }
+                            DataType::FixedSizeList(_, _) => {
+                                return Err(CodeGenError::NestedFixedSizeList(
+                                    class_type.name.clone(),
+                                    v.name.clone(),
+                                ));
+                            }
+                            _ => {
+                                let lang_rep = Helper::get_datatype_language_representation(
+                                    dt.as_ref(),
+                                    &options.type_prefix,
+                                );
+
+                                if v.required {
+                                    format!("Default({lang_rep})")
+                                } else {
+                                    format!("TNone<{lang_rep}>.Create")
+                                }
+                            }
+                        };
+
+                        Ok((1..size + 1)
+                            .map(|i| format!("{variable_name}{i} := {rhs};"))
+                            .collect::<Vec<String>>())
+                    }
+                    _ => Ok(vec![match &v.data_type {
+                        DataType::Uri if v.required => {
+                            format!("{variable_name} := TURI.Create('');")
+                        }
+                        DataType::Uri => format!("{variable_name} := TNone<TURI>.Create;"),
+                        DataType::InlineList(_) => Self::get_variable_initialization_code(
+                            &variable_name,
+                            &Helper::get_datatype_language_representation(
+                                &v.data_type,
+                                &options.type_prefix,
+                            ),
+                            true,
+                            false,
+                            v.default_value.clone(),
+                        ),
+                        _ => Self::get_variable_initialization_code(
+                            &variable_name,
+                            &Helper::get_datatype_language_representation(
+                                &v.data_type,
+                                &options.type_prefix,
+                            ),
+                            v.required,
+                            true,
+                            v.default_value.clone(),
+                        ),
+                    }]),
+                }
+            })
+            .collect::<Result<Vec<Vec<String>>, CodeGenError>>()?
+            .into_iter()
+            .flatten()
+            .filter(|i| !i.is_empty())
+            .collect::<Vec<String>>();
+
+        Ok(serialize_variables)
+    }
+
+    fn build_deserialize_element_variables<'a>(
+        class_type: &'a ClassType,
+        type_aliases: &'a [TypeAlias],
+        options: &'a CodeGenOptions,
+    ) -> Vec<ElementDeserializeVariable> {
+        class_type
+            .variables
+            .iter()
+            .filter(|v| !v.is_const && v.source == XMLSource::Element)
+            .filter_map(|v| {
+                let variable_name = Helper::as_variable_name(&v.name);
+
+                match &v.data_type {
+                    DataType::Alias(name) => {
+                        let (data_type, pattern) =
+                            Helper::get_alias_data_type(&name, type_aliases)?;
+
+                        let from_xml_code_available = match &data_type {
+                            DataType::InlineList(item_type) => match item_type.as_ref() {
+                                DataType::Alias(name) => {
+                                    let (data_type, pattern) =
+                                        Helper::get_alias_data_type(&name, type_aliases)?;
+
+                                    Self::generate_standard_type_from_xml(
+                                        &data_type,
+                                        "vPart".to_owned(),
+                                        pattern,
+                                    )
+                                }
+                                DataType::Enumeration(name) | DataType::Union(name) => {
+                                    format!(
+                                        "{}Helper.FromXmlValue(vPart)",
+                                        Helper::as_type_name(&name, &options.type_prefix)
+                                    )
+                                }
+                                DataType::Custom(_)
+                                | DataType::List(_)
+                                | DataType::FixedSizeList(_, _)
+                                | DataType::InlineList(_) => todo!(),
+                                _ => Self::generate_standard_type_from_xml(
+                                    &data_type,
+                                    "vPart".to_owned(),
+                                    None,
+                                ),
+                            },
+                            _ => Self::generate_standard_type_from_xml(
+                                &data_type,
+                                format!("node.ChildNodes['{}'].Text", v.xml_name),
+                                pattern,
+                            ),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: v.xml_name.clone(),
+                            has_optional_wrapper: false,
+                            is_required: v.required,
+                            is_list: false,
+                            is_inline_list: matches!(data_type, DataType::InlineList(_)),
+                            is_fixed_size_list: false,
+                            fixed_size_list_size: None,
+                            data_type_repr: Helper::get_datatype_language_representation(
+                                &data_type,
+                                &options.type_prefix,
+                            ),
+                            from_xml_code_missing: String::new(),
+                            from_xml_code_available,
+                        })
+                    }
+                    DataType::Custom(name) => {
+                        let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                        let from_xml_code_available = match v.required {
+                            true => {
+                                format!("{}.FromXml(node.ChildNodes['{}'])", type_name, v.xml_name,)
+                            }
+                            false => format!("{type_name}.FromXml(vOptionalNode);"),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: v.xml_name.clone(),
+                            has_optional_wrapper: false,
+                            is_required: v.required,
+                            is_list: false,
+                            is_inline_list: false,
+                            is_fixed_size_list: false,
+                            fixed_size_list_size: None,
+                            data_type_repr: type_name,
+                            from_xml_code_missing: String::new(),
+                            from_xml_code_available,
+                        })
+                    }
+                    DataType::Enumeration(name) => {
+                        let type_name = Helper::as_type_name(name, &options.type_prefix);
+
+                        let from_xml_code_available = match v.required {
+                            true => format!(
+                                "{}.FromXml(node.ChildNodes['{}'].Text)",
+                                type_name, v.xml_name,
+                            ),
+                            false => format!("{type_name}.FromXml(vOptionalNode.Text)"),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: v.xml_name.clone(),
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                            is_required: v.required,
+                            is_list: false,
+                            is_inline_list: false,
+                            is_fixed_size_list: false,
+                            fixed_size_list_size: None,
+                            data_type_repr: type_name,
+                            from_xml_code_missing: String::new(),
+                            from_xml_code_available,
+                        })
+                    }
+                    DataType::FixedSizeList(item_type, size) => {
+                        let from_xml_code_available = match item_type.as_ref() {
+                            DataType::Alias(name) => {
+                                let (data_type, pattern) =
+                                    Helper::get_alias_data_type(&name, type_aliases)?;
+
+                                Self::generate_standard_type_from_xml(
+                                    &data_type,
+                                    format!("__{}Node.Text", variable_name),
+                                    pattern,
+                                )
+                            }
+                            DataType::Custom(name) => format!(
+                                "{}.FromXml(__{}Node);",
+                                Helper::as_type_name(&name, &options.type_prefix),
+                                variable_name
+                            ),
+                            DataType::Enumeration(name) => format!(
+                                "{}.FromXmlValue(__{}Node.Text);",
+                                Helper::as_type_name(&name, &options.type_prefix),
+                                variable_name
+                            ),
+                            _ => Self::generate_standard_type_from_xml(
+                                &item_type,
+                                format!("__{}Node.Text", variable_name),
+                                None,
+                            ),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: v.xml_name.clone(),
+                            has_optional_wrapper: false,
+                            is_required: v.required,
+                            is_list: false,
+                            is_inline_list: false,
+                            is_fixed_size_list: true,
+                            fixed_size_list_size: Some(*size),
+                            data_type_repr: Helper::get_datatype_language_representation(
+                                &item_type,
+                                &options.type_prefix,
+                            ),
+                            from_xml_code_missing: String::new(),
+                            from_xml_code_available,
+                        })
+                    }
+                    DataType::List(item_type) => {
+                        let from_xml_code_available = match item_type.as_ref() {
+                            DataType::Alias(name) => {
+                                let (data_type, pattern) =
+                                    Helper::get_alias_data_type(&name, type_aliases)?;
+
+                                Self::generate_standard_type_from_xml(
+                                    &data_type,
+                                    format!("__{}Node.Text", variable_name),
+                                    pattern,
+                                )
+                            }
+                            DataType::Custom(name) => format!(
+                                "{}.FromXml(__{}Node)",
+                                Helper::as_type_name(&name, &options.type_prefix),
+                                variable_name
+                            ),
+                            DataType::Enumeration(name) => format!(
+                                "{}.FromXmlValue(__{}Node.Text)",
+                                Helper::as_type_name(&name, &options.type_prefix),
+                                variable_name
+                            ),
+                            _ => Self::generate_standard_type_from_xml(
+                                item_type,
+                                format!("__{}Node.Text", variable_name),
+                                None,
+                            ),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: v.xml_name.clone(),
+                            has_optional_wrapper: false,
+                            is_required: v.required,
+                            is_list: true,
+                            is_inline_list: false,
+                            is_fixed_size_list: false,
+                            fixed_size_list_size: None,
+                            data_type_repr: Helper::get_datatype_language_representation(
+                                &v.data_type,
+                                &options.type_prefix,
+                            ),
+                            from_xml_code_missing: String::new(),
+                            from_xml_code_available,
+                        })
+                    }
+                    DataType::InlineList(item_type) => {
+                        let from_xml_code_available = match item_type.as_ref() {
+                            DataType::Alias(name) => {
+                                let (data_type, pattern) =
+                                    Helper::get_alias_data_type(&name, type_aliases)?;
+
+                                Self::generate_standard_type_from_xml(
+                                    &data_type,
+                                    "vPart".to_owned(),
+                                    pattern,
+                                )
+                            }
+                            DataType::Enumeration(name) | DataType::Union(name) => format!(
+                                "{}Helper.FromXmlValue(vPart)",
+                                Helper::as_type_name(&name, &options.type_prefix)
+                            ),
+                            DataType::Custom(_)
+                            | DataType::List(_)
+                            | DataType::FixedSizeList(_, _)
+                            | DataType::InlineList(_) => todo!(),
+                            _ => Self::generate_standard_type_from_xml(
+                                item_type,
+                                "vPart".to_owned(),
+                                None,
+                            ),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: v.xml_name.clone(),
+                            has_optional_wrapper: false,
+                            is_required: v.required,
+                            is_list: false,
+                            is_inline_list: true,
+                            is_fixed_size_list: false,
+                            fixed_size_list_size: None,
+                            data_type_repr: Helper::get_datatype_language_representation(
+                                &v.data_type,
+                                &options.type_prefix,
+                            ),
+                            from_xml_code_missing: String::new(),
+                            from_xml_code_available,
+                        })
+                    }
+                    _ => Some(ElementDeserializeVariable {
+                        name: variable_name,
+                        xml_name: v.xml_name.clone(),
+                        has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                        is_required: v.required,
+                        is_list: false,
+                        is_inline_list: false,
+                        is_fixed_size_list: false,
+                        fixed_size_list_size: None,
+                        data_type_repr: Helper::get_datatype_language_representation(
+                            &v.data_type,
+                            &options.type_prefix,
+                        ),
+                        from_xml_code_missing: String::new(),
+                        from_xml_code_available: match v.required {
+                            true => Self::generate_standard_type_from_xml(
+                                &v.data_type,
+                                format!("node.ChildNodes['{}'].Text", v.xml_name),
+                                None,
+                            ),
+                            false => Self::generate_standard_type_from_xml(
+                                &v.data_type,
+                                "vOptionalNode.Text".to_owned(),
+                                None,
+                            ),
+                        },
+                    }),
+                }
+            })
+            .collect::<Vec<ElementDeserializeVariable>>()
+    }
+
+    fn build_deserialize_attribute_variables<'a>(
+        class_type: &'a ClassType,
+        type_aliases: &'a [TypeAlias],
+        options: &'a CodeGenOptions,
+    ) -> Vec<AttributeDeserializeVariable> {
+        class_type
+            .variables
+            .iter()
+            .filter(|v| !v.is_const && v.source == XMLSource::Attribute)
+            .filter_map(|v| {
+                let (data_type, pattern) = match &v.data_type {
+                    DataType::Alias(name) => Helper::get_alias_data_type(&name, type_aliases)?,
+                    _ => (v.data_type.clone(), None),
+                };
+
+                Some(AttributeDeserializeVariable {
+                    name: Helper::as_variable_name(&v.name),
+                    xml_name: v.xml_name.clone(),
+                    has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
+                    from_xml_code_available: Self::generate_standard_type_from_xml(
+                        &data_type,
+                        format!("node.Attributes['{}']", v.xml_name),
+                        pattern,
+                    ),
+                    from_xml_code_missing: match (v.required, &v.default_value) {
+                        (false, None) => {
+                            let lang_rep = Helper::get_datatype_language_representation(
+                                &data_type,
+                                &options.type_prefix,
+                            );
+
+                            format!("TNone<{lang_rep}>.Create")
+                        }
+                        (true, None) => {
+                            format!(
+                                "raise Exception.Create('Required attribute \"{}\" is missing');",
+                                v.xml_name
+                            )
+                        }
+                        (_, Some(default_value)) => default_value.clone(),
+                    },
+                })
+            })
+            .collect::<Vec<AttributeDeserializeVariable>>()
     }
 }
 

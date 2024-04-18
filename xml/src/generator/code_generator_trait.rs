@@ -37,6 +37,7 @@ pub struct CodeGenOptions {
 pub enum CodeGenError {
     IOError(std::io::Error),
     ComplexTypeInSimpleTypeNotAllowed(String, String),
+    TemplateEngineError(String),
     /// A required data type is missing
     MissingDataType(String, String),
     /// A fixed size list inside of a fixed size list is not supported
@@ -55,6 +56,7 @@ impl fmt::Debug for CodeGenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IOError(arg0) => f.debug_tuple("IOError").field(arg0).finish(),
+            Self::TemplateEngineError(e) => write!(f, "Some error occurred while using the template engine. Error: {}", e),
             Self::MissingDataType(type_name, variable)  => write!(
                 f,
                 "Required DataType is missing. Class: {type_name}, Variable: {variable}"

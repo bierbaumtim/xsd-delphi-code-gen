@@ -1,10 +1,6 @@
-use std::io::Write;
-
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::generator::types::{BinaryEncoding, DataType, TypeAlias};
-
-use super::code_writer::CodeWriter;
 
 pub struct Helper;
 
@@ -193,26 +189,6 @@ impl Helper {
         }
 
         None
-    }
-
-    pub(crate) fn write_qualified_name_comment<T: Write>(
-        writer: &mut CodeWriter<T>,
-        qualified_name: &String,
-        indentation: Option<usize>,
-    ) -> Result<(), std::io::Error> {
-        writer.writeln_fmt(
-            format_args!("// XML Qualified Name: {qualified_name}"),
-            indentation,
-        )?;
-
-        Ok(())
-    }
-
-    pub(crate) fn write_required_comment<T: Write>(
-        writer: &mut CodeWriter<T>,
-        indentation: Option<usize>,
-    ) -> Result<(), std::io::Error> {
-        writer.writeln("/// <summary>Required</summary>", indentation)
     }
 }
 
