@@ -9,8 +9,8 @@ pub(crate) fn capitalize(value: &str) -> String {
     }
 }
 
-pub(crate) fn get_enum_variant_prefix(name: &str, type_prefix: &String) -> String {
-    let prefixed_type_name = type_prefix.clone() + name;
+pub(crate) fn get_enum_variant_prefix(name: &str, type_prefix: &str) -> String {
+    let prefixed_type_name = type_prefix.to_owned() + name;
 
     prefixed_type_name
         .chars()
@@ -20,7 +20,7 @@ pub(crate) fn get_enum_variant_prefix(name: &str, type_prefix: &String) -> Strin
 }
 
 pub(crate) fn sanitize_name(name: &str) -> String {
-    name.replace("-", "_").replace(".", "_")
+    name.replace(['-', '.'], "_")
 }
 
 pub(crate) fn schema_type_to_base_type(

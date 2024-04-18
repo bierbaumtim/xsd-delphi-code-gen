@@ -5,7 +5,7 @@ use crate::models::{ClassType, Endpoint, EnumType};
 
 pub(crate) fn render_models(
     spec: &Spec,
-    dest: &std::path::PathBuf,
+    dest: &std::path::Path,
     prefix: Option<String>,
     class_types: &[ClassType],
     enum_types: &[EnumType],
@@ -35,7 +35,7 @@ pub(crate) fn render_models(
 
 pub(crate) fn render_client_interface(
     spec: &Spec,
-    dest: &std::path::PathBuf,
+    dest: &std::path::Path,
     prefix: Option<String>,
     endpoints: &[Endpoint],
     tera: &Tera,
@@ -66,7 +66,7 @@ pub(crate) fn render_client_interface(
 
 pub(crate) fn render_client(
     spec: &Spec,
-    dest: &std::path::PathBuf,
+    dest: &std::path::Path,
     prefix: Option<String>,
     endpoints: &[Endpoint],
     tera: &Tera,

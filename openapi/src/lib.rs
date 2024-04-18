@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use sw4rm_rs::from_path;
 use tera::Tera;
@@ -10,7 +10,7 @@ mod render;
 mod schema_collector;
 mod type_registry;
 
-pub fn generate_openapi_client(source: &[PathBuf], dest: &PathBuf, prefix: Option<String>) {
+pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: Option<String>) {
     let source = match source.first() {
         Some(p) => p,
         None => {

@@ -114,13 +114,13 @@ pub(crate) fn collect_endpoints(
 fn get_endpoint_name(operation: &Operation, path: &str, method: &str) -> String {
     match operation.operation_id.as_ref() {
         Some(name) => {
-            if name.contains("/") {
+            if name.contains('/') {
                 format!(
                     "{}{}",
                     method,
                     capitalize(
-                        path.trim_end_matches("/")
-                            .split("/")
+                        path.trim_end_matches('/')
+                            .split('/')
                             .last()
                             .unwrap()
                             .to_string()
@@ -135,8 +135,8 @@ fn get_endpoint_name(operation: &Operation, path: &str, method: &str) -> String 
             "{}{}",
             method,
             capitalize(
-                path.trim_end_matches("/")
-                    .split("/")
+                path.trim_end_matches('/')
+                    .split('/')
                     .last()
                     .unwrap()
                     .to_string()
@@ -156,11 +156,10 @@ fn get_endpoint_response_type(
     let (response_type, is_class, is_enum) = operation
         .responses
         .iter()
-        .filter(|r| match r.0 {
-            StringOrHttpCode::String(s) => s.starts_with("2"),
+        .find(|r| match r.0 {
+            StringOrHttpCode::String(s) => s.starts_with('2'),
             StringOrHttpCode::StatusCode(c) => *c >= 200 && *c < 300,
         })
-        .next()
         .and_then(|r| r.1.resolve(spec).ok())
         .and_then(|r| r.content.get("application/json").cloned())
         .and_then(|m| m.schema)
@@ -233,7 +232,7 @@ fn get_endpoint_args(operation: &Operation, spec: &Spec) -> Vec<EndpointArg> {
         .parameters
         .iter()
         .filter_map(|p| {
-            p.resolve(spec).ok().and_then(|p| {
+            p.resolve(spec).ok().map(|p| {
                 let name = capitalize(&p.name.clone().unwrap_or_default());
 
                 let s_type_name = match p.schema_type {
@@ -245,14 +244,15 @@ fn get_endpoint_args(operation: &Operation, spec: &Spec) -> Vec<EndpointArg> {
                 };
 
                 let type_name = match &p.schema {
-                    Some(s) => s.resolve(spec).ok().and_then(|s| match &s.schema_type {
-                        Some(t) => Some(helper::schema_type_to_base_type(&t, &None)),
-                        None => None,
+                    Some(s) => s.resolve(spec).ok().and_then(|s| {
+                        s.schema_type
+                            .as_ref()
+                            .map(|t| helper::schema_type_to_base_type(t, &None))
                     }),
                     None => None,
                 };
 
-                let arg_type = match p.location.clone().unwrap_or_default() {
+                let arg_type = match p.location.unwrap_or_default() {
                     ParameterLocation::Query => "query".to_owned(),
                     ParameterLocation::Path => "path".to_owned(),
                     ParameterLocation::Body => "body".to_owned(),
@@ -261,7 +261,7 @@ fn get_endpoint_args(operation: &Operation, spec: &Spec) -> Vec<EndpointArg> {
                     ParameterLocation::Cookie => todo!(),
                 };
 
-                Some(EndpointArg {
+                EndpointArg {
                     name,
                     type_name: type_name.unwrap_or(s_type_name),
                     arg_type,
@@ -279,7 +279,7 @@ fn get_endpoint_args(operation: &Operation, spec: &Spec) -> Vec<EndpointArg> {
                         Some(d) => d.to_string(),
                         None => "".to_string(),
                     },
-                })
+                }
             })
         })
         .collect::<Vec<EndpointArg>>();
