@@ -65,8 +65,8 @@ impl TypeAliasCodeGenerator {
 
                 Some(TemplateTypeAlias {
                     name: Helper::as_type_name(&a.name, &options.type_prefix),
-                    qualified_name: a.qualified_name.clone(),
-                    pattern: a.pattern.clone(),
+                    qualified_name: &a.qualified_name,
+                    pattern: &a.pattern,
                     data_type_repr: Helper::get_datatype_language_representation(
                         &a.for_type,
                         &options.type_prefix,

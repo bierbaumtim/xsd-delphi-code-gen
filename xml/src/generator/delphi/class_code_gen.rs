@@ -160,7 +160,7 @@ impl ClassCodeGenerator {
 
         Ok(TemplateClassType {
             name: Helper::as_type_name(&class_type.name, &options.type_prefix),
-            qualified_name: class_type.qualified_name.clone(),
+            qualified_name: &class_type.qualified_name,
             super_type: class_type
                 .super_type
                 .as_ref()
@@ -184,7 +184,7 @@ impl ClassCodeGenerator {
         class_type: &'a ClassType,
         type_aliases: &'a [TypeAlias],
         options: &'a CodeGenOptions,
-    ) -> Result<Vec<TemplateVariable>, CodeGenError> {
+    ) -> Result<Vec<TemplateVariable<'a>>, CodeGenError> {
         let variables = class_type
             .variables
             .iter()
@@ -205,8 +205,8 @@ impl ClassCodeGenerator {
 
                         Ok(vec![TemplateVariable {
                             name: Helper::as_variable_name(&v.name),
-                            xml_name: v.xml_name.clone(),
-                            default_value: v.default_value.clone(),
+                            xml_name: &v.xml_name,
+                            default_value: &v.default_value,
                             required: v.required,
                             requires_free: v.requires_free,
                             data_type_repr,
@@ -226,43 +226,43 @@ impl ClassCodeGenerator {
             .collect::<Result<Vec<Vec<TemplateVariable>>, CodeGenError>>()?
             .into_iter()
             .flatten()
-            .collect::<Vec<TemplateVariable>>();
+            .collect::<Vec<TemplateVariable<'a>>>();
 
         Ok(variables)
     }
 
-    fn build_standard_template_variable(
-        variable: &Variable,
-        options: &CodeGenOptions,
-    ) -> TemplateVariable {
+    fn build_standard_template_variable<'a>(
+        variable: &'a Variable,
+        options: &'a CodeGenOptions,
+    ) -> TemplateVariable<'a> {
         TemplateVariable {
             name: Helper::as_variable_name(&variable.name),
-            xml_name: variable.xml_name.clone(),
+            xml_name: &variable.xml_name,
             data_type_repr: Helper::get_datatype_language_representation(
                 &variable.data_type,
                 &options.type_prefix,
             ),
-            default_value: variable.default_value.clone(),
+            default_value: &variable.default_value,
             required: variable.required,
             requires_free: variable.requires_free,
         }
     }
 
-    fn build_fixed_size_list_template_variable(
-        variable: &Variable,
-        data_type: &DataType,
+    fn build_fixed_size_list_template_variable<'a>(
+        variable: &'a Variable,
+        data_type: &'a DataType,
         size: usize,
         options: &CodeGenOptions,
-    ) -> Vec<TemplateVariable> {
+    ) -> Vec<TemplateVariable<'a>> {
         (1..size + 1)
             .map(|i| TemplateVariable {
                 name: format!("{}{}", Helper::as_variable_name(&variable.name), i),
-                xml_name: variable.xml_name.clone(),
+                xml_name: &variable.xml_name,
                 data_type_repr: Helper::get_datatype_language_representation(
                     data_type,
                     &options.type_prefix,
                 ),
-                default_value: variable.default_value.clone(),
+                default_value: &variable.default_value,
                 required: variable.required,
                 requires_free: variable.requires_free,
             })
@@ -272,7 +272,7 @@ impl ClassCodeGenerator {
     fn build_serialize_variables<'a>(
         class_type: &'a ClassType,
         type_aliases: &'a [TypeAlias],
-    ) -> Result<Vec<TemplateSerializeVariable>, CodeGenError> {
+    ) -> Result<Vec<TemplateSerializeVariable<'a>>, CodeGenError> {
         let variables = class_type
             .variables
             .iter()
@@ -299,7 +299,7 @@ impl ClassCodeGenerator {
 
                             Ok(vec![TemplateSerializeVariable {
                                 name: variable_name.clone(),
-                                xml_name: v.xml_name.clone(),
+                                xml_name: &v.xml_name,
                                 is_required: v.required,
                                 is_class: false,
                                 is_enum: false,
@@ -307,7 +307,7 @@ impl ClassCodeGenerator {
                                 is_inline_list: matches!(data_type, DataType::InlineList(_)),
                                 from_xml_code: String::new(),
                                 to_xml_code: Helper::get_variable_value_as_string(
-                                    &getter_data_type,
+                                    getter_data_type,
                                     &variable_getter,
                                     &pattern,
                                 ),
@@ -319,7 +319,7 @@ impl ClassCodeGenerator {
                     }
                     DataType::Enumeration(_) => Ok(vec![TemplateSerializeVariable {
                         name: variable_name.clone(),
-                        xml_name: v.xml_name.clone(),
+                        xml_name: &v.xml_name,
                         is_required: v.required,
                         is_class: false,
                         is_enum: true,
@@ -331,7 +331,7 @@ impl ClassCodeGenerator {
                     }]),
                     DataType::Custom(_) => Ok(vec![TemplateSerializeVariable {
                         name: variable_name.clone(),
-                        xml_name: v.xml_name.clone(),
+                        xml_name: &v.xml_name,
                         is_required: v.required,
                         is_class: true,
                         is_enum: false,
@@ -343,7 +343,7 @@ impl ClassCodeGenerator {
                     }]),
                     DataType::List(lt) => Ok(vec![TemplateSerializeVariable {
                         name: variable_name.clone(),
-                        xml_name: v.xml_name.clone(),
+                        xml_name: &v.xml_name,
                         is_required: v.required,
                         is_class: matches!(**lt, DataType::Custom(_)),
                         is_enum: matches!(**lt, DataType::Enumeration(_)),
@@ -352,7 +352,7 @@ impl ClassCodeGenerator {
                         has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                         from_xml_code: String::new(),
                         to_xml_code: Helper::get_variable_value_as_string(
-                            &lt,
+                            lt,
                             &String::from("__Item"),
                             &None,
                         ),
@@ -360,7 +360,7 @@ impl ClassCodeGenerator {
                     DataType::FixedSizeList(dt, size) => Ok((1..size + 1)
                         .map(|i| TemplateSerializeVariable {
                             name: format!("{}{}", Helper::as_variable_name(&v.name), i),
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
                             is_required: v.required,
                             is_class: matches!(**dt, DataType::Custom(_)),
                             is_enum: matches!(**dt, DataType::Enumeration(_)),
@@ -369,7 +369,7 @@ impl ClassCodeGenerator {
                             has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             from_xml_code: String::new(),
                             to_xml_code: Helper::get_variable_value_as_string(
-                                &dt,
+                                dt,
                                 &format!("{}{}", Helper::as_variable_name(&v.name), i),
                                 &None,
                             ),
@@ -386,7 +386,7 @@ impl ClassCodeGenerator {
 
                         Ok(vec![TemplateSerializeVariable {
                             name: variable_name.clone(),
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
                             is_required: v.required,
                             is_class: false,
                             is_enum: false,
@@ -403,10 +403,10 @@ impl ClassCodeGenerator {
                     }
                 }
             })
-            .collect::<Result<Vec<Vec<TemplateSerializeVariable>>, CodeGenError>>()?
+            .collect::<Result<Vec<Vec<TemplateSerializeVariable<'a>>>, CodeGenError>>()?
             .into_iter()
             .flatten()
-            .collect::<Vec<TemplateSerializeVariable>>();
+            .collect::<Vec<TemplateSerializeVariable<'a>>>();
 
         Ok(variables)
     }
@@ -440,7 +440,7 @@ impl ClassCodeGenerator {
                                 ),
                                 _ => Self::get_variable_initialization_code(
                                     &variable_name,
-                                    &Helper::as_type_name(&name, &options.type_prefix),
+                                    &Helper::as_type_name(name, &options.type_prefix),
                                     v.required,
                                     true,
                                     v.default_value.clone(),
@@ -453,7 +453,7 @@ impl ClassCodeGenerator {
                     DataType::Enumeration(name) => {
                         Ok(vec![Self::get_variable_initialization_code(
                             &variable_name,
-                            &Helper::as_type_name(&name, &options.type_prefix),
+                            &Helper::as_type_name(name, &options.type_prefix),
                             v.required,
                             true,
                             v.default_value.clone(),
@@ -461,7 +461,7 @@ impl ClassCodeGenerator {
                     }
                     DataType::Custom(name) => Ok(vec![Self::get_variable_initialization_code(
                         &variable_name,
-                        &Helper::as_type_name(&name, &options.type_prefix),
+                        &Helper::as_type_name(name, &options.type_prefix),
                         v.required,
                         false,
                         v.default_value.clone(),
@@ -587,7 +587,7 @@ impl ClassCodeGenerator {
         class_type: &'a ClassType,
         type_aliases: &'a [TypeAlias],
         options: &'a CodeGenOptions,
-    ) -> Vec<ElementDeserializeVariable> {
+    ) -> Vec<ElementDeserializeVariable<'a>> {
         class_type
             .variables
             .iter()
@@ -598,13 +598,13 @@ impl ClassCodeGenerator {
                 match &v.data_type {
                     DataType::Alias(name) => {
                         let (data_type, pattern) =
-                            Helper::get_alias_data_type(&name, type_aliases)?;
+                            Helper::get_alias_data_type(name, type_aliases)?;
 
-                        let from_xml_code_available = match &data_type {
+                        let from_xml_code = match &data_type {
                             DataType::InlineList(item_type) => match item_type.as_ref() {
                                 DataType::Alias(name) => {
                                     let (data_type, pattern) =
-                                        Helper::get_alias_data_type(&name, type_aliases)?;
+                                        Helper::get_alias_data_type(name, type_aliases)?;
 
                                     Self::generate_standard_type_from_xml(
                                         &data_type,
@@ -615,7 +615,7 @@ impl ClassCodeGenerator {
                                 DataType::Enumeration(name) | DataType::Union(name) => {
                                     format!(
                                         "{}Helper.FromXmlValue(vPart)",
-                                        Helper::as_type_name(&name, &options.type_prefix)
+                                        Helper::as_type_name(name, &options.type_prefix)
                                     )
                                 }
                                 DataType::Custom(_)
@@ -637,7 +637,7 @@ impl ClassCodeGenerator {
 
                         Some(ElementDeserializeVariable {
                             name: variable_name,
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
                             has_optional_wrapper: false,
                             is_required: v.required,
                             is_list: false,
@@ -648,14 +648,13 @@ impl ClassCodeGenerator {
                                 &data_type,
                                 &options.type_prefix,
                             ),
-                            from_xml_code_missing: String::new(),
-                            from_xml_code_available,
+                            from_xml_code,
                         })
                     }
                     DataType::Custom(name) => {
                         let type_name = Helper::as_type_name(name, &options.type_prefix);
 
-                        let from_xml_code_available = match v.required {
+                        let from_xml_code = match v.required {
                             true => {
                                 format!("{}.FromXml(node.ChildNodes['{}'])", type_name, v.xml_name,)
                             }
@@ -664,7 +663,7 @@ impl ClassCodeGenerator {
 
                         Some(ElementDeserializeVariable {
                             name: variable_name,
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
                             has_optional_wrapper: false,
                             is_required: v.required,
                             is_list: false,
@@ -672,14 +671,13 @@ impl ClassCodeGenerator {
                             is_fixed_size_list: false,
                             fixed_size_list_size: None,
                             data_type_repr: type_name,
-                            from_xml_code_missing: String::new(),
-                            from_xml_code_available,
+                            from_xml_code,
                         })
                     }
                     DataType::Enumeration(name) => {
                         let type_name = Helper::as_type_name(name, &options.type_prefix);
 
-                        let from_xml_code_available = match v.required {
+                        let from_xml_code = match v.required {
                             true => format!(
                                 "{}.FromXml(node.ChildNodes['{}'].Text)",
                                 type_name, v.xml_name,
@@ -689,7 +687,7 @@ impl ClassCodeGenerator {
 
                         Some(ElementDeserializeVariable {
                             name: variable_name,
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
                             has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             is_required: v.required,
                             is_list: false,
@@ -697,15 +695,14 @@ impl ClassCodeGenerator {
                             is_fixed_size_list: false,
                             fixed_size_list_size: None,
                             data_type_repr: type_name,
-                            from_xml_code_missing: String::new(),
-                            from_xml_code_available,
+                            from_xml_code,
                         })
                     }
                     DataType::FixedSizeList(item_type, size) => {
-                        let from_xml_code_available = match item_type.as_ref() {
+                        let from_xml_code = match item_type.as_ref() {
                             DataType::Alias(name) => {
                                 let (data_type, pattern) =
-                                    Helper::get_alias_data_type(&name, type_aliases)?;
+                                    Helper::get_alias_data_type(name, type_aliases)?;
 
                                 Self::generate_standard_type_from_xml(
                                     &data_type,
@@ -715,58 +712,12 @@ impl ClassCodeGenerator {
                             }
                             DataType::Custom(name) => format!(
                                 "{}.FromXml(__{}Node);",
-                                Helper::as_type_name(&name, &options.type_prefix),
+                                Helper::as_type_name(name, &options.type_prefix),
                                 variable_name
                             ),
                             DataType::Enumeration(name) => format!(
                                 "{}.FromXmlValue(__{}Node.Text);",
-                                Helper::as_type_name(&name, &options.type_prefix),
-                                variable_name
-                            ),
-                            _ => Self::generate_standard_type_from_xml(
-                                &item_type,
-                                format!("__{}Node.Text", variable_name),
-                                None,
-                            ),
-                        };
-
-                        Some(ElementDeserializeVariable {
-                            name: variable_name,
-                            xml_name: v.xml_name.clone(),
-                            has_optional_wrapper: false,
-                            is_required: v.required,
-                            is_list: false,
-                            is_inline_list: false,
-                            is_fixed_size_list: true,
-                            fixed_size_list_size: Some(*size),
-                            data_type_repr: Helper::get_datatype_language_representation(
-                                &item_type,
-                                &options.type_prefix,
-                            ),
-                            from_xml_code_missing: String::new(),
-                            from_xml_code_available,
-                        })
-                    }
-                    DataType::List(item_type) => {
-                        let from_xml_code_available = match item_type.as_ref() {
-                            DataType::Alias(name) => {
-                                let (data_type, pattern) =
-                                    Helper::get_alias_data_type(&name, type_aliases)?;
-
-                                Self::generate_standard_type_from_xml(
-                                    &data_type,
-                                    format!("__{}Node.Text", variable_name),
-                                    pattern,
-                                )
-                            }
-                            DataType::Custom(name) => format!(
-                                "{}.FromXml(__{}Node)",
-                                Helper::as_type_name(&name, &options.type_prefix),
-                                variable_name
-                            ),
-                            DataType::Enumeration(name) => format!(
-                                "{}.FromXmlValue(__{}Node.Text)",
-                                Helper::as_type_name(&name, &options.type_prefix),
+                                Helper::as_type_name(name, &options.type_prefix),
                                 variable_name
                             ),
                             _ => Self::generate_standard_type_from_xml(
@@ -778,7 +729,52 @@ impl ClassCodeGenerator {
 
                         Some(ElementDeserializeVariable {
                             name: variable_name,
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
+                            has_optional_wrapper: false,
+                            is_required: v.required,
+                            is_list: false,
+                            is_inline_list: false,
+                            is_fixed_size_list: true,
+                            fixed_size_list_size: Some(*size),
+                            data_type_repr: Helper::get_datatype_language_representation(
+                                item_type,
+                                &options.type_prefix,
+                            ),
+                            from_xml_code,
+                        })
+                    }
+                    DataType::List(item_type) => {
+                        let from_xml_code = match item_type.as_ref() {
+                            DataType::Alias(name) => {
+                                let (data_type, pattern) =
+                                    Helper::get_alias_data_type(name, type_aliases)?;
+
+                                Self::generate_standard_type_from_xml(
+                                    &data_type,
+                                    format!("__{}Node.Text", variable_name),
+                                    pattern,
+                                )
+                            }
+                            DataType::Custom(name) => format!(
+                                "{}.FromXml(__{}Node)",
+                                Helper::as_type_name(name, &options.type_prefix),
+                                variable_name
+                            ),
+                            DataType::Enumeration(name) => format!(
+                                "{}.FromXmlValue(__{}Node.Text)",
+                                Helper::as_type_name(name, &options.type_prefix),
+                                variable_name
+                            ),
+                            _ => Self::generate_standard_type_from_xml(
+                                item_type,
+                                format!("__{}Node.Text", variable_name),
+                                None,
+                            ),
+                        };
+
+                        Some(ElementDeserializeVariable {
+                            name: variable_name,
+                            xml_name: &v.xml_name,
                             has_optional_wrapper: false,
                             is_required: v.required,
                             is_list: true,
@@ -789,15 +785,14 @@ impl ClassCodeGenerator {
                                 &v.data_type,
                                 &options.type_prefix,
                             ),
-                            from_xml_code_missing: String::new(),
-                            from_xml_code_available,
+                            from_xml_code,
                         })
                     }
                     DataType::InlineList(item_type) => {
-                        let from_xml_code_available = match item_type.as_ref() {
+                        let from_xml_code = match item_type.as_ref() {
                             DataType::Alias(name) => {
                                 let (data_type, pattern) =
-                                    Helper::get_alias_data_type(&name, type_aliases)?;
+                                    Helper::get_alias_data_type(name, type_aliases)?;
 
                                 Self::generate_standard_type_from_xml(
                                     &data_type,
@@ -807,7 +802,7 @@ impl ClassCodeGenerator {
                             }
                             DataType::Enumeration(name) | DataType::Union(name) => format!(
                                 "{}Helper.FromXmlValue(vPart)",
-                                Helper::as_type_name(&name, &options.type_prefix)
+                                Helper::as_type_name(name, &options.type_prefix)
                             ),
                             DataType::Custom(_)
                             | DataType::List(_)
@@ -822,7 +817,7 @@ impl ClassCodeGenerator {
 
                         Some(ElementDeserializeVariable {
                             name: variable_name,
-                            xml_name: v.xml_name.clone(),
+                            xml_name: &v.xml_name,
                             has_optional_wrapper: false,
                             is_required: v.required,
                             is_list: false,
@@ -833,13 +828,12 @@ impl ClassCodeGenerator {
                                 &v.data_type,
                                 &options.type_prefix,
                             ),
-                            from_xml_code_missing: String::new(),
-                            from_xml_code_available,
+                            from_xml_code,
                         })
                     }
                     _ => Some(ElementDeserializeVariable {
                         name: variable_name,
-                        xml_name: v.xml_name.clone(),
+                        xml_name: &v.xml_name,
                         has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                         is_required: v.required,
                         is_list: false,
@@ -850,8 +844,7 @@ impl ClassCodeGenerator {
                             &v.data_type,
                             &options.type_prefix,
                         ),
-                        from_xml_code_missing: String::new(),
-                        from_xml_code_available: match v.required {
+                        from_xml_code: match v.required {
                             true => Self::generate_standard_type_from_xml(
                                 &v.data_type,
                                 format!("node.ChildNodes['{}'].Text", v.xml_name),
@@ -873,20 +866,20 @@ impl ClassCodeGenerator {
         class_type: &'a ClassType,
         type_aliases: &'a [TypeAlias],
         options: &'a CodeGenOptions,
-    ) -> Vec<AttributeDeserializeVariable> {
+    ) -> Vec<AttributeDeserializeVariable<'a>> {
         class_type
             .variables
             .iter()
             .filter(|v| !v.is_const && v.source == XMLSource::Attribute)
             .filter_map(|v| {
                 let (data_type, pattern) = match &v.data_type {
-                    DataType::Alias(name) => Helper::get_alias_data_type(&name, type_aliases)?,
+                    DataType::Alias(name) => Helper::get_alias_data_type(name, type_aliases)?,
                     _ => (v.data_type.clone(), None),
                 };
 
                 Some(AttributeDeserializeVariable {
                     name: Helper::as_variable_name(&v.name),
-                    xml_name: v.xml_name.clone(),
+                    xml_name: &v.xml_name,
                     has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                     from_xml_code_available: Self::generate_standard_type_from_xml(
                         &data_type,

@@ -99,7 +99,7 @@ begin
 
       if __{{element.name}}Node.LocalName <> '{{element.xml_name}}' then continue;
 
-      {{element.name}}.Add({{element.from_xml_code_available}});
+      {{element.name}}.Add({{element.from_xml_code}});
     end;
   end;
   {%- elif element.is_inline_list %}
@@ -107,13 +107,13 @@ begin
 
   {%- if element.is_required %}
   for var vPart in node.ChildNodes['{{element.xml_name}}'].Text.Split([' ']) do begin
-    {{element.name}}.Add({{element.from_xml_code_available}});
+    {{element.name}}.Add({{element.from_xml_code}});
   end;
   {%- else %}
   vOptionalNode := node.ChildNodes.FindNode('{{element.xml_name}}');
   if Assigned(vOptionalNode) then begin
     for var vPart in vOptionalNode.Text.Split([' ']) do begin
-      {{element.name}}.Add({{element.from_xml_code_available}});
+      {{element.name}}.Add({{element.from_xml_code}});
     end;
   end;
   {%- endif %}
@@ -131,24 +131,24 @@ begin
 
       case I of
       {%- for i in range(end=element.fixed_size_list_size) %}
-        {{i}}: {{element.name}}{{ i + 1 }} := {{element.from_xml_code_available}};
+        {{i}}: {{element.name}}{{ i + 1 }} := {{element.from_xml_code}};
       {%- endfor %}
       end;
     end;
   end;
   {%- elif element.is_required %}
-  {{element.name}} := {{element.from_xml_code_available}};
+  {{element.name}} := {{element.from_xml_code}};
   {%- elif element.has_optional_wrapper %}
   vOptionalNode := node.ChildNodes.FindNode('{{element.xml_name}}');
   if Assigned(vOptionalNode) then begin
-    F{{element.name}} := TSome<{{element.data_type_repr}}>.Create({{element.from_xml_code_available}});
+    F{{element.name}} := TSome<{{element.data_type_repr}}>.Create({{element.from_xml_code}});
   end else begin
     F{{element.name}} := TNone<{{element.data_type_repr}}>.Create;
   end;
   {%- else %}
   vOptionalNode := node.ChildNodes.FindNode('{{element.xml_name}}');
   if Assigned(vOptionalNode) then begin
-    {{element.name}} := {{element.from_xml_code_available}};
+    {{element.name}} := {{element.from_xml_code}};
   end else begin
     {{element.name}} := nil;
   end;

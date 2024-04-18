@@ -190,7 +190,7 @@ impl UnionTypeCodeGenerator {
 
                 TemplateUnionType {
                     name: Helper::as_type_name(&u.name, &options.type_prefix),
-                    qualified_name: u.qualified_name.clone(),
+                    qualified_name: &u.qualified_name,
                     documentations,
                     variants,
                 }

@@ -3,21 +3,21 @@ use serde::Serialize;
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct ClassType<'a> {
     pub name: String,
-    pub qualified_name: String,
+    pub qualified_name: &'a String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub super_type: Option<String>,
     pub documentations: Vec<&'a str>,
     // variables
-    pub variables: Vec<Variable>,
-    pub optional_variables: Vec<Variable>,
-    pub constant_variables: Vec<Variable>,
-    pub serialize_variables: Vec<SerializeVariable>,
+    pub variables: Vec<Variable<'a>>,
+    pub optional_variables: Vec<Variable<'a>>,
+    pub constant_variables: Vec<Variable<'a>>,
+    pub serialize_variables: Vec<SerializeVariable<'a>>,
     // initializer
     pub variable_initializer: Vec<String>,
     // deserialize
     pub has_optional_element_variables: bool,
-    pub deserialize_attribute_variables: Vec<AttributeDeserializeVariable>,
-    pub deserialize_element_variables: Vec<ElementDeserializeVariable>,
+    pub deserialize_attribute_variables: Vec<AttributeDeserializeVariable<'a>>,
+    pub deserialize_element_variables: Vec<ElementDeserializeVariable<'a>>,
     //
     pub needs_destructor: bool,
     pub has_optional_fields: bool,
@@ -25,19 +25,19 @@ pub struct ClassType<'a> {
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
-pub struct Variable {
+pub struct Variable<'a> {
     pub name: String,
     pub data_type_repr: String,
-    pub xml_name: String,
+    pub xml_name: &'a String,
     pub requires_free: bool,
     pub required: bool,
-    pub default_value: Option<String>,
+    pub default_value: &'a Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
-pub struct SerializeVariable {
+pub struct SerializeVariable<'a> {
     pub name: String,
-    pub xml_name: String,
+    pub xml_name: &'a String,
     //
     pub is_class: bool,
     pub is_enum: bool,
@@ -50,9 +50,9 @@ pub struct SerializeVariable {
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
-pub struct AttributeDeserializeVariable {
+pub struct AttributeDeserializeVariable<'a> {
     pub name: String,
-    pub xml_name: String,
+    pub xml_name: &'a String,
     //
     pub has_optional_wrapper: bool,
     pub from_xml_code_available: String,
@@ -60,9 +60,9 @@ pub struct AttributeDeserializeVariable {
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
-pub struct ElementDeserializeVariable {
+pub struct ElementDeserializeVariable<'a> {
     pub name: String,
-    pub xml_name: String,
+    pub xml_name: &'a String,
     //
     pub is_required: bool,
     pub is_list: bool,
@@ -72,14 +72,13 @@ pub struct ElementDeserializeVariable {
     pub fixed_size_list_size: Option<usize>,
     pub has_optional_wrapper: bool,
     pub data_type_repr: String,
-    pub from_xml_code_available: String,
-    pub from_xml_code_missing: String,
+    pub from_xml_code: String,
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct Enumeration<'a> {
     pub name: String,
-    pub qualified_name: String,
+    pub qualified_name: &'a String,
     pub values: Vec<EnumerationValue<'a>>,
     pub documentations: Vec<&'a str>,
     //
@@ -90,23 +89,23 @@ pub struct Enumeration<'a> {
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct EnumerationValue<'a> {
     pub variant_name: String,
-    pub xml_value: String,
+    pub xml_value: &'a String,
     pub documentations: Vec<&'a str>,
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct TypeAlias<'a> {
     pub name: String,
-    pub qualified_name: String,
+    pub qualified_name: &'a String,
     pub data_type_repr: String,
-    pub pattern: Option<String>,
+    pub pattern: &'a Option<String>,
     pub documentations: Vec<&'a str>,
 }
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq)]
 pub struct UnionType<'a> {
     pub name: String,
-    pub qualified_name: String,
+    pub qualified_name: &'a String,
     pub variants: Vec<UnionVariant>,
     pub documentations: Vec<&'a str>,
 }

@@ -39,7 +39,7 @@ impl EnumCodeGenerator {
                         TemplateEnumerationValue {
                             variant_name: prefix.clone()
                                 + Helper::first_char_uppercase(&v.variant_name).as_str(),
-                            xml_value: v.xml_value.clone(),
+                            xml_value: &v.xml_value,
                             documentations,
                         }
                     })
@@ -47,7 +47,7 @@ impl EnumCodeGenerator {
 
                 TemplateEnumeration {
                     name: Helper::as_type_name(&e.name, &options.type_prefix),
-                    qualified_name: e.qualified_name.clone(),
+                    qualified_name: &e.qualified_name,
                     variant_prefix: prefix,
                     values,
                     documentations,
