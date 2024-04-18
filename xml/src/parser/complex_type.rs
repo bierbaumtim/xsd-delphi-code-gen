@@ -1,5 +1,6 @@
 use std::{fs::File, io::BufReader};
 
+use crate::parser::node::NodeParser;
 use quick_xml::{events::Event, Reader};
 
 use crate::type_registry::TypeRegistry;
@@ -54,6 +55,7 @@ impl ComplexTypeParser {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(s)) => match s.name().as_ref() {
+                    // TODO: Add support for choice nested inside sequence
                     b"xs:sequence" | b"xs:all" | b"xs:choice" => {
                         if is_in_compositor {
                             return Err(ParserError::UnexpectedStartOfNode(
@@ -78,8 +80,31 @@ impl ComplexTypeParser {
                     b"xs:element" => {
                         let name = XmlParserHelper::get_attribute_value(&s, "name")?;
                         let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
+                        let b_type = XmlParserHelper::get_attribute_value(&s, "type")
+                            .and_then(|t| xml_parser.resolve_namespace(t))
+                            .and_then(|t| {
+                                XmlParserHelper::base_type_str_to_node_type(&t)
+                                    .ok_or(ParserError::MissingOrNotSupportedBaseType(t))
+                            });
 
-                        current_element = Some((name, base_attributes));
+                        match b_type {
+                            Ok(node_type) => {
+                                current_element = None;
+
+                                let node = NodeParser::parse_element_with_type_node(
+                                    reader,
+                                    node_type,
+                                    name,
+                                    base_attributes,
+                                )?;
+
+                                children.push(node);
+                            }
+                            Err(ParserError::MissingAttribute(_)) => {
+                                current_element = Some((name, base_attributes));
+                            }
+                            Err(e) => return Err(e),
+                        };
                     }
                     b"xs:complexContent" => {
                         if extends_existing_type {
@@ -118,8 +143,12 @@ impl ComplexTypeParser {
                             let c_type = CustomTypeDefinition::Complex(c_type);
                             registry.register_type(c_type);
 
-                            let node =
-                                Node::new(node_type, name.clone(), (*base_attributes).clone());
+                            let node = Node::new(
+                                node_type,
+                                name.clone(),
+                                (*base_attributes).clone(),
+                                None,
+                            );
                             children.push(node);
                         } else {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")
@@ -151,8 +180,12 @@ impl ComplexTypeParser {
                             let node_type = NodeType::Custom(s_type.qualified_name.clone());
                             registry.register_type(s_type.into());
 
-                            let node =
-                                Node::new(node_type, name.clone(), (*base_attributes).clone());
+                            let node = Node::new(
+                                node_type,
+                                name.clone(),
+                                (*base_attributes).clone(),
+                                None,
+                            );
                             children.push(node);
                         } else {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")
@@ -202,7 +235,7 @@ impl ComplexTypeParser {
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
 
-                        let node = Node::new(node_type, name, base_attributes);
+                        let node = Node::new(node_type, name, base_attributes, None);
 
                         children.push(node);
                     }

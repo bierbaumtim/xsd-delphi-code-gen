@@ -68,8 +68,8 @@ impl XmlParserHelper {
 
     /// Parses the base attributes of a node
     pub fn get_base_attributes(node: &BytesStart) -> Result<BaseAttributes, ParserError> {
-        let min_occurs = Self::get_occurance_value(node, "minOccurs")?;
-        let max_occurs = Self::get_occurance_value(node, "maxOccurs")?;
+        let min_occurs = Self::get_occurrence_value(node, "minOccurs")?;
+        let max_occurs = Self::get_occurrence_value(node, "maxOccurs")?;
 
         Ok(BaseAttributes {
             min_occurs,
@@ -77,8 +77,8 @@ impl XmlParserHelper {
         })
     }
 
-    /// Parses the occurance value of an attribute
-    pub fn get_occurance_value(node: &BytesStart, name: &str) -> Result<Option<i64>, ParserError> {
+    /// Parses the occurrence value of an attribute
+    pub fn get_occurrence_value(node: &BytesStart, name: &str) -> Result<Option<i64>, ParserError> {
         #![allow(clippy::redundant_closure_for_method_calls)]
         let value = Self::get_attribute_value(node, name)
             .map(|v| match v.parse::<i64>() {

@@ -6,6 +6,7 @@ use super::{
     annotations::AnnotationsParser,
     complex_type::ComplexTypeParser,
     helper::XmlParserHelper,
+    node::NodeParser,
     simple_type::SimpleTypeParser,
     types::{BaseAttributes, CustomTypeDefinition, Node, NodeType, ParsedData, ParserError},
 };
@@ -159,8 +160,31 @@ impl XmlParser {
                         b"xs:element" => {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")?;
                             let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
+                            let b_type = XmlParserHelper::get_attribute_value(&s, "type")
+                                .and_then(|t| self.resolve_namespace(t))
+                                .and_then(|t| {
+                                    XmlParserHelper::base_type_str_to_node_type(&t)
+                                        .ok_or(ParserError::MissingOrNotSupportedBaseType(t))
+                                });
 
-                            current_element = Some((name, base_attributes));
+                            match b_type {
+                                Ok(node_type) => {
+                                    current_element = None;
+
+                                    let node = NodeParser::parse_element_with_type_node(
+                                        reader,
+                                        node_type,
+                                        name,
+                                        base_attributes,
+                                    )?;
+
+                                    nodes.push(node);
+                                }
+                                Err(ParserError::MissingAttribute(_)) => {
+                                    current_element = Some((name, base_attributes));
+                                }
+                                Err(e) => return Err(e),
+                            };
                         }
                         b"xs:complexType" => {
                             if let Some((name, base_attributes)) = &current_element {
@@ -176,8 +200,12 @@ impl XmlParser {
                                 let c_type = CustomTypeDefinition::Complex(c_type);
                                 registry.register_type(c_type);
 
-                                let node =
-                                    Node::new(node_type, name.clone(), (*base_attributes).clone());
+                                let node = Node::new(
+                                    node_type,
+                                    name.clone(),
+                                    (*base_attributes).clone(),
+                                    None,
+                                );
                                 nodes.push(node);
                             } else {
                                 let name = XmlParserHelper::get_attribute_value(&s, "name")
@@ -205,8 +233,12 @@ impl XmlParser {
                                 let node_type = NodeType::Custom(s_type.qualified_name.clone());
                                 registry.register_type(s_type.into());
 
-                                let node =
-                                    Node::new(node_type, name.clone(), (*base_attributes).clone());
+                                let node = Node::new(
+                                    node_type,
+                                    name.clone(),
+                                    (*base_attributes).clone(),
+                                    None,
+                                );
                                 nodes.push(node);
                             } else {
                                 let name = XmlParserHelper::get_attribute_value(&s, "name")
@@ -244,7 +276,7 @@ impl XmlParser {
                         };
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
-                        let node = Node::new(node_type, name, base_attributes);
+                        let node = Node::new(node_type, name, base_attributes, None);
                         nodes.push(node);
                     }
                 }
@@ -333,7 +365,7 @@ impl XmlParser {
                             return Some(ParserError::MalformedAttribute(
                                 "unknown".to_owned(),
                                 Some(format!("{e:?}")),
-                            ))
+                            ));
                         }
                     };
 

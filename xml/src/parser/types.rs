@@ -17,14 +17,22 @@ pub struct Node {
     pub node_type: NodeType,
     pub name: String,
     pub base_attributes: BaseAttributes,
+    /// Documentation extracted from xs:annotation
+    pub documentations: Option<Vec<String>>,
 }
 
 impl Node {
-    pub const fn new(node_type: NodeType, name: String, base_attributes: BaseAttributes) -> Self {
+    pub const fn new(
+        node_type: NodeType,
+        name: String,
+        base_attributes: BaseAttributes,
+        documentations: Option<Vec<String>>,
+    ) -> Self {
         Self {
             node_type,
             name,
             base_attributes,
+            documentations,
         }
     }
 }
