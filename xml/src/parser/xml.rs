@@ -306,7 +306,7 @@ impl XmlParser {
 
                 self.lookup_namespace(&alias)
                     .ok_or(ParserError::FailedToResolveNamespace(alias))
-                    .map(std::clone::Clone::clone)
+                    .cloned()
             }
             None => Ok(self.as_qualified_name(b_type.as_str())),
         }

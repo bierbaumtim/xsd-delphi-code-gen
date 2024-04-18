@@ -34,3 +34,9 @@ impl TypeRegistry {
         name
     }
 }
+
+impl Default for TypeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}

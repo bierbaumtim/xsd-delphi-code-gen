@@ -124,6 +124,17 @@ where
     }
 }
 
+impl<K, T> Default for DependencyGraph<K, T>
+where
+    // K: Sized,
+    K: Eq + PartialEq + Hash + Clone,
+    T: Clone + Dependable<K>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
