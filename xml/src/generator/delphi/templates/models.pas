@@ -63,11 +63,11 @@ type
   end;
   {$ENDREGION}
 
-  {% if enumerations | length > 0 %}
+  {% if enumerations | length > 0 -%}
   {$REGION 'Enumerations'}
-  {% for enum in enumerations -%}
+  {%- for enum in enumerations %}
   // XML Qualified Name: {{enum.qualified_name}}
-  {% for line in enum.documentations %}
+  {% for line in enum.documentations -%}
   // {{line}}
   {% endfor -%}
   {% if enum.line_per_variant -%}
@@ -113,7 +113,7 @@ type
   {$REGION 'Aliases'}
   {%- for alias in type_aliases %}
   // XML Qualified Name: {{alias.qualified_name}}
-  {% for line in alias.documentations %}
+  {% for line in alias.documentations -%}
   // {{line}}
   {% endfor -%}
   {{alias.name}} = {{alias.data_type_repr}};
@@ -133,7 +133,7 @@ type
   {$REGION 'Union Types'}
   {%- for union in union_types %}
     // XML Qualified Name: {{alias.qualified_name}}
-    {% for line in union.documentations %}
+    {% for line in union.documentations -%}
     // {{line}}
     {% endfor -%}
     {{union.name}} = record

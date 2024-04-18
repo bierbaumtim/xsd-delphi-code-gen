@@ -11,7 +11,7 @@
 
 {% macro class_declaration(class) -%}
   // XML Qualified Name: {{class.qualified_name}}
-  {% for line in class.documentations %}
+  {% for line in class.documentations -%}
   // {{line}}
   {% endfor -%}
   {{class.name}} = class({{class.super_type | default(value="TObject") }})
