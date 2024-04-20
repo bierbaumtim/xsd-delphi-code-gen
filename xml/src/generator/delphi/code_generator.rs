@@ -81,7 +81,7 @@ impl<T: Write> DelphiCodeGenerator<T> {
     fn build_tera_context(&self) -> Result<Context, CodeGenError> {
         let mut models_context = Context::new();
         models_context.insert("unitName", &self.options.unit_name);
-        models_context.insert("crate_version", "0.0.1");
+        models_context.insert("crate_version", env!("CARGO_PKG_VERSION"));
         models_context.insert("gen_from_xml", &self.options.generate_from_xml);
         models_context.insert("gen_to_xml", &self.options.generate_to_xml);
         models_context.insert("gen_datetime_helper", &self.generate_date_time_helper);
