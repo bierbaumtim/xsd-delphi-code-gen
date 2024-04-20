@@ -11,9 +11,14 @@ pub struct ParsedData {
     pub documentations: Vec<String>,
 }
 
-// xs:element
 #[derive(Debug)]
-pub struct Node {
+pub enum Node {
+    Single(SingleNode),
+    Group(NodeGroup),
+}
+
+#[derive(Debug)]
+pub struct SingleNode {
     pub node_type: NodeType,
     pub name: String,
     pub base_attributes: BaseAttributes,
@@ -21,7 +26,7 @@ pub struct Node {
     pub documentations: Option<Vec<String>>,
 }
 
-impl Node {
+impl SingleNode {
     pub const fn new(
         node_type: NodeType,
         name: String,
@@ -34,6 +39,18 @@ impl Node {
             base_attributes,
             documentations,
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct NodeGroup {
+    pub nodes: Vec<Node>,
+    pub order: OrderIndicator,
+}
+
+impl NodeGroup {
+    pub const fn new(nodes: Vec<Node>, order: OrderIndicator) -> Self {
+        Self { nodes, order }
     }
 }
 

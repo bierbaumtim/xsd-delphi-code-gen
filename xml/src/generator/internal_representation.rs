@@ -5,11 +5,11 @@ mod type_alias;
 mod union_type;
 
 use crate::{
-    parser::types::{
-        CustomTypeDefinition, NodeType, ParsedData, DEFAULT_OCCURANCE, UNBOUNDED_OCCURANCE,
-    },
+    parser::types::{CustomTypeDefinition, OrderIndicator, ParsedData},
     type_registry::TypeRegistry,
 };
+
+use self::class_type::collect_variables;
 
 pub use super::{
     dependency_graph::DependencyGraph,
@@ -169,7 +169,8 @@ impl InternalRepresentation {
             }
         }
 
-        let document_variables = Self::get_document_variables(data, registry);
+        let document_variables =
+            collect_variables(&data.nodes, registry, &OrderIndicator::Sequence);
 
         let document_type = ClassType {
             super_type: None,
@@ -188,84 +189,5 @@ impl InternalRepresentation {
             union_types: union_types_dep_graph.get_sorted_elements(),
             enumerations,
         }
-    }
-
-    /// Gets the variables of the document.
-    /// The document is a special class type that contains the root element of the XML document.
-    /// The variables of the document are the root elements of the XML document.
-    ///
-    /// # Arguments
-    /// * `data` - The parsed data.
-    /// * `registry` - The type registry.
-    /// # Returns
-    /// The variables of the document.
-    fn get_document_variables(data: &ParsedData, registry: &TypeRegistry) -> Vec<Variable> {
-        data.nodes
-            .iter()
-            .map(|node| {
-                let min_occurs = node.base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE);
-                let max_occurs = node.base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE);
-
-                Variable {
-                    name: node.name.clone(),
-                    xml_name: node.name.clone(),
-                    required: min_occurs > 0,
-                    data_type: match &node.node_type {
-                        NodeType::Standard(s) => helper::node_base_type_to_datatype(s),
-                        NodeType::Custom(e) => {
-                            let c_type = registry.types.get(e);
-
-                            match c_type {
-                                Some(c_type) => {
-                                    let data_type = match c_type {
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.enumeration.is_some() =>
-                                        {
-                                            DataType::Enumeration(s.name.clone())
-                                        }
-                                        CustomTypeDefinition::Simple(s)
-                                            if s.base_type.is_some() || s.list_type.is_some() =>
-                                        {
-                                            DataType::Alias(s.name.clone())
-                                        }
-                                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
-                                            DataType::Union(s.name.clone())
-                                        }
-                                        _ => DataType::Custom(c_type.get_name()),
-                                    };
-
-                                    if max_occurs == UNBOUNDED_OCCURANCE
-                                        || (min_occurs != max_occurs
-                                            && max_occurs > DEFAULT_OCCURANCE)
-                                    {
-                                        DataType::List(Box::new(data_type))
-                                    } else if min_occurs == max_occurs
-                                        && max_occurs > DEFAULT_OCCURANCE
-                                    {
-                                        let size = usize::try_from(max_occurs).unwrap();
-
-                                        DataType::FixedSizeList(Box::new(data_type), size)
-                                    } else {
-                                        data_type
-                                    }
-                                }
-                                None => todo!(),
-                            }
-                        }
-                    },
-                    requires_free: match &node.node_type {
-                        NodeType::Standard(_) => false,
-                        NodeType::Custom(c) => registry.types.get(c).map_or(false, |t| match t {
-                            CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
-                            CustomTypeDefinition::Complex(_) => true,
-                        }),
-                    },
-                    default_value: None,
-                    is_const: false,
-                    source: XMLSource::Element,
-                    documentations: node.documentations.as_ref().cloned().unwrap_or_default(),
-                }
-            })
-            .collect::<Vec<Variable>>()
     }
 }

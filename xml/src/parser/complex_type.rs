@@ -12,7 +12,7 @@ use super::{
     simple_type::SimpleTypeParser,
     types::{
         BaseAttributes, ComplexType, CustomTypeDefinition, Node, NodeType, OrderIndicator,
-        ParserError,
+        ParserError, SingleNode,
     },
     xml::XmlParser,
 };
@@ -37,7 +37,7 @@ impl ComplexTypeParser {
         name: String,
         qualified_parent: Option<String>,
     ) -> Result<ComplexType, ParserError> {
-        let mut children = Vec::new();
+        let mut children: Vec<Node> = Vec::new();
         let mut custom_attributes = Vec::new();
         let mut buf = Vec::new();
         let mut is_in_compositor = false;
@@ -55,26 +55,28 @@ impl ComplexTypeParser {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(s)) => match s.name().as_ref() {
-                    // TODO: Add support for choice nested inside sequence
                     b"xs:sequence" | b"xs:all" | b"xs:choice" => {
                         if is_in_compositor {
-                            return Err(ParserError::UnexpectedStartOfNode(
-                                std::str::from_utf8(s.name().0)
-                                    .unwrap_or("Unknown")
-                                    .to_owned(),
-                            ));
-                        }
+                            let group = NodeParser::parse_node_group(
+                                reader,
+                                registry,
+                                xml_parser,
+                                &s,
+                                qualified_name.clone(),
+                            )?;
+                            children.push(Node::Group(group));
+                        } else {
+                            is_in_compositor = true;
 
-                        is_in_compositor = true;
-
-                        match s.name().as_ref() {
-                            b"xs:all" => order = OrderIndicator::All,
-                            b"xs:choice" => {
-                                let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
-                                order = OrderIndicator::Choice(base_attributes);
+                            match s.name().as_ref() {
+                                b"xs:all" => order = OrderIndicator::All,
+                                b"xs:choice" => {
+                                    let base_attributes = XmlParserHelper::get_base_attributes(&s)?;
+                                    order = OrderIndicator::Choice(base_attributes);
+                                }
+                                b"xs:sequence" => order = OrderIndicator::Sequence,
+                                _ => (),
                             }
-                            b"xs:sequence" => order = OrderIndicator::Sequence,
-                            _ => (),
                         }
                     }
                     b"xs:element" => {
@@ -143,13 +145,13 @@ impl ComplexTypeParser {
                             let c_type = CustomTypeDefinition::Complex(c_type);
                             registry.register_type(c_type);
 
-                            let node = Node::new(
+                            let node = SingleNode::new(
                                 node_type,
                                 name.clone(),
                                 (*base_attributes).clone(),
                                 None,
                             );
-                            children.push(node);
+                            children.push(Node::Single(node));
                         } else {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")
                                 .ok()
@@ -180,13 +182,13 @@ impl ComplexTypeParser {
                             let node_type = NodeType::Custom(s_type.qualified_name.clone());
                             registry.register_type(s_type.into());
 
-                            let node = Node::new(
+                            let node = SingleNode::new(
                                 node_type,
                                 name.clone(),
                                 (*base_attributes).clone(),
                                 None,
                             );
-                            children.push(node);
+                            children.push(Node::Single(node));
                         } else {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")
                                 .ok()
@@ -235,9 +237,9 @@ impl ComplexTypeParser {
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
 
-                        let node = Node::new(node_type, name, base_attributes, None);
+                        let node = SingleNode::new(node_type, name, base_attributes, None);
 
-                        children.push(node);
+                        children.push(Node::Single(node));
                     }
                     b"xs:attribute" => {
                         let attr = CustomAttributeParser::parse(

@@ -8,7 +8,9 @@ use super::{
     helper::XmlParserHelper,
     node::NodeParser,
     simple_type::SimpleTypeParser,
-    types::{BaseAttributes, CustomTypeDefinition, Node, NodeType, ParsedData, ParserError},
+    types::{
+        BaseAttributes, CustomTypeDefinition, Node, NodeType, ParsedData, ParserError, SingleNode,
+    },
 };
 use crate::type_registry::TypeRegistry;
 
@@ -200,13 +202,13 @@ impl XmlParser {
                                 let c_type = CustomTypeDefinition::Complex(c_type);
                                 registry.register_type(c_type);
 
-                                let node = Node::new(
+                                let node = SingleNode::new(
                                     node_type,
                                     name.clone(),
                                     (*base_attributes).clone(),
                                     None,
                                 );
-                                nodes.push(node);
+                                nodes.push(Node::Single(node));
                             } else {
                                 let name = XmlParserHelper::get_attribute_value(&s, "name")
                                     .ok()
@@ -233,13 +235,13 @@ impl XmlParser {
                                 let node_type = NodeType::Custom(s_type.qualified_name.clone());
                                 registry.register_type(s_type.into());
 
-                                let node = Node::new(
+                                let node = SingleNode::new(
                                     node_type,
                                     name.clone(),
                                     (*base_attributes).clone(),
                                     None,
                                 );
-                                nodes.push(node);
+                                nodes.push(Node::Single(node));
                             } else {
                                 let name = XmlParserHelper::get_attribute_value(&s, "name")
                                     .ok()
@@ -276,8 +278,8 @@ impl XmlParser {
                         };
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
-                        let node = Node::new(node_type, name, base_attributes, None);
-                        nodes.push(node);
+                        let node = SingleNode::new(node_type, name, base_attributes, None);
+                        nodes.push(Node::Single(node));
                     }
                 }
                 // There are several other `Event`s we do not consider here
@@ -339,6 +341,15 @@ impl XmlParser {
                 self.lookup_namespace(&alias)
                     .ok_or(ParserError::FailedToResolveNamespace(alias))
                     .cloned()
+                    .map(|mut namespace| {
+                        if !namespace.ends_with('/') {
+                            namespace.push('/');
+                        }
+
+                        namespace.push_str(&b_type[position + 1..]);
+
+                        namespace
+                    })
             }
             None => Ok(self.as_qualified_name(b_type.as_str())),
         }

@@ -1,7 +1,8 @@
 use crate::{
     generator::types::{ClassType, DataType, Variable, XMLSource},
     parser::types::{
-        CustomTypeDefinition, NodeType, OrderIndicator, DEFAULT_OCCURANCE, UNBOUNDED_OCCURANCE,
+        CustomTypeDefinition, Node, NodeType, OrderIndicator, SingleNode, DEFAULT_OCCURANCE,
+        UNBOUNDED_OCCURANCE,
     },
     type_registry::TypeRegistry,
 };
@@ -59,130 +60,7 @@ pub fn build_class_type_ir(
     ct: &crate::parser::types::ComplexType,
     registry: &TypeRegistry,
 ) -> ClassType {
-    let mut variables = Vec::new();
-
-    for child in &ct.children {
-        let min_occurs = match &ct.order {
-            OrderIndicator::All => child
-                .base_attributes
-                .min_occurs
-                .unwrap_or(DEFAULT_OCCURANCE)
-                .clamp(0, 1),
-            OrderIndicator::Choice(base_attributes) => {
-                base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE)
-            }
-            _ => child
-                .base_attributes
-                .min_occurs
-                .unwrap_or(DEFAULT_OCCURANCE),
-        };
-        let max_occurs = match &ct.order {
-            OrderIndicator::All => child
-                .base_attributes
-                .max_occurs
-                .unwrap_or(DEFAULT_OCCURANCE)
-                .clamp(0, 1),
-            OrderIndicator::Choice(base_attributes) => {
-                base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE)
-            }
-            _ => child
-                .base_attributes
-                .max_occurs
-                .unwrap_or(DEFAULT_OCCURANCE),
-        };
-
-        let required = match &ct.order {
-            OrderIndicator::Choice(_) => false,
-            _ => min_occurs > 0,
-        };
-
-        match &child.node_type {
-            NodeType::Standard(s) => {
-                let d_type = node_base_type_to_datatype(s);
-
-                let d_type = if max_occurs == UNBOUNDED_OCCURANCE
-                    || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
-                {
-                    DataType::List(Box::new(d_type))
-                } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
-                    let size = usize::try_from(max_occurs).unwrap();
-
-                    DataType::FixedSizeList(Box::new(d_type.clone()), size)
-                } else {
-                    d_type
-                };
-
-                let variable = Variable {
-                    name: child.name.clone(),
-                    xml_name: child.name.clone(),
-                    requires_free: matches!(d_type, DataType::List(_) | DataType::Uri),
-                    data_type: d_type,
-                    required,
-                    default_value: None,
-                    is_const: false,
-                    source: XMLSource::Element,
-                    documentations: child.documentations.as_ref().cloned().unwrap_or_default(),
-                };
-
-                variables.push(variable);
-            }
-            NodeType::Custom(c) => {
-                let c_type = registry.types.get(c);
-
-                if let Some(c_type) = c_type {
-                    let data_type = match c_type {
-                        CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
-                            DataType::Enumeration(s.name.clone())
-                        }
-                        CustomTypeDefinition::Simple(s)
-                            if s.base_type.is_some() || s.list_type.is_some() =>
-                        {
-                            DataType::Alias(s.name.clone())
-                        }
-                        CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
-                            DataType::Union(s.name.clone())
-                        }
-                        _ => DataType::Custom(c_type.get_name()),
-                    };
-
-                    let requires_free = match c_type {
-                        CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
-                        CustomTypeDefinition::Complex(_) => true,
-                    };
-
-                    let data_type = if max_occurs == UNBOUNDED_OCCURANCE
-                        || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
-                    {
-                        DataType::List(Box::new(data_type))
-                    } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
-                        let size = usize::try_from(max_occurs).unwrap();
-
-                        DataType::FixedSizeList(Box::new(data_type), size)
-                    } else {
-                        data_type
-                    };
-
-                    let variable = Variable {
-                        name: child.name.clone(),
-                        xml_name: child.name.clone(),
-                        requires_free: requires_free
-                            || matches!(
-                                data_type,
-                                DataType::List(_) | DataType::InlineList(_) | DataType::Uri
-                            ),
-                        data_type,
-                        required,
-                        default_value: None,
-                        is_const: false,
-                        source: XMLSource::Element,
-                        documentations: child.documentations.as_ref().cloned().unwrap_or_default(),
-                    };
-
-                    variables.push(variable);
-                }
-            }
-        }
-    }
+    let mut variables = collect_variables(&ct.children, registry, &ct.order);
 
     for attr in &ct.custom_attributes {
         match &attr.base_type {
@@ -265,5 +143,135 @@ pub fn build_class_type_ir(
         super_type,
         variables,
         documentations: ct.documentations.clone(),
+    }
+}
+
+pub fn collect_variables(
+    nodes: &[Node],
+    registry: &TypeRegistry,
+    order: &OrderIndicator,
+) -> Vec<Variable> {
+    nodes
+        .iter()
+        .filter_map(|n| match n {
+            Node::Single(e) => single_node_to_variable(e, registry, order).map(|v| vec![v]),
+            Node::Group(g) => Some(collect_variables(&g.nodes, registry, &g.order)),
+        })
+        .flatten()
+        .collect::<Vec<Variable>>()
+}
+
+fn single_node_to_variable(
+    node: &SingleNode,
+    registry: &TypeRegistry,
+    order: &OrderIndicator,
+) -> Option<Variable> {
+    let min_occurs = match order {
+        OrderIndicator::All => node
+            .base_attributes
+            .min_occurs
+            .unwrap_or(DEFAULT_OCCURANCE)
+            .clamp(0, 1),
+        OrderIndicator::Choice(base_attributes) => {
+            base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE)
+        }
+        _ => node.base_attributes.min_occurs.unwrap_or(DEFAULT_OCCURANCE),
+    };
+    let max_occurs = match order {
+        OrderIndicator::All => node
+            .base_attributes
+            .max_occurs
+            .unwrap_or(DEFAULT_OCCURANCE)
+            .clamp(0, 1),
+        OrderIndicator::Choice(base_attributes) => {
+            base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE)
+        }
+        _ => node.base_attributes.max_occurs.unwrap_or(DEFAULT_OCCURANCE),
+    };
+
+    let required = match order {
+        OrderIndicator::Choice(_) => false,
+        _ => min_occurs > 0,
+    };
+
+    match &node.node_type {
+        NodeType::Standard(s) => {
+            let d_type = node_base_type_to_datatype(s);
+
+            let d_type = if max_occurs == UNBOUNDED_OCCURANCE
+                || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
+            {
+                DataType::List(Box::new(d_type))
+            } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
+                let size = usize::try_from(max_occurs).unwrap();
+
+                DataType::FixedSizeList(Box::new(d_type.clone()), size)
+            } else {
+                d_type
+            };
+
+            Some(Variable {
+                name: node.name.clone(),
+                xml_name: node.name.clone(),
+                requires_free: matches!(d_type, DataType::List(_) | DataType::Uri),
+                data_type: d_type,
+                required,
+                default_value: None,
+                is_const: false,
+                source: XMLSource::Element,
+                documentations: node.documentations.as_ref().cloned().unwrap_or_default(),
+            })
+        }
+        NodeType::Custom(c) => {
+            let c_type = registry.types.get(c)?;
+
+            let data_type = match c_type {
+                CustomTypeDefinition::Simple(s) if s.enumeration.is_some() => {
+                    DataType::Enumeration(s.name.clone())
+                }
+                CustomTypeDefinition::Simple(s)
+                    if s.base_type.is_some() || s.list_type.is_some() =>
+                {
+                    DataType::Alias(s.name.clone())
+                }
+                CustomTypeDefinition::Simple(s) if s.variants.is_some() => {
+                    DataType::Union(s.name.clone())
+                }
+                _ => DataType::Custom(c_type.get_name()),
+            };
+
+            let requires_free = match c_type {
+                CustomTypeDefinition::Simple(s) => s.list_type.is_some(),
+                CustomTypeDefinition::Complex(_) => true,
+            };
+
+            let data_type = if max_occurs == UNBOUNDED_OCCURANCE
+                || (min_occurs != max_occurs && max_occurs > DEFAULT_OCCURANCE)
+            {
+                DataType::List(Box::new(data_type))
+            } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
+                let size = usize::try_from(max_occurs).unwrap();
+
+                DataType::FixedSizeList(Box::new(data_type), size)
+            } else {
+                data_type
+            };
+
+            Some(Variable {
+                name: node.name.clone(),
+                xml_name: node.name.clone(),
+                requires_free: requires_free
+                    || matches!(
+                        data_type,
+                        DataType::List(_) | DataType::InlineList(_) | DataType::Uri
+                    ),
+                data_type,
+                required,
+                default_value: None,
+                is_const: false,
+                source: XMLSource::Element,
+                documentations: node.documentations.as_ref().cloned().unwrap_or_default(),
+            })
+        }
     }
 }
