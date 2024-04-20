@@ -1,5 +1,4 @@
 use std::io::{BufWriter, Write};
-use std::time::Instant;
 use tera::{Context, Tera};
 
 use crate::generator::{
@@ -55,7 +54,6 @@ pub struct DelphiCodeGenerator<T: Write> {
 }
 
 impl<T: Write> DelphiCodeGenerator<T> {
-    // MARK: New way using Tera template engine
     #[inline]
     fn setup_tera(&self) -> Result<Tera, CodeGenError> {
         let macros_template_str = include_str!("templates/macros.pas");
@@ -189,24 +187,11 @@ where
     }
 
     fn generate(&mut self) -> Result<(), CodeGenError> {
-        let instant = Instant::now();
         let tera = self.setup_tera()?;
-        println!("Setup tera within {}ms", instant.elapsed().as_millis());
-        let instant = Instant::now();
         let models_context = self.build_tera_context()?;
-        println!(
-            "Build tera context within {}µs",
-            instant.elapsed().as_micros()
-        );
 
-        let instant = Instant::now();
         match tera.render_to("models.pas", &models_context, &mut self.writer.buffer) {
-            Ok(_) => {
-                println!(
-                    "Rendered template within {}ms",
-                    instant.elapsed().as_millis()
-                );
-            }
+            Ok(_) => {}
             Err(e) => {
                 return Err(CodeGenError::TemplateEngineError(format!(
                     "Failed to render model template due to {:?}",
