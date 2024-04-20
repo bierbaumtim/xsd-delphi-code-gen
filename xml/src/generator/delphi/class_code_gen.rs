@@ -678,7 +678,7 @@ impl ClassCodeGenerator {
                             true => {
                                 format!("{}.FromXml(node.ChildNodes['{}'])", type_name, v.xml_name,)
                             }
-                            false => format!("{type_name}.FromXml(vOptionalNode);"),
+                            false => format!("{type_name}.FromXml(vOptionalNode)"),
                         };
 
                         Some(ElementDeserializeVariable {
