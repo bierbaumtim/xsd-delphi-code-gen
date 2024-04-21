@@ -157,7 +157,7 @@ impl XmlParser {
                             self.current_namespace =
                                 XmlParserHelper::get_attribute_value(&s, "targetNamespace").ok();
 
-                            self.extract_schema_namespace_aliases(&s);
+                            self.extract_schema_namespace_aliases(&s)?;
                         }
                         b"xs:element" => {
                             let name = XmlParserHelper::get_attribute_value(&s, "name")?;
@@ -273,9 +273,9 @@ impl XmlParser {
                         let b_type = self.resolve_namespace(b_type)?;
                         let Some(node_type) =
                             XmlParserHelper::base_type_str_to_node_type(b_type.as_str())
-                        else {
-                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
-                        };
+                            else {
+                                return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
+                            };
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
                         let node = SingleNode::new(node_type, name, base_attributes, None);
@@ -360,20 +360,20 @@ impl XmlParser {
     /// # Arguments
     ///
     /// * `s` - The schema element.
-    fn extract_schema_namespace_aliases(&mut self, s: &BytesStart<'_>) -> Option<ParserError> {
-        let prefix = b"xmlns:";
+    fn extract_schema_namespace_aliases(&mut self, s: &BytesStart<'_>) -> Result<(), ParserError> {
+        const PREFIX: &[u8] = b"xmlns:";
 
         for attr in s.attributes().filter(|a| {
             a.as_ref()
-                .is_ok_and(|a| a.key.0.starts_with(prefix) && a.key.0 != prefix)
+                .is_ok_and(|a| a.key.0.starts_with(PREFIX) && a.key.0 != PREFIX)
         }) {
             match attr {
                 Ok(a) => {
-                    let alias = &a.key.0[prefix.len()..];
+                    let alias = &a.key.0[PREFIX.len()..];
                     let alias = match std::str::from_utf8(alias) {
                         Ok(v) => String::from(v),
                         Err(e) => {
-                            return Some(ParserError::MalformedAttribute(
+                            return Err(ParserError::MalformedAttribute(
                                 "unknown".to_owned(),
                                 Some(format!("{e:?}")),
                             ));
@@ -388,15 +388,15 @@ impl XmlParser {
                     };
 
                     let Some(value) = value else {
-                        return Some(ParserError::MalformedAttribute(alias, None));
+                        return Err(ParserError::MalformedAttribute(alias, None));
                     };
 
                     self.namespace_aliases.insert(alias, value);
                 }
-                Err(e) => return Some(ParserError::MalformedNamespaceAttribute(e.to_string())),
+                Err(e) => return Err(ParserError::MalformedNamespaceAttribute(e.to_string())),
             }
         }
 
-        None
+        Ok(())
     }
 }
