@@ -271,9 +271,9 @@ impl XmlParser {
                         let b_type = self.resolve_namespace(b_type)?;
                         let Some(node_type) =
                             XmlParserHelper::base_type_str_to_node_type(b_type.as_str())
-                            else {
-                                return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
-                            };
+                        else {
+                            return Err(ParserError::MissingOrNotSupportedBaseType(b_type));
+                        };
 
                         let base_attributes = XmlParserHelper::get_base_attributes(&e)?;
                         let node = SingleNode::new(node_type, name, base_attributes, None);
@@ -371,7 +371,11 @@ impl XmlParser {
         }) {
             match attr {
                 Ok(a) => {
-                    let alias = &a.key.0.get(PREFIX.len()..).expect("Namespace alias should not be empty here");
+                    let alias = &a
+                        .key
+                        .0
+                        .get(PREFIX.len()..)
+                        .expect("Namespace alias should not be empty here");
                     let alias = match std::str::from_utf8(alias) {
                         Ok(v) => String::from(v),
                         Err(e) => {

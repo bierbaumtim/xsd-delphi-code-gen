@@ -11,8 +11,8 @@ quick-xml = "0.31.0"
 unicode-segmentation = "1.11.0"
 chrono = "0.4.38"
 tera = "1.19.1"
-serde = "1.0.198"
-serde_with = {version = "3.7.0", features = ["macros"]}
+serde = "1.0.199"
+serde_with = {version = "3.8.1", features = ["macros"]}
 
 [dev-dependencies]
 indoc = "2"

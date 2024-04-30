@@ -18,7 +18,9 @@ pub(crate) fn collect_endpoints(
     let mut endpoints = vec![];
 
     for (k, v) in &spec.paths {
-        let Ok(v) = v.resolve(spec) else { continue; };
+        let Ok(v) = v.resolve(spec) else {
+            continue;
+        };
 
         if let Some(o) = v.get {
             let name = get_endpoint_name(&o, k, "Get");
@@ -162,7 +164,14 @@ fn get_endpoint_response_type(
         .and_then(|m| m.schema)
         .and_then(|s| s.resolve(spec).ok())
         .and_then(|s| {
-            schema_collector::schema_to_type(&s, endpoint_name, spec, &None, class_types, enum_types)
+            schema_collector::schema_to_type(
+                &s,
+                endpoint_name,
+                spec,
+                &None,
+                class_types,
+                enum_types,
+            )
         })
         .unwrap_or(("none".to_string(), false, false));
 
@@ -183,7 +192,9 @@ fn get_endpoint_responses(
     let mut responses = vec![];
 
     for (k, v) in &operation.responses {
-        let Ok(v) = v.resolve(spec) else { continue; };
+        let Ok(v) = v.resolve(spec) else {
+            continue;
+        };
 
         let response = ResponseModel {
             status_code: match k {

@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 lazy_static = "1.4.0"
-serde = "1.0.198"
+serde = "1.0.199"
 sw4rm-rs = "0.2.0"
 tera = "1.19.1"

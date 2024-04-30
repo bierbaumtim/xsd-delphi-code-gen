@@ -16,7 +16,6 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: &Option<
 
         return;
     };
-    
 
     if !dest.is_dir() {
         eprintln!("Destination path is not a directory");
@@ -66,8 +65,7 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: &Option<
     // TODO: Iterate over all paths and generate endpoints
     // TODO: Build context for client template
 
-    let (mut class_types, mut enum_types) =
-        schema_collector::collect_types(&openapi_spec, prefix);
+    let (mut class_types, mut enum_types) = schema_collector::collect_types(&openapi_spec, prefix);
     let endpoints =
         endpoint_collector::collect_endpoints(&openapi_spec, &mut class_types, &mut enum_types);
 

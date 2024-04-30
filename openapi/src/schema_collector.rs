@@ -18,7 +18,9 @@ pub(crate) fn collect_types(
     let mut enum_types = vec![];
 
     for (k, v) in spec.schemas() {
-        let Ok(s) = v.resolve(spec) else { continue; };
+        let Ok(s) = v.resolve(spec) else {
+            continue;
+        };
 
         schema_to_type(
             &s,
@@ -97,7 +99,7 @@ pub(crate) fn schema_to_type(
                                         class_types,
                                         enum_types,
                                     )
-                                        .expect("Type of array items must be resolved");
+                                    .expect("Type of array items must be resolved");
 
                                     (name, is_class, is_enum)
                                 }
