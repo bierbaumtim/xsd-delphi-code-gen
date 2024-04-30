@@ -24,7 +24,7 @@ pub(crate) fn sanitize_name(name: &str) -> String {
 }
 
 pub(crate) fn schema_type_to_base_type(
-    schema_type: &SchemaType,
+    schema_type: SchemaType,
     format: &Option<String>,
 ) -> String {
     match schema_type {
@@ -38,6 +38,6 @@ pub(crate) fn schema_type_to_base_type(
         SchemaType::Integer => "integer".to_string(),
         SchemaType::Number => "double".to_string(),
         SchemaType::Boolean => "boolean".to_string(),
-        _ => "".to_string(),
+        _ => String::new(),
     }
 }

@@ -12,22 +12,19 @@ use crate::{
 
 pub(crate) fn collect_types(
     spec: &Spec,
-    prefix: Option<String>,
+    prefix: &Option<String>,
 ) -> (Vec<ClassType>, Vec<EnumType>) {
     let mut class_types = vec![];
     let mut enum_types = vec![];
 
     for (k, v) in spec.schemas() {
-        let s = match v.resolve(spec) {
-            Ok(s) => s,
-            Err(_) => continue,
-        };
+        let Ok(s) = v.resolve(spec) else { continue; };
 
         schema_to_type(
             &s,
             k.as_str(),
             spec,
-            prefix.clone(),
+            prefix,
             &mut class_types,
             &mut enum_types,
         );
@@ -40,7 +37,7 @@ pub(crate) fn schema_to_type(
     schema: &Schema,
     name: &str,
     spec: &Spec,
-    prefix: Option<String>,
+    prefix: &Option<String>,
     class_types: &mut Vec<ClassType>,
     enum_types: &mut Vec<EnumType>,
 ) -> Option<(String, bool, bool)> {
@@ -96,18 +93,18 @@ pub(crate) fn schema_to_type(
                                             _ => k.to_owned() + "Item",
                                         },
                                         spec,
-                                        prefix.clone(),
+                                        prefix,
                                         class_types,
                                         enum_types,
                                     )
-                                    .expect("Type of array items must be resolved");
+                                        .expect("Type of array items must be resolved");
 
                                     (name, is_class, is_enum)
                                 }
                                 SchemaType::Object => {
                                     (s.title.clone().unwrap_or(k.to_string()), true, false)
                                 }
-                                _ => (schema_type_to_base_type(t, &s.format), false, false),
+                                _ => (schema_type_to_base_type(*t, &s.format), false, false),
                             })?;
 
                         Some(Property {
@@ -140,7 +137,7 @@ pub(crate) fn schema_to_type(
             Some((name, true, false))
         }
         Some(SchemaType::Array) => None,
-        Some(t) => Some((schema_type_to_base_type(&t, &schema.format), false, false)),
+        Some(t) => Some((schema_type_to_base_type(t, &schema.format), false, false)),
         _ => None,
     }
 }

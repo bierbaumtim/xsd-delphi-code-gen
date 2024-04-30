@@ -21,7 +21,7 @@ fn main() {
     match &args.source_format {
         SourceFormat::Xml => generate_xml(&args.input, &output_path, build_code_gen_options(&args)),
         SourceFormat::OpenApi => {
-            generate_openapi_client(&args.input, &output_path, args.type_prefix.clone())
+            generate_openapi_client(&args.input, &output_path, &args.type_prefix)
         }
     }
 }

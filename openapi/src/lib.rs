@@ -10,15 +10,13 @@ mod render;
 mod schema_collector;
 mod type_registry;
 
-pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: Option<String>) {
-    let source = match source.first() {
-        Some(p) => p,
-        None => {
-            eprintln!("No source file provided");
+pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: &Option<String>) {
+    let Some(source) = source.first() else {
+        eprintln!("No source file provided");
 
-            return;
-        }
+        return;
     };
+    
 
     if !dest.is_dir() {
         eprintln!("Destination path is not a directory");
@@ -69,7 +67,7 @@ pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: Option<S
     // TODO: Build context for client template
 
     let (mut class_types, mut enum_types) =
-        schema_collector::collect_types(&openapi_spec, prefix.clone());
+        schema_collector::collect_types(&openapi_spec, prefix);
     let endpoints =
         endpoint_collector::collect_endpoints(&openapi_spec, &mut class_types, &mut enum_types);
 
