@@ -234,30 +234,24 @@ impl SimpleTypeParser {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(s)) => {
-                    if s.name().as_ref() == b"xs:simpleType" {
-                        let variant_name = format!("{name}Variant{variant_count}");
+                Ok(Event::Start(s)) if s.name().as_ref() == b"xs:simpleType" => {
+                    let variant_name = format!("{name}Variant{variant_count}");
 
-                        let s_type = Self::parse(
-                            reader,
-                            registry,
-                            xml_parser,
-                            variant_name,
-                            Some(qualified_parent.to_owned()),
-                        )?;
+                    let s_type = Self::parse(
+                        reader,
+                        registry,
+                        xml_parser,
+                        variant_name,
+                        Some(qualified_parent.to_owned()),
+                    )?;
 
-                        registry.register_type(s_type.clone().into());
+                    registry.register_type(s_type.clone().into());
 
-                        types.push(UnionVariant::Simple(s_type));
+                    types.push(UnionVariant::Simple(s_type));
 
-                        variant_count += 1;
-                    }
+                    variant_count += 1;
                 }
-                Ok(Event::End(e)) => {
-                    if e.name().as_ref() == b"xs:union" {
-                        break;
-                    }
-                }
+                Ok(Event::End(e)) if e.name().as_ref() == b"xs:union" => break,
                 Ok(_) => (),
                 Err(_) => return Err(ParserError::UnexpectedError),
             }

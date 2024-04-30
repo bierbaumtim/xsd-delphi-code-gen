@@ -149,8 +149,6 @@ impl XmlParser {
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-                Ok(Event::Eof) => break,
                 Ok(Event::Start(s)) => {
                     match s.name().as_ref() {
                         b"xs:schema" => {
@@ -282,6 +280,9 @@ impl XmlParser {
                         nodes.push(Node::Single(node));
                     }
                 }
+                // Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                Err(_) => return Err(ParserError::UnexpectedError),
+                Ok(Event::Eof) => break,
                 // There are several other `Event`s we do not consider here
                 _ => (),
             }
@@ -346,6 +347,7 @@ impl XmlParser {
                             namespace.push('/');
                         }
 
+                        // TODO: use get to prevent panic on empty string
                         namespace.push_str(&b_type[position + 1..]);
 
                         namespace
@@ -369,7 +371,7 @@ impl XmlParser {
         }) {
             match attr {
                 Ok(a) => {
-                    let alias = &a.key.0[PREFIX.len()..];
+                    let alias = &a.key.0.get(PREFIX.len()..).expect("Namespace alias should not be empty here");
                     let alias = match std::str::from_utf8(alias) {
                         Ok(v) => String::from(v),
                         Err(e) => {

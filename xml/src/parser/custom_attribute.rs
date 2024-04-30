@@ -80,11 +80,7 @@ impl CustomAttributeParser {
                         }
                         _ => (),
                     },
-                    Ok(Event::End(e)) => {
-                        if e.name().as_ref() == b"xs:attribute" {
-                            break;
-                        }
-                    }
+                    Ok(Event::End(e)) if e.name().as_ref() == b"xs:attribute" => break,
                     Ok(Event::Eof) => return Err(ParserError::UnexpectedEndOfFile),
                     Err(_) => return Err(ParserError::UnexpectedError),
                     _ => (),

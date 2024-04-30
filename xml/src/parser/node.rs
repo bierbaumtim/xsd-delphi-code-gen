@@ -39,10 +39,7 @@ impl NodeParser {
                     let mut values = AnnotationsParser::parse(reader)?;
                     annotations.append(&mut values);
                 }
-                Ok(Event::End(e)) => match e.name().as_ref() {
-                    b"xs:element" => break,
-                    _ => continue,
-                },
+                Ok(Event::End(e)) if e.name().as_ref() == b"xs:element" => break,
                 Ok(Event::Eof) => return Err(ParserError::UnexpectedEndOfFile),
                 Err(_) => return Err(ParserError::UnexpectedError),
                 _ => (),
@@ -74,16 +71,16 @@ impl NodeParser {
         let order = match start.name().as_ref() {
             b"xs:all" => OrderIndicator::All,
             b"xs:choice" => {
-                let base_attributes = XmlParserHelper::get_base_attributes(&start)?;
+                let base_attributes = XmlParserHelper::get_base_attributes(start)?;
                 OrderIndicator::Choice(base_attributes)
             }
             b"xs:sequence" => OrderIndicator::Sequence,
             _ => {
                 return Err(ParserError::UnexpectedStartOfNode(
-                    std::str::from_utf8(&start.name().0)
+                    std::str::from_utf8(start.name().0)
                         .unwrap_or("Unknown")
                         .to_owned(),
-                ))
+                ));
             }
         };
 

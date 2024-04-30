@@ -26,7 +26,7 @@ impl TypeRegistry {
         self.types.entry(name).or_insert(custom_type);
     }
 
-    /// Generates a unique type name for a anonymous type
+    /// Generates a unique type name for an anonymous type
     pub fn generate_type_name(&mut self) -> String {
         let name = format!("__Custom_Type_{}__", self.gen_type_count);
 
