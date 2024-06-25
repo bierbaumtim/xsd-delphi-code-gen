@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 
-quick-xml = "0.31.0"
+quick-xml = "0.34.0"
 unicode-segmentation = "1.11.0"
 chrono = "0.4.38"
 tera = "1.19.1"
