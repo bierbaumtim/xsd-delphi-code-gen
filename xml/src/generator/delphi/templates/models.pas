@@ -6,8 +6,7 @@
 // {{ macros::fixed_size_line(content="Version: " ~ crate_version, size=74) }} //
 // {{ macros::fixed_size_line(content="Timestamp: " ~ timestamp, size=74) }} //
 // ========================================================================== //
-
-{%- for line in documentations -%}
+{% for line in documentations -%}
 // {{line}}
 {%- endfor %}
 
@@ -129,7 +128,7 @@ type
   {% endfor -%}
   {$ENDREGION}
 
-  {% if union_types | length > 0 -%}
+  {%- if union_types | length > 0 %}
   {$REGION 'Union Types'}
   {%- for union in union_types %}
     // XML Qualified Name: {{alias.qualified_name}}
@@ -170,16 +169,16 @@ const
 
 {% if gen_datetime_helper or gen_hex_binary_helper -%}
 {$REGION 'Helper'}
-{%- if gen_datetime_helper and gen_from_xml %}
+{% if gen_datetime_helper and gen_from_xml -%}
 function DecodeDateTime(const pDateStr: String; const pFormat: String = ''): TDateTime;
 begin
   if pFormat = '' then Exit(ISO8601ToDate(pDateStr));
 
   Result := ISO8601ToDate(pDateStr);
 end;
-{% endif -%}
+{%- endif %}
 
-{% if gen_datetime_helper and gen_to_xml %}
+{% if gen_datetime_helper and gen_to_xml  -%}
 function EncodeTime(const pTime: TTime; const pFormat: String): String;
 begin
   var vFormatSettings := TFormatSettings.Create;
@@ -187,16 +186,16 @@ begin
 
   Result := TimeToStr(pTime, vFormatSettings);
 end;
-{% endif -%}
+{%- endif %}
 
-{% if gen_hex_binary_helper and gen_from_xml %}
+{% if gen_hex_binary_helper and gen_from_xml -%}
 function HexStrToBin(const pHex: String): TBytes;
 begin
   HexToBin(pHex, 0, Result, 0, Length(pHex) / 2);
 end;
-{% endif -%}
+{%- endif %}
 
-{% if gen_hex_binary_helper and gen_to_xml %}
+{% if gen_hex_binary_helper and gen_to_xml -%}
 function BinToHexStr(const pBin: TBytes): String;
 begin
   var vTemp: TBytes;
@@ -204,7 +203,7 @@ begin
 
   Result := TEncoding.GetString(vTemp);
 end;
-{% endif -%}
+{%- endif %}
 {$ENDREGION}
 {%- endif %}
 
@@ -219,11 +218,11 @@ begin
   {%- if loop.first -%}
   if pXmlValue = '{{value.xml_value}}' then begin
   {%- else -%}
-  {{" if"}} pXmlValue = = '{{value.xml_value}}' then begin
+  {{" if"}} pXmlValue = '{{value.xml_value}}' then begin
   {%- endif %}
     Result := {{enum.name}}.{{value.variant_name}};
   end else
-  {%- endfor %}
+  {%- endfor %} begin
     raise Exception.Create('\"' + pXmlValue + '\" is a unknown value for {{enum.name}}');
   end;
 end;
@@ -290,7 +289,7 @@ begin
 end;
 {%- endif %}
 end;
-{% endfor -%}
+{%- endfor %}
 {$ENDREGION}
 {%- endif %}
 

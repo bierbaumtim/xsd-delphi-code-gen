@@ -57,14 +57,14 @@
     procedure AppendToXmlRaw(pParent: IXMLNode); {% if class.super_type %}override;{% else %}virtual;{% endif %}
     function ToXml: String; {% if class.super_type %}override;{% else %}virtual;{% endif %}
     {%- endif %}
-    {% if class.has_optional_fields %}
-    {% for variable in class.optional_variables -%}
-    {% for line in variable.documentations -%}
+    {%- if class.has_optional_fields %}
+    {% for variable in class.optional_variables %}
+    {%- for line in variable.documentations %}
     // {{line}}
-    {% endfor -%}
+    {%- endfor %}
     property {{variable.name}}: TOptional<{{variable.data_type_repr}}> read F{{variable.name}} write Set{{variable.name}};
-    {% endfor -%}
-    {% endif %}
+    {%- endfor %}
+    {%- endif %}
   end;
 {%- endmacro class_declaration -%}
 
@@ -76,9 +76,9 @@ begin
   {%- if class.super_type %}
   inherited;
   {% endif %}
-  {% for initializer in class.variable_initializer -%}
+  {%- for initializer in class.variable_initializer %}
   {{initializer}}
-  {% endfor %}
+  {%- endfor %}
 end;
 {%- endif %}
 
@@ -89,7 +89,7 @@ begin
   inherited;
   {%- endif %}
 
-  {% if class.deserialize_element_variables | length > 0 -%}
+  {%- if class.deserialize_element_variables | length > 0 %}
   // Variables
   {%- if class.has_optional_element_variables %}
   var vOptionalNode: IXMLNode;
@@ -108,23 +108,23 @@ begin
       {{element.name}}.Add({{element.from_xml_code}});
     end;
   end;
-  {%- elif element.is_inline_list %}
+  {% elif element.is_inline_list %}
   {{element.name}} := {{element.data_type_repr}}.Create;
 
   {%- if element.is_required %}
   for var vPart in node.ChildNodes['{{element.xml_name}}'].Text.Split([' ']) do begin
     {{element.name}}.Add({{element.from_xml_code}});
   end;
-  {%- else %}
+  {% else %}
   vOptionalNode := node.ChildNodes.FindNode('{{element.xml_name}}');
   if Assigned(vOptionalNode) then begin
     for var vPart in vOptionalNode.Text.Split([' ']) do begin
       {{element.name}}.Add({{element.from_xml_code}});
     end;
   end;
-  {%- endif %}
+  {% endif %}
   {%- elif element.is_fixed_size_list %}
-  {%- for i in range(end=element.fixed_size_list_size) %}
+  {% for i in range(end=element.fixed_size_list_size) %}
   {{element.name}}{{ i + 1 }} := Default({{element.data_type_repr}});
   {%- endfor %}
 
@@ -142,7 +142,7 @@ begin
       end;
     end;
   end;
-  {%- elif element.is_required %}
+  {% elif element.is_required %}
   {{element.name}} := {{element.from_xml_code}};
   {%- elif element.has_optional_wrapper %}
   vOptionalNode := node.ChildNodes.FindNode('{{element.xml_name}}');
@@ -151,15 +151,15 @@ begin
   end else begin
     F{{element.name}} := TNone<{{element.data_type_repr}}>.Create;
   end;
-  {%- else %}
+  {% else %}
   vOptionalNode := node.ChildNodes.FindNode('{{element.xml_name}}');
   if Assigned(vOptionalNode) then begin
     {{element.name}} := {{element.from_xml_code}};
   end else begin
     {{element.name}} := nil;
   end;
-  {%- endif %}
-  {% endfor %}
+  {% endif %}
+  {%- endfor %}
   {%- endif %}
 
   {%- if class.deserialize_attribute_variables | length > 0 %}
@@ -170,7 +170,7 @@ begin
   end else begin
     {% if attr.has_optional_wrapper %}F{% endif %}{{attr.name}} := {{attr.from_xml_code_missing}};
   end;
-  {% endfor %}
+  {%- endfor %}
   {%- endif %}
 end;
 {%- endif %}
@@ -229,7 +229,7 @@ begin
   end;
   {%- endif %}
 {%- elif variable.is_enum %}
-  {%- if variable.has_optional_wrapper %}
+  {% if variable.has_optional_wrapper %}
   if F{{variable.name}}.IsSome then begin
     node := pParent.AddChild('{{variable.xml_name}}');
     node.Text := F{{variable.name}}.Unwrap.ToXmlValue;
@@ -247,7 +247,7 @@ begin
   node := pParent.AddChild('{{variable.xml_name}}');
   node.Text := {{variable.to_xml_code}};
 {% endif %}
-{% endfor %}
+{%- endfor %}
 end;
 
 function {{class.name}}.ToXml: String;
@@ -269,6 +269,7 @@ begin
 end;
 {% endfor -%}
 {%- endif %}
+
 {% if class.needs_destructor -%}
 destructor {{class.name}}.Destroy;
 begin
