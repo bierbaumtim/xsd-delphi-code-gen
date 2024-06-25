@@ -66,15 +66,17 @@ uses uJsonHelper,
 
 {$REGION 'Enumhelper'}
 {% for enumType in enumTypes -%}
+{ T{{prefix}}{{enumType.name}} }
+
 class function T{{prefix}}{{enumType.name}}Helper.FromString(const pValue: String): T{{prefix}}{{enumType.name}};
   {% for variant in enumType.variants -%}
   {% if loop.first -%}
   if pValue = '{{variant.key}}' then begin 
-    Result := {{variant.name}}
+    Result := {{variant.name}};
   end
   {%- else -%}
   {{" "}}else if pValue = '{{variant.key}}' then begin 
-    Result := {{variant.name}}
+    Result := {{variant.name}};
   end
   {%- endif -%}
   {%- endfor -%}
@@ -88,7 +90,7 @@ end;
 
 {$REGION 'Models'}
 {% for classType in classTypes -%}
-{{"{{"}} T{{prefix}}{{classType.name}} {{"}}"}}
+{ T{{prefix}}{{classType.name}} }
 const
   {% for property in classType.properties -%}
   cn{{classType.name}}{{property.name}}Key: string = '{{property.key}}';
