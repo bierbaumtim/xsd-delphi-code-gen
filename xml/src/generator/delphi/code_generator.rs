@@ -51,6 +51,7 @@ pub struct DelphiCodeGenerator<T: Write> {
     documentations: Vec<String>,
     generate_date_time_helper: bool,
     generate_hex_binary_helper: bool,
+    needs_net_encoding_unit_use_clause: bool,
 }
 
 impl<T: Write> DelphiCodeGenerator<T> {
@@ -84,6 +85,10 @@ impl<T: Write> DelphiCodeGenerator<T> {
         models_context.insert("gen_to_xml", &self.options.generate_to_xml);
         models_context.insert("gen_datetime_helper", &self.generate_date_time_helper);
         models_context.insert("gen_hex_binary_helper", &self.generate_hex_binary_helper);
+        models_context.insert(
+            "needs_net_encoding_unit_use_clause",
+            &self.needs_net_encoding_unit_use_clause,
+        );
 
         // Add calculated fields
         let gen_bool_consts = self.internal_representation.classes.iter().any(|c| {
@@ -182,6 +187,14 @@ where
                 .types_aliases
                 .iter()
                 .any(|a| matches!(&a.for_type, DataType::Binary(BinaryEncoding::Hex))),
+            needs_net_encoding_unit_use_clause: internal_representation.classes.iter().any(|c| {
+                c.variables
+                    .iter()
+                    .any(|v| matches!(v.data_type, DataType::Binary(BinaryEncoding::Base64)))
+            }) || internal_representation
+                .types_aliases
+                .iter()
+                .any(|a| matches!(a.for_type, DataType::Binary(BinaryEncoding::Base64))),
             internal_representation,
         }
     }

@@ -658,7 +658,7 @@ impl ClassCodeGenerator {
                         Some(ElementDeserializeVariable {
                             name: variable_name,
                             xml_name: &v.xml_name,
-                            has_optional_wrapper: false,
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             is_required: v.required,
                             is_list: false,
                             is_inline_list: matches!(data_type, DataType::InlineList(_)),
@@ -684,7 +684,7 @@ impl ClassCodeGenerator {
                         Some(ElementDeserializeVariable {
                             name: variable_name,
                             xml_name: &v.xml_name,
-                            has_optional_wrapper: false,
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             is_required: v.required,
                             is_list: false,
                             is_inline_list: false,
@@ -699,10 +699,10 @@ impl ClassCodeGenerator {
 
                         let from_xml_code = match v.required {
                             true => format!(
-                                "{}.FromXml(node.ChildNodes['{}'].Text)",
+                                "{}.FromXmlValue(node.ChildNodes['{}'].Text)",
                                 type_name, v.xml_name,
                             ),
-                            false => format!("{type_name}.FromXml(vOptionalNode.Text)"),
+                            false => format!("{type_name}.FromXmlValue(vOptionalNode.Text)"),
                         };
 
                         Some(ElementDeserializeVariable {
@@ -750,7 +750,7 @@ impl ClassCodeGenerator {
                         Some(ElementDeserializeVariable {
                             name: variable_name,
                             xml_name: &v.xml_name,
-                            has_optional_wrapper: false,
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             is_required: v.required,
                             is_list: false,
                             is_inline_list: false,
@@ -795,7 +795,7 @@ impl ClassCodeGenerator {
                         Some(ElementDeserializeVariable {
                             name: variable_name,
                             xml_name: &v.xml_name,
-                            has_optional_wrapper: false,
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             is_required: v.required,
                             is_list: true,
                             is_inline_list: false,
@@ -838,7 +838,7 @@ impl ClassCodeGenerator {
                         Some(ElementDeserializeVariable {
                             name: variable_name,
                             xml_name: &v.xml_name,
-                            has_optional_wrapper: false,
+                            has_optional_wrapper: v.needs_optional_wrapper(type_aliases),
                             is_required: v.required,
                             is_list: false,
                             is_inline_list: true,

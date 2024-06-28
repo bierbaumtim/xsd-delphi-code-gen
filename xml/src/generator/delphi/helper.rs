@@ -142,7 +142,7 @@ impl Helper {
             DataType::DateTime | DataType::Date => format!("DateToISO8601({variable_name})"),
             DataType::Double => format!("FloatToStr({variable_name})"),
             DataType::Binary(BinaryEncoding::Base64) => {
-                format!("TNetEncoding.Base64.EncodeStringToBytes({variable_name})")
+                format!("TNetEncoding.Base64.EncodeBytesToString({variable_name})")
             }
             DataType::Binary(BinaryEncoding::Hex) => format!("BinToHexStr({variable_name})"),
             DataType::String => variable_name.to_string(),

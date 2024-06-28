@@ -265,7 +265,11 @@ procedure {{class.name}}.Set{{variable.name}}(pValue: TOptional<{{variable.data_
 begin
   if F{{variable.name}} <> pValue then F{{variable.name}}.Free;
 
-  F{{variable.name}} := pValue;
+  if (not Assigned(pValue)) or (pValue = nil) then begin
+    F{{variable.name}} := TNone<{{variable.data_type_repr}}>.Create;
+  end else begin
+    F{{variable.name}} := pValue;
+  end;
 end;
 {% endfor -%}
 {%- endif %}

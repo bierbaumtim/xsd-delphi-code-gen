@@ -162,6 +162,9 @@ type
   {%- endif %}
 
 implementation
+{% if needs_net_encoding_unit_use_clause -%}
+uses System.NetEncoding;
+{%- endif %}
 
 const
   cnXmlTrueValue: string = 'true';
@@ -233,7 +236,7 @@ function {{enum.name}}Helper.ToXmlValue: String;
 begin
   case Self of
     {%- for value in enum.values %}
-    {{enum.name}}.{{value.variant_name}}: '{{value.xml_value}}';
+    {{enum.name}}.{{value.variant_name}}: Result := '{{value.xml_value}}';
     {%- endfor %}
   end;
 end;
