@@ -41,7 +41,7 @@ fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
             .map(|d| d.join(path))
             .map_err(|e| format!("Relative path not supported due to following error: \"{e:?}\""))
     } else {
-        path.canonicalize()
+        std::path::absolute(path)
             .map_err(|e| format!("Could not resolve output path due to following error: \"{e:?}\""))
     }
 }
