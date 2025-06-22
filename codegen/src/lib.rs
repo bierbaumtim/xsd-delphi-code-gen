@@ -1,0 +1,1491 @@
+use std::collections::HashMap;
+use std::fmt::Write;
+
+pub mod types;
+
+use types::*;
+
+/// Represents a parsed code section with its content and manual additions
+#[derive(Debug, Clone)]
+pub struct CodeSection {
+    pub marker_name: String,
+    pub generated_content: String,
+    pub manual_additions: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+/// Configuration for code generation
+#[derive(Debug, Clone)]
+pub struct CodeGenConfig {
+    pub generate_json_helpers: bool,
+    pub generate_xml_helpers: bool,
+    pub json_helper_unit: String,
+    pub xml_helper_unit: String,
+    pub date_format: String,
+    pub indent_size: usize,
+    pub preserve_existing_code: bool,
+}
+
+impl Default for CodeGenConfig {
+    fn default() -> Self {
+        Self {
+            generate_json_helpers: true,
+            generate_xml_helpers: true,
+            json_helper_unit: "uJsonHelper".to_string(),
+            xml_helper_unit: "uXmlHelper".to_string(),
+            date_format: "yyyy-mm-dd".to_string(),
+            indent_size: 2,
+            preserve_existing_code: true,
+        }
+    }
+}
+
+/// Main code generator
+pub struct DelphiCodeGenerator {
+    config: CodeGenConfig,
+    // existing_code_blocks: HashMap<String, String>,
+    parsed_sections: HashMap<String, CodeSection>,
+}
+
+impl DelphiCodeGenerator {
+    pub fn new(config: CodeGenConfig) -> Self {
+        Self {
+            config,
+            // existing_code_blocks: HashMap::new(),
+            parsed_sections: HashMap::new(),
+        }
+    }
+
+    /// Parse existing code to identify marked sections and manual additions
+    fn parse_marked_sections(&mut self, code: &str) {
+        let lines: Vec<&str> = code.lines().collect();
+        let mut i = 0;
+
+        while i < lines.len() {
+            let line = lines[i].trim();
+
+            // Look for begin markers
+            if line.starts_with("// __begin_") && line.ends_with("__") {
+                let marker_name = line[11..line.len() - 2].to_string(); // Remove "// __begin_" and "__"
+                let start_line = i;
+
+                // Find corresponding end marker
+                let end_marker = format!("// __end_{}__", marker_name);
+                let mut end_line = i + 1;
+                let mut generated_content = String::new();
+                let mut in_generated_block = true;
+                let mut manual_additions = String::new();
+
+                while end_line < lines.len() {
+                    let current_line = lines[end_line];
+
+                    if current_line.trim() == end_marker {
+                        break;
+                    }
+
+                    // Check if we hit a nested begin marker (generated content)
+                    if in_generated_block && current_line.trim().starts_with("// __begin_") {
+                        generated_content.push_str(current_line);
+                        generated_content.push('\n');
+                    }
+                    // Check if we hit a nested end marker (end of generated content)
+                    else if in_generated_block && current_line.trim().starts_with("// __end_") {
+                        generated_content.push_str(current_line);
+                        generated_content.push('\n');
+                        in_generated_block = false; // Switch to manual additions
+                    }
+                    // Regular generated content
+                    else if in_generated_block {
+                        generated_content.push_str(current_line);
+                        generated_content.push('\n');
+                    }
+                    // Manual additions (after generated content)
+                    else {
+                        manual_additions.push_str(current_line);
+                        manual_additions.push('\n');
+                    }
+
+                    end_line += 1;
+                }
+
+                if end_line < lines.len() {
+                    self.parsed_sections.insert(
+                        marker_name.clone(),
+                        CodeSection {
+                            marker_name,
+                            generated_content: generated_content.trim_end().to_string(),
+                            manual_additions: manual_additions.trim_end().to_string(),
+                            start_line,
+                            end_line,
+                        },
+                    );
+                }
+
+                i = end_line;
+            }
+
+            i += 1;
+        }
+    }
+
+    /// Generate comment marker for the beginning of a section
+    fn begin_marker(&self, section_name: &str) -> String {
+        format!("  // __begin_{}__", section_name)
+    }
+
+    /// Generate comment marker for the end of a section
+    fn end_marker(&self, section_name: &str) -> String {
+        format!("  // __end_{}__", section_name)
+    }
+
+    /// Get preserved manual additions for a section
+    fn get_manual_additions(&self, section_name: &str) -> String {
+        if let Some(section) = self.parsed_sections.get(section_name) {
+            if !section.manual_additions.is_empty() {
+                format!("\n{}", section.manual_additions)
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    }
+
+    /// Generate unit header with manual edit instructions
+    fn generate_unit_header(&self, unit_name: &str) -> String {
+        format!(
+            r#"unit u{}Models;
+
+{{
+  Auto-generated Delphi unit with manual edit support
+
+  HOW TO ADD MANUAL EDITS:
+
+  1. Manual code can be added AFTER each generated block
+  2. Generated blocks are marked with comments: // __begin_section__ ... // __end_section__
+  3. Add your custom code AFTER the // __end_section__ marker
+  4. Supported manual additions:
+     - Private fields (after // __end_fields__)
+     - Private/Public methods (after // __end_methods__)
+     - Properties (after // __end_properties__)
+     - Custom implementations (after // __end_class_implementation__)
+
+  EXAMPLE:
+    // __begin_fields__
+    FGeneratedField: String;
+    // __end_fields__
+    FMyCustomField: Integer;  // <- Manual addition here
+
+  WARNING: Do not modify code INSIDE the marked blocks - it will be overwritten!
+}}
+
+interface"#,
+            unit_name
+        )
+    }
+
+    /// Parse existing unit to preserve custom code blocks
+    pub fn parse_existing_unit(&mut self, existing_code: &str) {
+        if !self.config.preserve_existing_code {
+            return;
+        }
+
+        // // Extract custom code blocks that should be preserved
+        // self.extract_custom_code_blocks(existing_code);
+
+        // Parse marked sections for precise updates
+        self.parse_marked_sections(existing_code);
+    }
+
+    // fn extract_custom_code_blocks(&mut self, code: &str) {
+    //     // Extract method implementations that might have custom logic
+    //     let lines: Vec<&str> = code.lines().collect();
+    //     let mut in_method = false;
+    //     let mut method_name = String::new();
+    //     let mut method_lines = Vec::new();
+
+    //     for line in lines {
+    //         let trimmed = line.trim();
+
+    //         // Detect method start
+    //         if trimmed.starts_with("constructor ")
+    //             || trimmed.starts_with("destructor ")
+    //             || trimmed.starts_with("function ")
+    //             || trimmed.starts_with("procedure ")
+    //         {
+    //             if in_method && !method_name.is_empty() {
+    //                 self.existing_code_blocks
+    //                     .insert(method_name.clone(), method_lines.join("\n"));
+    //             }
+    //             in_method = true;
+    //             method_name = self.extract_method_name(trimmed);
+    //             method_lines.clear();
+    //         }
+
+    //         if in_method {
+    //             method_lines.push(line.to_string());
+    //         }
+
+    //         // Detect method end
+    //         if trimmed == "end;" && in_method {
+    //             if !method_name.is_empty() {
+    //                 self.existing_code_blocks
+    //                     .insert(method_name.clone(), method_lines.join("\n"));
+    //             }
+    //             in_method = false;
+    //             method_name.clear();
+    //             method_lines.clear();
+    //         }
+    //     }
+    // }
+
+    // fn extract_method_name(&self, line: &str) -> String {
+    //     // Extract method name from declaration line
+    //     let parts: Vec<&str> = line.split_whitespace().collect();
+    //     if parts.len() >= 2 {
+    //         let name_part = parts[1];
+    //         if let Some(dot_pos) = name_part.find('.') {
+    //             name_part[dot_pos + 1..]
+    //                 .split('(')
+    //                 .next()
+    //                 .unwrap_or("")
+    //                 .to_string()
+    //         } else {
+    //             name_part.split('(').next().unwrap_or("").to_string()
+    //         }
+    //     } else {
+    //         String::new()
+    //     }
+    // }
+
+    /// Generate complete Delphi unit
+    pub fn generate_unit(&self, unit: &DelphiUnit) -> Result<String, Box<dyn std::error::Error>> {
+        let mut output = String::new();
+
+        // Unit header with manual edit instructions
+        output.push_str(&self.generate_unit_header(&unit.unit_name));
+        writeln!(output)?;
+        writeln!(output)?;
+
+        // Uses clause (interface)
+        if !unit.uses_interface.is_empty() {
+            writeln!(output, "uses")?;
+            for (i, use_unit) in unit.uses_interface.iter().enumerate() {
+                if i == unit.uses_interface.len() - 1 {
+                    writeln!(output, "  {};", use_unit)?;
+                } else {
+                    writeln!(output, "  {},", use_unit)?;
+                }
+            }
+            writeln!(output)?;
+        }
+
+        writeln!(output, "type")?;
+
+        // Forward declarations
+        if !unit.forward_declarations.is_empty() {
+            writeln!(output, "  {{$REGION 'Forward Declarations'}}")?;
+            writeln!(output, "{}", self.begin_marker("forward_declarations"))?;
+            for decl in &unit.forward_declarations {
+                writeln!(output, "  {};", decl)?;
+            }
+            writeln!(output, "{}", self.end_marker("forward_declarations"))?;
+            output.push_str(&self.get_manual_additions("forward_declarations"));
+            writeln!(output, "  {{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        // Enums and helpers
+        if !unit.enums.is_empty() {
+            writeln!(output, "  {{$REGION 'Enums and Helpers'}}")?;
+            writeln!(output, "  {{$SCOPEDENUMS ON}}")?;
+            writeln!(output, "{}", self.begin_marker("enums"))?;
+
+            for enum_def in &unit.enums {
+                self.generate_enum_declaration(&mut output, enum_def)?;
+                if enum_def.generate_helper {
+                    self.generate_enum_helper_declaration(&mut output, enum_def)?;
+                }
+            }
+
+            writeln!(output, "{}", self.end_marker("enums"))?;
+            output.push_str(&self.get_manual_additions("enums"));
+            writeln!(output, "  {{$SCOPEDENUMS OFF}}")?;
+            writeln!(output, "  {{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        // Records
+        if !unit.records.is_empty() {
+            writeln!(output, "  {{$REGION 'Records'}}")?;
+            writeln!(output, "{}", self.begin_marker("records"))?;
+            for record in &unit.records {
+                self.generate_record_declaration(&mut output, record)?;
+            }
+            writeln!(output, "{}", self.end_marker("records"))?;
+            output.push_str(&self.get_manual_additions("records"));
+            writeln!(output, "  {{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        // Classes
+        if !unit.classes.is_empty() {
+            writeln!(output, "  {{$REGION 'Models'}}")?;
+            writeln!(output, "{}", self.begin_marker("classes"))?;
+            for class in &unit.classes {
+                self.generate_class_declaration(&mut output, class)?;
+            }
+            writeln!(output, "{}", self.end_marker("classes"))?;
+            output.push_str(&self.get_manual_additions("classes"));
+            writeln!(output, "  {{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        // Implementation section
+        writeln!(output, "implementation")?;
+        writeln!(output)?;
+
+        // Uses clause (implementation)
+        let mut impl_uses = unit.uses_implementation.clone();
+        if self.config.generate_json_helpers {
+            impl_uses.push(self.config.json_helper_unit.clone());
+        }
+        if self.config.generate_xml_helpers {
+            impl_uses.push(self.config.xml_helper_unit.clone());
+        }
+        impl_uses.extend_from_slice(&[
+            "System.DateUtils".to_string(),
+            "System.SysUtils".to_string(),
+        ]);
+
+        if !impl_uses.is_empty() {
+            writeln!(output, "uses")?;
+            for (i, use_unit) in impl_uses.iter().enumerate() {
+                if i == impl_uses.len() - 1 {
+                    writeln!(output, "  {};", use_unit)?;
+                } else {
+                    writeln!(output, "  {},", use_unit)?;
+                }
+            }
+            writeln!(output)?;
+        }
+
+        // Constants
+        if !unit.constants.is_empty() {
+            for (name, value) in &unit.constants {
+                writeln!(output, "const")?;
+                writeln!(output, "  {}: string = '{}';", name, value)?;
+            }
+            writeln!(output)?;
+        }
+
+        // Enum helpers implementation
+        if !unit.enums.is_empty() && unit.enums.iter().any(|e| e.generate_helper) {
+            writeln!(output, "{{$REGION 'Enum Helpers'}}")?;
+            writeln!(output, "{}", self.begin_marker("enum_helpers_impl"))?;
+            for enum_def in &unit.enums {
+                if enum_def.generate_helper {
+                    self.generate_enum_helper_implementation(&mut output, enum_def)?;
+                }
+            }
+            writeln!(output, "{}", self.end_marker("enum_helpers_impl"))?;
+            output.push_str(&self.get_manual_additions("enum_helpers_impl"));
+            writeln!(output, "{{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        // Record implementations
+        if !unit.records.is_empty() {
+            writeln!(output, "{{$REGION 'Records'}}")?;
+            writeln!(output, "{}", self.begin_marker("records_impl"))?;
+            for record in &unit.records {
+                self.generate_record_implementation(&mut output, record)?;
+            }
+            writeln!(output, "{}", self.end_marker("records_impl"))?;
+            output.push_str(&self.get_manual_additions("records_impl"));
+            writeln!(output, "{{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        // Class implementations
+        if !unit.classes.is_empty() {
+            writeln!(output, "{{$REGION 'Models'}}")?;
+            writeln!(output, "{}", self.begin_marker("class_implementations"))?;
+            for class in &unit.classes {
+                self.generate_class_implementation(&mut output, class)?;
+            }
+            writeln!(output, "{}", self.end_marker("class_implementations"))?;
+            output.push_str(&self.get_manual_additions("class_implementations"));
+            writeln!(output, "{{$ENDREGION}}")?;
+            writeln!(output)?;
+        }
+
+        writeln!(output, "end.")?;
+
+        Ok(output)
+    }
+
+    fn generate_enum_declaration(
+        &self,
+        output: &mut String,
+        enum_def: &DelphiEnum,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(comment) = &enum_def.comment {
+            writeln!(output, "  // {}", comment)?;
+        }
+
+        write!(output, "  {} = (", enum_def.name)?;
+
+        for (i, variant) in enum_def.variants.iter().enumerate() {
+            if i > 0 {
+                write!(output, ", ")?;
+            }
+
+            if let Some(value) = &variant.value {
+                write!(output, "{} = {}", variant.name, value)?;
+            } else {
+                write!(output, "{}", variant.name)?;
+            }
+        }
+
+        writeln!(output, ");")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_enum_helper_declaration(
+        &self,
+        output: &mut String,
+        enum_def: &DelphiEnum,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(
+            output,
+            "  {} = record helper for {}",
+            enum_def.helper_name, enum_def.name
+        )?;
+        writeln!(
+            output,
+            "    class function FromString(const pValue: String): {}; static;",
+            enum_def.name
+        )?;
+        writeln!(output, "    function ToString: String;")?;
+        writeln!(output, "  end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_enum_helper_implementation(
+        &self,
+        output: &mut String,
+        enum_def: &DelphiEnum,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(output, "{{ {} }}", enum_def.helper_name)?;
+
+        // FromString method
+        writeln!(
+            output,
+            "class function {}.FromString(const pValue: String): {};",
+            enum_def.helper_name, enum_def.name
+        )?;
+        writeln!(output, "begin")?;
+
+        for (i, variant) in enum_def.variants.iter().enumerate() {
+            let condition = if i == 0 { "if" } else { "else if" };
+            writeln!(
+                output,
+                "  {} LowerCase(pValue) = '{}' then",
+                condition,
+                variant.name.to_lowercase()
+            )?;
+            writeln!(output, "    Result := {}.{}", enum_def.name, variant.name)?;
+        }
+
+        writeln!(output, "  else")?;
+        writeln!(
+            output,
+            "    raise Exception.CreateFmt('Unknown {} value: %s', [pValue]);",
+            enum_def.name
+        )?;
+        writeln!(output, "end;")?;
+        writeln!(output)?;
+
+        // ToString method
+        writeln!(
+            output,
+            "function {}.ToString: String;",
+            enum_def.helper_name
+        )?;
+        writeln!(output, "begin")?;
+        writeln!(output, "  case Self of")?;
+
+        for variant in &enum_def.variants {
+            writeln!(
+                output,
+                "    {}.{}: Result := '{}';",
+                enum_def.name,
+                variant.name,
+                variant.name.to_lowercase()
+            )?;
+        }
+
+        writeln!(output, "  else")?;
+        writeln!(output, "    Result := 'Unknown';")?;
+        writeln!(output, "  end;")?;
+        writeln!(output, "end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_record_declaration(
+        &self,
+        output: &mut String,
+        record: &DelphiRecord,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(comment) = &record.comment {
+            writeln!(output, "  // {}", comment)?;
+        }
+
+        writeln!(output, "  {} = record", record.name)?;
+
+        // Fields
+        if !record.fields.is_empty() {
+            for field in &record.fields {
+                self.generate_field_declaration(output, field, "    ")?;
+            }
+            writeln!(output)?;
+        }
+
+        // Methods
+        if !record.methods.is_empty() {
+            for method in &record.methods {
+                self.generate_method_declaration(output, method, "    ")?;
+            }
+        }
+
+        writeln!(output, "  end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_class_declaration(
+        &self,
+        output: &mut String,
+        class: &DelphiClass,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(comment) = &class.comment {
+            writeln!(output, "  // {}", comment)?;
+        }
+
+        if let Some(parent) = &class.parent_class {
+            writeln!(output, "  {} = class({})", class.name, parent)?;
+        } else {
+            writeln!(output, "  {} = class", class.name)?;
+        }
+
+        // Group fields and methods by visibility
+        let mut visibility_groups: HashMap<
+            DelphiVisibility,
+            (Vec<&DelphiField>, Vec<&DelphiMethod>),
+        > = HashMap::new();
+
+        for field in &class.fields {
+            visibility_groups
+                .entry(field.visibility.clone())
+                .or_default()
+                .0
+                .push(field);
+        }
+
+        for method in &class.methods {
+            visibility_groups
+                .entry(method.visibility.clone())
+                .or_default()
+                .1
+                .push(method);
+        }
+
+        // Generate in visibility order
+        let visibility_order = [
+            DelphiVisibility::StrictPrivate,
+            DelphiVisibility::Private,
+            DelphiVisibility::Protected,
+            DelphiVisibility::Public,
+            DelphiVisibility::Published,
+        ];
+
+        for visibility in &visibility_order {
+            if let Some((fields, methods)) = visibility_groups.get(visibility) {
+                if !fields.is_empty() || !methods.is_empty() {
+                    writeln!(output, "  {}:", self.visibility_to_string(visibility))?;
+
+                    // Generate fields with markers
+                    if !fields.is_empty() {
+                        let fields_marker = format!("fields_{}", class.name.to_lowercase());
+                        writeln!(output, "{}", self.begin_marker(&fields_marker))?;
+                        for field in fields {
+                            self.generate_field_declaration(output, field, "    ")?;
+                        }
+                        writeln!(output, "{}", self.end_marker(&fields_marker))?;
+                        output.push_str(&self.get_manual_additions(&fields_marker));
+                    }
+
+                    if !fields.is_empty() && !methods.is_empty() {
+                        writeln!(output)?;
+                    }
+
+                    // Generate methods with markers
+                    if !methods.is_empty() {
+                        let methods_marker = format!(
+                            "methods_{}_{}",
+                            self.visibility_to_string(visibility).replace(" ", "_"),
+                            class.name.to_lowercase()
+                        );
+                        writeln!(output, "{}", self.begin_marker(&methods_marker))?;
+                        for method in methods {
+                            self.generate_method_declaration(output, method, "    ")?;
+                        }
+                        writeln!(output, "{}", self.end_marker(&methods_marker))?;
+                        output.push_str(&self.get_manual_additions(&methods_marker));
+                    }
+
+                    writeln!(output)?;
+                }
+            }
+        }
+
+        // Properties with markers
+        if !class.properties.is_empty() {
+            writeln!(output, "  public")?;
+            let properties_marker = format!("properties_{}", class.name.to_lowercase());
+            writeln!(output, "{}", self.begin_marker(&properties_marker))?;
+            for property in &class.properties {
+                self.generate_property_declaration(output, property, "    ")?;
+            }
+            writeln!(output, "{}", self.end_marker(&properties_marker))?;
+            output.push_str(&self.get_manual_additions(&properties_marker));
+            writeln!(output)?;
+        }
+
+        writeln!(output, "  end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_field_declaration(
+        &self,
+        output: &mut String,
+        field: &DelphiField,
+        indent: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(comment) = &field.comment {
+            writeln!(output, "{}// {}", indent, comment)?;
+        }
+        writeln!(output, "{}F{}: {};", indent, field.name, field.field_type)?;
+
+        Ok(())
+    }
+
+    fn generate_method_declaration(
+        &self,
+        output: &mut String,
+        method: &DelphiMethod,
+        indent: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(comment) = &method.comment {
+            writeln!(output, "{}// {}", indent, comment)?;
+        }
+
+        let mut method_line = String::new();
+
+        if method.is_class_method {
+            method_line.push_str("class ");
+        }
+
+        if method.is_constructor {
+            method_line.push_str("constructor ");
+        } else if method.is_destructor {
+            method_line.push_str("destructor ");
+        } else if method.return_type.is_some() {
+            method_line.push_str("function ");
+        } else {
+            method_line.push_str("procedure ");
+        }
+
+        method_line.push_str(&method.name);
+
+        if !method.parameters.is_empty() {
+            method_line.push('(');
+            for (i, param) in method.parameters.iter().enumerate() {
+                if i > 0 {
+                    method_line.push_str("; ");
+                }
+
+                if param.is_const {
+                    method_line.push_str("const ");
+                } else if param.is_var {
+                    method_line.push_str("var ");
+                } else if param.is_out {
+                    method_line.push_str("out ");
+                }
+
+                method_line.push_str(&format!("{}: {}", param.name, param.param_type));
+
+                if let Some(default) = &param.default_value {
+                    method_line.push_str(&format!(" = {}", default));
+                }
+            }
+            method_line.push(')');
+        }
+
+        if let Some(return_type) = &method.return_type {
+            method_line.push_str(&format!(": {}", return_type));
+        }
+
+        method_line.push(';');
+
+        if method.is_virtual {
+            method_line.push_str(" virtual;");
+        } else if method.is_override {
+            method_line.push_str(" override;");
+        }
+
+        if method.is_static {
+            method_line.push_str(" static;");
+        }
+
+        writeln!(output, "{}{}", indent, method_line)?;
+
+        Ok(())
+    }
+
+    fn generate_property_declaration(
+        &self,
+        output: &mut String,
+        property: &DelphiProperty,
+        indent: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(comment) = &property.comment {
+            writeln!(output, "{}// {}", indent, comment)?;
+        }
+
+        let mut prop_line = format!(
+            "{}property {}: {}",
+            indent, property.name, property.property_type
+        );
+
+        if let Some(getter) = &property.getter {
+            prop_line.push_str(&format!(" read {}", getter));
+        }
+
+        if let Some(setter) = &property.setter {
+            prop_line.push_str(&format!(" write {}", setter));
+        }
+
+        prop_line.push(';');
+
+        writeln!(output, "{}", prop_line)?;
+
+        Ok(())
+    }
+
+    fn generate_record_implementation(
+        &self,
+        output: &mut String,
+        record: &DelphiRecord,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Generate method implementations
+        for method in &record.methods {
+            self.generate_method_implementation(
+                output,
+                method,
+                &record.name,
+                record.generate_json_support,
+                record.generate_xml_support,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn generate_class_implementation(
+        &self,
+        output: &mut String,
+        class: &DelphiClass,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let class_impl_marker = format!("class_impl_{}", class.name.to_lowercase());
+        writeln!(output, "{}", self.begin_marker(&class_impl_marker))?;
+
+        // Generate constants for JSON keys
+        if class.generate_json_support {
+            for field in &class.fields {
+                if let Some(json_key) = &field.json_key {
+                    writeln!(output, "const")?;
+                    writeln!(output, "  cn{}Key: string = '{}';", field.name, json_key)?;
+                    writeln!(output)?;
+                }
+            }
+        }
+
+        // Generate method implementations
+        for method in &class.methods {
+            self.generate_method_implementation(
+                output,
+                method,
+                &class.name,
+                class.generate_json_support,
+                class.generate_xml_support,
+            )?;
+        }
+
+        // Auto-generate JSON constructors if needed
+        if class.generate_json_support && !class.methods.iter().any(|m| m.name == "FromJson") {
+            self.generate_auto_json_constructor(output, class)?;
+        }
+
+        // Auto-generate destructor if needed
+        let has_reference_types = class.fields.iter().any(|f| f.is_reference_type);
+        if has_reference_types && !class.methods.iter().any(|m| m.is_destructor) {
+            self.generate_auto_destructor(output, class)?;
+        }
+
+        writeln!(output, "{}", self.end_marker(&class_impl_marker))?;
+        output.push_str(&self.get_manual_additions(&class_impl_marker));
+
+        Ok(())
+    }
+
+    fn generate_method_implementation(
+        &self,
+        output: &mut String,
+        method: &DelphiMethod,
+        type_name: &str,
+        json_support: bool,
+        _xml_support: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if we have existing implementation to preserve
+        // let method_key = format!("{}.{}", type_name, method.name);
+        // if let Some(existing_impl) = self.existing_code_blocks.get(&method_key) {
+        //     writeln!(output, "{}", existing_impl)?;
+        //     writeln!(output)?;
+        //     return Ok(());
+        // }
+
+        writeln!(output, "{{ {} }}", type_name)?;
+
+        let mut method_signature = String::new();
+
+        if method.is_class_method {
+            method_signature.push_str("class ");
+        }
+
+        if method.is_constructor {
+            method_signature.push_str("constructor ");
+        } else if method.is_destructor {
+            method_signature.push_str("destructor ");
+        } else if method.return_type.is_some() {
+            method_signature.push_str("function ");
+        } else {
+            method_signature.push_str("procedure ");
+        }
+
+        method_signature.push_str(&format!("{}.{}", type_name, method.name));
+
+        if !method.parameters.is_empty() {
+            method_signature.push('(');
+            for (i, param) in method.parameters.iter().enumerate() {
+                if i > 0 {
+                    method_signature.push_str("; ");
+                }
+
+                if param.is_const {
+                    method_signature.push_str("const ");
+                } else if param.is_var {
+                    method_signature.push_str("var ");
+                } else if param.is_out {
+                    method_signature.push_str("out ");
+                }
+
+                method_signature.push_str(&format!("{}: {}", param.name, param.param_type));
+            }
+            method_signature.push(')');
+        }
+
+        if let Some(return_type) = &method.return_type {
+            method_signature.push_str(&format!(": {}", return_type));
+        }
+
+        method_signature.push(';');
+
+        writeln!(output, "{}", method_signature)?;
+        writeln!(output, "begin")?;
+
+        // Generate basic implementation based on method type
+        if method.is_constructor && method.name == "FromJson" && json_support {
+            self.generate_json_constructor_body(output, method)?;
+        } else if method.is_constructor && method.name == "FromJsonRaw" && json_support {
+            self.generate_json_raw_constructor_body(output, method)?;
+        } else if method.is_destructor {
+            self.generate_destructor_body(output)?;
+        } else {
+            writeln!(output, "  // TODO: Implement {}", method.name)?;
+            if method.return_type.is_some() {
+                writeln!(
+                    output,
+                    "  Result := Default({});",
+                    method.return_type.as_ref().unwrap()
+                )?;
+            }
+        }
+
+        writeln!(output, "end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_json_constructor_body(
+        &self,
+        output: &mut String,
+        _method: &DelphiMethod,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(output, "  var vRoot := TJSONObject.ParseJSONValue(pJson);")?;
+        writeln!(output)?;
+        writeln!(output, "  try")?;
+        writeln!(output, "    FromJsonRaw(vRoot);")?;
+        writeln!(output, "  finally")?;
+        writeln!(output, "    FreeAndNil(vRoot);")?;
+        writeln!(output, "  end;")?;
+
+        Ok(())
+    }
+
+    fn generate_json_raw_constructor_body(
+        &self,
+        output: &mut String,
+        _method: &DelphiMethod,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(output, "  inherited Create;")?;
+        writeln!(output)?;
+        writeln!(output, "  // TODO: Parse JSON fields")?;
+
+        Ok(())
+    }
+
+    fn generate_destructor_body(
+        &self,
+        output: &mut String,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(output, "  // TODO: Free reference types")?;
+        writeln!(output)?;
+        writeln!(output, "  inherited;")?;
+
+        Ok(())
+    }
+
+    fn generate_auto_json_constructor(
+        &self,
+        output: &mut String,
+        class: &DelphiClass,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // FromJson constructor
+        writeln!(
+            output,
+            "constructor {}.FromJson(const pJson: String);",
+            class.name
+        )?;
+        writeln!(output, "begin")?;
+        writeln!(output, "  var vRoot := TJSONObject.ParseJSONValue(pJson);")?;
+        writeln!(output)?;
+        writeln!(output, "  try")?;
+        writeln!(output, "    FromJsonRaw(vRoot);")?;
+        writeln!(output, "  finally")?;
+        writeln!(output, "    FreeAndNil(vRoot);")?;
+        writeln!(output, "  end;")?;
+        writeln!(output, "end;")?;
+        writeln!(output)?;
+
+        // FromJsonRaw constructor
+        writeln!(
+            output,
+            "constructor {}.FromJsonRaw(pJson: TJSONValue);",
+            class.name
+        )?;
+        writeln!(output, "begin")?;
+        writeln!(output, "  inherited Create;")?;
+        writeln!(output)?;
+
+        for field in &class.fields {
+            if let Some(_json_key) = &field.json_key {
+                let const_name = format!("cn{}Key", field.name);
+                if field.is_reference_type {
+                    writeln!(
+                        output,
+                        "  F{} := {}.FromJsonRaw(pJson.GetValue<TJSONObject>({}));",
+                        field.name, field.field_type, const_name
+                    )?;
+                } else {
+                    writeln!(output, "  F{} := TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {}, '');",
+                            field.name, const_name)?;
+                }
+            }
+        }
+
+        writeln!(output, "end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn generate_auto_destructor(
+        &self,
+        output: &mut String,
+        class: &DelphiClass,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(output, "destructor {}.Destroy;", class.name)?;
+        writeln!(output, "begin")?;
+
+        for field in &class.fields {
+            if field.is_reference_type {
+                writeln!(output, "  FreeAndNil(F{});", field.name)?;
+            }
+        }
+
+        writeln!(output)?;
+        writeln!(output, "  inherited;")?;
+        writeln!(output, "end;")?;
+        writeln!(output)?;
+
+        Ok(())
+    }
+
+    fn visibility_to_string(&self, visibility: &DelphiVisibility) -> &'static str {
+        match visibility {
+            DelphiVisibility::Private => "private",
+            DelphiVisibility::StrictPrivate => "strict private",
+            DelphiVisibility::Protected => "protected",
+            DelphiVisibility::Public => "public",
+            DelphiVisibility::Published => "published",
+        }
+    }
+
+    /// Update existing unit with minimal changes while preserving manual edits
+    pub fn update_unit(
+        &mut self,
+        existing_code: &str,
+        new_unit: &DelphiUnit,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // Parse the existing code to extract manual additions
+        self.parse_existing_unit(existing_code);
+
+        // Generate the new unit with preserved manual additions
+        self.generate_unit(new_unit)
+    }
+
+    /// Update specific sections of existing code
+    pub fn update_sections(
+        &mut self,
+        existing_code: &str,
+        sections_to_update: Vec<String>,
+        new_unit: &DelphiUnit,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // Parse existing code
+        self.parse_existing_unit(existing_code);
+
+        // Generate new code for specific sections only
+        let new_full_code = self.generate_unit(new_unit)?;
+
+        // Replace only the specified sections in the existing code
+        let mut result = existing_code.to_string();
+
+        for section_name in sections_to_update {
+            if let Some(new_section) =
+                self.extract_section_from_generated(&new_full_code, &section_name)
+            {
+                result = self.replace_section_in_code(&result, &section_name, &new_section)?;
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Extract a specific section from generated code
+    fn extract_section_from_generated(
+        &self,
+        generated_code: &str,
+        section_name: &str,
+    ) -> Option<String> {
+        let begin_marker = format!("// __begin_{}__", section_name);
+        let end_marker = format!("// __end_{}__", section_name);
+
+        if let Some(start_pos) = generated_code.find(&begin_marker) {
+            if let Some(end_pos) = generated_code.find(&end_marker) {
+                if end_pos > start_pos {
+                    let section = &generated_code[start_pos..end_pos + end_marker.len()];
+                    return Some(section.to_string());
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Replace a specific section in existing code
+    fn replace_section_in_code(
+        &self,
+        existing_code: &str,
+        section_name: &str,
+        new_section: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let begin_marker = format!("// __begin_{}__", section_name);
+        let end_marker = format!("// __end_{}__", section_name);
+
+        if let Some(start_pos) = existing_code.find(&begin_marker) {
+            // Find the end of the section (including manual additions)
+            let end_search_start = start_pos + begin_marker.len();
+
+            // Look for the end marker
+            if let Some(end_marker_pos) = existing_code[end_search_start..].find(&end_marker) {
+                let absolute_end_pos = end_search_start + end_marker_pos + end_marker.len();
+
+                // Look for the next begin marker to find where manual additions end
+                let manual_additions_end = if let Some(next_begin) =
+                    existing_code[absolute_end_pos..].find("// __begin_")
+                {
+                    absolute_end_pos + next_begin
+                } else {
+                    // If no next section, look for other structural markers
+                    let markers = ["{$ENDREGION}", "implementation", "end."];
+                    let mut next_structural = existing_code.len();
+
+                    for marker in &markers {
+                        if let Some(pos) = existing_code[absolute_end_pos..].find(marker) {
+                            let absolute_pos = absolute_end_pos + pos;
+                            if absolute_pos < next_structural {
+                                next_structural = absolute_pos;
+                            }
+                        }
+                    }
+                    next_structural
+                };
+
+                // Extract manual additions
+                let manual_additions = existing_code[absolute_end_pos..manual_additions_end].trim();
+
+                // Reconstruct the code
+                let mut result = String::new();
+                result.push_str(&existing_code[..start_pos]);
+                result.push_str(new_section);
+                if !manual_additions.is_empty() {
+                    result.push('\n');
+                    result.push_str(manual_additions);
+                }
+                result.push_str(&existing_code[manual_additions_end..]);
+
+                return Ok(result);
+            }
+        }
+
+        // If we can't find the section, return the original code
+        Ok(existing_code.to_string())
+    }
+}
+
+/// Builder for DelphiEnum
+pub struct DelphiEnumBuilder {
+    enum_def: DelphiEnum,
+}
+
+impl DelphiEnumBuilder {
+    pub fn new(name: &str) -> Self {
+        Self {
+            enum_def: DelphiEnum {
+                name: name.to_string(),
+                variants: Vec::new(),
+                helper_name: format!("{}Helper", name),
+                generate_helper: true,
+                scoped: true,
+                comment: None,
+            },
+        }
+    }
+
+    pub fn add_variant(mut self, name: &str) -> Self {
+        self.enum_def.variants.push(DelphiEnumVariant {
+            name: name.to_string(),
+            value: None,
+            comment: None,
+        });
+        self
+    }
+
+    pub fn add_variant_with_value(mut self, name: &str, value: &str) -> Self {
+        self.enum_def.variants.push(DelphiEnumVariant {
+            name: name.to_string(),
+            value: Some(value.to_string()),
+            comment: None,
+        });
+        self
+    }
+
+    pub fn helper_name(mut self, name: &str) -> Self {
+        self.enum_def.helper_name = name.to_string();
+        self
+    }
+
+    pub fn generate_helper(mut self, generate: bool) -> Self {
+        self.enum_def.generate_helper = generate;
+        self
+    }
+
+    pub fn comment(mut self, comment: &str) -> Self {
+        self.enum_def.comment = Some(comment.to_string());
+        self
+    }
+
+    pub fn build(self) -> DelphiEnum {
+        self.enum_def
+    }
+}
+
+/// Builder for DelphiClass
+pub struct DelphiClassBuilder {
+    class: DelphiClass,
+}
+
+impl DelphiClassBuilder {
+    pub fn new(name: &str) -> Self {
+        Self {
+            class: DelphiClass {
+                name: name.to_string(),
+                parent_class: None,
+                fields: Vec::new(),
+                methods: Vec::new(),
+                properties: Vec::new(),
+                generate_json_support: true,
+                generate_xml_support: false,
+                comment: None,
+            },
+        }
+    }
+
+    pub fn parent_class(mut self, parent: &str) -> Self {
+        self.class.parent_class = Some(parent.to_string());
+        self
+    }
+
+    pub fn add_field(mut self, field: DelphiField) -> Self {
+        self.class.fields.push(field);
+        self
+    }
+
+    pub fn add_string_field(mut self, name: &str, json_key: Option<&str>) -> Self {
+        self.class.fields.push(DelphiField {
+            name: name.to_string(),
+            field_type: "String".to_string(),
+            visibility: DelphiVisibility::StrictPrivate,
+            is_reference_type: false,
+            json_key: json_key.map(|s| s.to_string()),
+            xml_attribute: None,
+            comment: None,
+            default_value: None,
+        });
+        self
+    }
+
+    pub fn add_reference_field(
+        mut self,
+        name: &str,
+        field_type: &str,
+        json_key: Option<&str>,
+    ) -> Self {
+        self.class.fields.push(DelphiField {
+            name: name.to_string(),
+            field_type: field_type.to_string(),
+            visibility: DelphiVisibility::StrictPrivate,
+            is_reference_type: true,
+            json_key: json_key.map(|s| s.to_string()),
+            xml_attribute: None,
+            comment: None,
+            default_value: None,
+        });
+        self
+    }
+
+    pub fn add_property(mut self, name: &str, property_type: &str) -> Self {
+        self.class.properties.push(DelphiProperty {
+            name: name.to_string(),
+            property_type: property_type.to_string(),
+            getter: Some(format!("F{}", name)),
+            setter: None,
+            visibility: DelphiVisibility::Public,
+            comment: None,
+        });
+        self
+    }
+
+    pub fn json_support(mut self, enable: bool) -> Self {
+        self.class.generate_json_support = enable;
+        self
+    }
+
+    pub fn xml_support(mut self, enable: bool) -> Self {
+        self.class.generate_xml_support = enable;
+        self
+    }
+
+    pub fn comment(mut self, comment: &str) -> Self {
+        self.class.comment = Some(comment.to_string());
+        self
+    }
+
+    pub fn build(self) -> DelphiClass {
+        self.class
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enum_generation() {
+        let enum_def = DelphiEnumBuilder::new("TStatus")
+            .add_variant("None")
+            .add_variant("Active")
+            .add_variant("Inactive")
+            .build();
+
+        let generator = DelphiCodeGenerator::new(CodeGenConfig::default());
+        let mut output = String::new();
+
+        generator
+            .generate_enum_declaration(&mut output, &enum_def)
+            .unwrap();
+
+        assert!(output.contains("TStatus = (None, Active, Inactive);"));
+    }
+
+    #[test]
+    fn test_class_generation() {
+        let class = DelphiClassBuilder::new("TUser")
+            .add_string_field("Name", Some("name"))
+            .add_string_field("Email", Some("email"))
+            .add_property("Name", "String")
+            .add_property("Email", "String")
+            .build();
+
+        let generator = DelphiCodeGenerator::new(CodeGenConfig::default());
+        let mut output = String::new();
+
+        generator
+            .generate_class_declaration(&mut output, &class)
+            .unwrap();
+
+        assert!(output.contains("TUser = class"));
+        assert!(output.contains("FName: String;"));
+        assert!(output.contains("FEmail: String;"));
+        assert!(output.contains("property Name: String read FName;"));
+    }
+
+    #[test]
+    fn test_unit_generation() {
+        let mut unit = DelphiUnit {
+            unit_name: "Test".to_string(),
+            forward_declarations: vec!["TUser".to_string()],
+            enums: vec![],
+            records: vec![],
+            classes: vec![],
+            uses_interface: vec!["System.Classes".to_string()],
+            uses_implementation: vec![],
+            constants: HashMap::new(),
+            comment: None,
+        };
+
+        let class = DelphiClassBuilder::new("TUser")
+            .add_string_field("Name", Some("name"))
+            .add_property("Name", "String")
+            .build();
+
+        unit.classes.push(class);
+
+        let generator = DelphiCodeGenerator::new(CodeGenConfig::default());
+        let result = generator.generate_unit(&unit).unwrap();
+
+        assert!(result.contains("unit uTestModels;"));
+        assert!(result.contains("uses"));
+        assert!(result.contains("System.Classes"));
+        assert!(result.contains("TUser"));
+        assert!(result.contains("implementation"));
+        assert!(result.contains("end."));
+    }
+}
+
+/// Example main function demonstrating the Delphi code generator
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create a complete example unit with enum, class, and JSON support
+    let status_enum = DelphiEnumBuilder::new("TUserStatus")
+        .add_variant("Active")
+        .add_variant("Inactive")
+        .add_variant("Pending")
+        .add_variant("Suspended")
+        .comment("User account status")
+        .build();
+
+    let user_class = DelphiClassBuilder::new("TUser")
+        .add_string_field("Id", Some("id"))
+        .add_string_field("Name", Some("name"))
+        .add_string_field("Email", Some("email"))
+        .add_string_field("CreatedAt", Some("createdAt"))
+        .add_property("Id", "String")
+        .add_property("Name", "String")
+        .add_property("Email", "String")
+        .add_property("CreatedAt", "String")
+        .comment("User model with JSON serialization support")
+        .build();
+
+    let mut unit = DelphiUnit {
+        unit_name: "UserApi".to_string(),
+        forward_declarations: vec!["TUser".to_string()],
+        enums: vec![status_enum],
+        records: vec![],
+        classes: vec![user_class],
+        uses_interface: vec!["System.Classes".to_string(), "System.JSON".to_string()],
+        uses_implementation: vec![],
+        constants: HashMap::new(),
+        comment: Some("Generated User API models".to_string()),
+    };
+
+    // Add some JSON key constants
+    unit.constants
+        .insert("cnIdKey".to_string(), "id".to_string());
+    unit.constants
+        .insert("cnNameKey".to_string(), "name".to_string());
+    unit.constants
+        .insert("cnEmailKey".to_string(), "email".to_string());
+
+    // Configure the generator
+    let config = CodeGenConfig {
+        generate_json_helpers: true,
+        generate_xml_helpers: false,
+        json_helper_unit: "uJsonHelper".to_string(),
+        xml_helper_unit: "uXmlHelper".to_string(),
+        date_format: "yyyy-mm-dd".to_string(),
+        indent_size: 2,
+        preserve_existing_code: true,
+    };
+
+    let generator = DelphiCodeGenerator::new(config);
+    let generated_code = generator.generate_unit(&unit)?;
+
+    println!("Generated Delphi Unit:");
+    println!("=====================");
+    println!("{}", generated_code);
+
+    Ok(())
+}

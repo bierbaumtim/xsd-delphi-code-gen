@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
-use openapi::generate_openapi_client;
+use openapi::{generate_openapi_client, start_spec_browser};
 use xml::{generate_xml, generator::code_generator_trait::CodeGenOptions};
 
 fn main() {
@@ -21,7 +21,14 @@ fn main() {
     match &args.source_format {
         SourceFormat::Xml => generate_xml(&args.input, &output_path, build_code_gen_options(&args)),
         SourceFormat::OpenApi => {
-            generate_openapi_client(&args.input, &output_path, &args.type_prefix)
+            if args.input.is_empty() {
+                eprintln!("No input files provided for OpenAPI generation");
+
+                return;
+            }
+
+            let _ = start_spec_browser(args.input.first().expect("").clone());
+            // generate_openapi_client(&args.input, &output_path, &args.type_prefix)
         }
     }
 }

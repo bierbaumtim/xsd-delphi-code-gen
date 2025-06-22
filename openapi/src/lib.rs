@@ -3,12 +3,20 @@ use std::path::{Path, PathBuf};
 use sw4rm_rs::from_path;
 use tera::Tera;
 
+use crate::parser::types::OpenAPI;
+
 mod endpoint_collector;
 mod helper;
 mod models;
+mod parser;
 mod render;
 mod schema_collector;
+pub mod tui;
 mod type_registry;
+
+pub fn start_spec_browser(source: PathBuf) -> anyhow::Result<()> {
+    tui::run(source)
+}
 
 pub fn generate_openapi_client(source: &[PathBuf], dest: &Path, prefix: &Option<String>) {
     let Some(source) = source.first() else {
