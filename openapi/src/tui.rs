@@ -226,7 +226,32 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
                 }
             }
         }
-        // 1 => app.memory_leak_table_state.scroll_down_by(1),
+        1 => {
+            if app.components_details_focused {
+                // match app.endpoints_details_path_selected_tab {
+                //     EndpointTab::Parameters => {
+                //         app.endpoints_details_parameters_list_state
+                //             .scroll_down_by(1);
+                //     }
+                //     EndpointTab::Body => {
+                //         app.endpoints_details_body_list_state.scroll_down_by(1);
+                //     }
+                //     EndpointTab::Responses => {
+                //         app.endpoints_details_responses_list_state.scroll_down_by(1);
+                //     }
+                // }
+            } else {
+                let current_idx = app.components_list_state.selected();
+
+                app.components_list_state.scroll_down_by(1);
+
+                if app.components_list_state.selected() != current_idx {
+                    // app.endpoints_details_body_list_state.select(None);
+                    // app.endpoints_details_parameters_list_state.select(None);
+                    // app.endpoints_details_responses_list_state.select(None);
+                }
+            }
+        }
         // 2 => {
         //     if app.is_depencies_dependents_focused {
         //         let scroll_by: u16 = if scroll_page {
@@ -296,15 +321,9 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                 // app.unused_code_selected_item_types_list_state
                 //     .scroll_up_by(scroll_by);
             } else {
-                let scroll_by: u16 = if scroll_page {
-                    // app.unused_code_list_viewport.try_into().unwrap_or(1)
-                    1
-                } else {
-                    1
-                };
                 let current_idx = app.endpoints_list_state.selected();
 
-                app.endpoints_list_state.scroll_up_by(scroll_by);
+                app.endpoints_list_state.scroll_up_by(1);
 
                 if app.endpoints_list_state.selected() != current_idx {
                     app.endpoints_details_body_list_state.select(None);
@@ -313,7 +332,31 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                 }
             }
         }
-        // 1 => app.memory_leak_table_state.scroll_up_by(1),
+        1 => {
+            if app.components_details_focused {
+                // match app.endpoints_details_path_selected_tab {
+                //     EndpointTab::Parameters => {
+                //         app.endpoints_details_parameters_list_state.scroll_up_by(1);
+                //     }
+                //     EndpointTab::Body => {
+                //         app.endpoints_details_body_list_state.scroll_up_by(1);
+                //     }
+                //     EndpointTab::Responses => {
+                //         app.endpoints_details_responses_list_state.scroll_up_by(1);
+                //     }
+                // }
+            } else {
+                let current_idx = app.components_list_state.selected();
+
+                app.components_list_state.scroll_up_by(1);
+
+                if app.components_list_state.selected() != current_idx {
+                    // app.endpoints_details_body_list_state.select(None);
+                    // app.endpoints_details_parameters_list_state.select(None);
+                    // app.endpoints_details_responses_list_state.select(None);
+                }
+            }
+        }
         // 2 => {
         //     if app.is_depencies_dependents_focused {
         //         let scroll_by: u16 = if scroll_page {

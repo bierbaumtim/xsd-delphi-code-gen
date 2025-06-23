@@ -2,6 +2,7 @@ use ratatui::{prelude::*, widgets::*};
 
 use crate::tui::state::App;
 
+mod components;
 mod endpoints;
 
 pub fn ui(f: &mut Frame, app: &mut App) {
@@ -44,24 +45,10 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 
     match app.selected_tab {
         0 => endpoints::ui(f, app, chunks[1]),
-        1 => render_components(f, app, chunks[1]),
+        1 => components::ui(f, app, chunks[1]),
         2 => render_details(f, app, chunks[1]),
         _ => {}
     }
-}
-
-fn render_components(f: &mut Frame, app: &mut App, area: Rect) {
-    let text = Text::from(vec![
-        "Components".into(),
-        "".into(),
-        // format!("Total Components: {}", state.spec.components.schemas.len())
-        //     .gray()
-        //     .into(),
-    ])
-    .centered();
-
-    let paragraph = Paragraph::new(text).block(Block::bordered()).centered();
-    f.render_widget(paragraph, area);
 }
 
 fn render_details(f: &mut Frame, app: &mut App, area: Rect) {

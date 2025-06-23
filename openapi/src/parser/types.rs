@@ -300,6 +300,9 @@ pub struct Schema {
     pub example: Option<Value>,
     #[serde(default)]
     pub deprecated: bool,
+    #[serde(default)]
+    #[serde(rename = "enum")]
+    pub enum_: Vec<Value>, // `enum` is a reserved keyword in Rust, so we use `enum_`
 
     // Composition
     #[serde(default)]
@@ -655,7 +658,7 @@ impl OpenAPI {
         self.components
             .as_ref()?
             .schemas
-            .get(reference)
+            .get(reference.split("/").last().unwrap_or(reference))
             .and_then(|sr| match sr {
                 SchemaOrRef::Item(schema) => Some(schema),
                 SchemaOrRef::Ref { reference } => self.resolve_schema(reference),

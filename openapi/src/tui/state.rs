@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crossbeam_channel::{Receiver, Sender};
 use ratatui::{style::Color, widgets::*};
 
-use crate::parser::types::{OpenAPI, Operation, PathItem};
+use crate::parser::types::{OpenAPI, Operation, PathItem, Schema, SchemaOrRef};
 
 pub struct App {
     pub worker_sender: Sender<WorkerCommands>,
@@ -30,6 +30,11 @@ pub struct App {
     pub endpoints_details_parameters_list_state: ListState,
     pub endpoints_details_responses_list_state: ListState,
     pub endpoints_selected_index: Option<usize>,
+
+    // Components tab
+    pub components_list_state: ListState,
+    pub components_details_focused: bool,
+    pub components_selected_index: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -75,6 +80,7 @@ impl App {
             state: State::Initial,
             selected_tab: 0,
             spec: None,
+            // Endpoints tab
             endpoints_list_state: ListState::default(),
             endpoints_details_focused: false,
             endpoints_details_layout: 0,
@@ -87,6 +93,10 @@ impl App {
             endpoints_details_parameters_list_state: ListState::default(),
             endpoints_details_responses_list_state: ListState::default(),
             endpoints_selected_index: None,
+            // Components tab
+            components_list_state: ListState::default(),
+            components_details_focused: false,
+            components_selected_index: None,
         }
     }
 
@@ -95,6 +105,7 @@ impl App {
         self.spec = None;
         self.selected_tab = 0;
 
+        // Endpoints tab
         self.endpoints_list_state = ListState::default();
         self.endpoints_details_focused = false;
         self.endpoints_details_layout = 0;
@@ -107,6 +118,11 @@ impl App {
         self.endpoints_details_parameters_list_state = ListState::default();
         self.endpoints_details_responses_list_state = ListState::default();
         self.endpoints_selected_index = None;
+
+        // Components tab
+        self.components_list_state = ListState::default();
+        self.components_details_focused = false;
+        self.components_selected_index = None;
     }
 
     pub fn set_parsed(&mut self, spec: OpenAPI) {
@@ -127,6 +143,11 @@ impl App {
         self.endpoints_details_parameters_list_state = ListState::default();
         self.endpoints_details_responses_list_state = ListState::default();
         self.endpoints_selected_index = None;
+
+        // Reset the components list state
+        self.components_list_state = ListState::default();
+        self.components_details_focused = false;
+        self.components_selected_index = None;
 
         if !self.spec.as_ref().unwrap().paths.is_empty() {
             self.endpoints_list_state.select(Some(0));
@@ -192,6 +213,36 @@ impl App {
 
     pub fn get_endpoint_at(&self, index: usize) -> Option<EndpointListItem> {
         let items = self.get_endpoints_list_items();
+
+        items.get(index).cloned()
+    }
+
+    // Components Functions
+    pub fn get_components_list_items(&self) -> Vec<(&String, &Schema)> {
+        let Some(spec) = &self.spec else {
+            return vec![];
+        };
+
+        let Some(components) = spec.components.as_ref() else {
+            return vec![];
+        };
+
+        let mut items = components
+            .schemas
+            .iter()
+            .filter_map(|(name, schema)| match schema {
+                SchemaOrRef::Item(schema) => Some((name, schema)),
+                SchemaOrRef::Ref { reference } => spec.resolve_schema(reference).map(|s| (name, s)),
+            })
+            .collect::<Vec<_>>();
+
+        items.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+        items
+    }
+
+    pub fn get_component_at(&self, index: usize) -> Option<(&String, &Schema)> {
+        let items = self.get_components_list_items();
 
         items.get(index).cloned()
     }
