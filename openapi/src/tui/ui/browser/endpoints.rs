@@ -2,7 +2,10 @@ use ratatui::{prelude::*, widgets::*};
 
 use crate::{
     parser::types::*,
-    tui::state::{App, EndpointTab},
+    tui::{
+        state::{App, EndpointTab},
+        ui::browser::components,
+    },
 };
 
 pub fn ui(f: &mut Frame, app: &mut App, area: Rect) {
@@ -17,7 +20,7 @@ pub fn ui(f: &mut Frame, app: &mut App, area: Rect) {
 
     if app.endpoints_list_state.selected() != app.endpoints_selected_index {
         app.endpoints_selected_index = app.endpoints_list_state.selected();
-        app.endpoints_details_body_list_state = ListState::default();
+        app.endpoints_details_body_scroll_pos = 0;
         app.endpoints_details_parameters_list_state = ListState::default();
         app.endpoints_details_responses_list_state = ListState::default();
     }
@@ -185,220 +188,13 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
         if let Some(content_type) = tabs.get(app.endpoints_details_path_selected_tab_idx) {
             match *content_type {
                 EndpointTab::Body => {
-                    let body = op
-                        .request_body
-                        .as_ref()
-                        .expect("Request Body should be available here");
-
-                    let body = match body {
-                        RequestBodyOrRef::Item(body) => body,
-                        RequestBodyOrRef::Ref { reference } => app
-                            .spec
-                            .as_ref()
-                            .unwrap()
-                            .resolve_request_body(reference)
-                            .expect("Request Body struct should be available here"),
-                    };
-
-                    let items = body.content.iter().map(|(media_type, media)| {
-                        let schema = media.schema.as_ref().map_or("No Schema", |s| match s {
-                            SchemaOrRef::Item(schema) => schema
-                                .title
-                                .as_ref()
-                                .map_or("Custom Schema", |t| t.as_str()),
-                            SchemaOrRef::Ref { reference } => reference,
-                        });
-
-                        let text = Text::from(vec![
-                            Line::from(media_type.as_str()),
-                            Line::from(format!("Schema: {schema}")),
-                        ]);
-
-                        ListItem::new(text)
-                    });
-
-                    let select_item_index = app
-                        .endpoints_details_body_list_state
-                        .selected()
-                        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
-                    let items_len = items.len();
-
-                    let content = List::new(items)
-                        .block(
-                            if app.endpoints_details_focused {
-                                Block::bordered().border_style(Style::default().blue())
-                            } else {
-                                Block::bordered()
-                            }
-                            .title_bottom(
-                                Line::from(format!("{}/{}", select_item_index, items_len))
-                                    .right_aligned(),
-                            ),
-                        )
-                        .style(Style::default().white())
-                        .highlight_style(Style::default().blue().bold())
-                        .highlight_symbol(">>")
-                        .repeat_highlight_symbol(false)
-                        .direction(ListDirection::TopToBottom);
-
-                    if app.endpoints_details_body_list_state.selected().is_none() {
-                        app.endpoints_details_body_list_state.select_first();
-                    }
-
-                    f.render_stateful_widget(
-                        content,
-                        layout_1_v[1],
-                        &mut app.endpoints_details_body_list_state,
-                    );
+                    render_body(f, app, &op, layout_1_v[1]);
                 }
                 EndpointTab::Parameters => {
-                    let items = op
-                        .parameters
-                        .iter()
-                        .filter_map(|param| {
-                            let param = match param {
-                                ParameterOrRef::Item(param) => Some(param),
-                                ParameterOrRef::Ref { reference } => {
-                                    app.spec.as_ref().unwrap().resolve_parameter(reference)
-                                }
-                            }?;
-
-                            let text = Text::from(vec![
-                                Line::from(vec![
-                                    Span::styled(
-                                        param.name.as_str(),
-                                        if param.required {
-                                            Style::default().bold().fg(Color::Red)
-                                        } else {
-                                            Style::default().bold()
-                                        },
-                                    ),
-                                    Span::styled(
-                                        format!(" ({})", param.in_.to_string().to_uppercase()),
-                                        Style::default().fg(Color::DarkGray),
-                                    ),
-                                ]),
-                                Line::from(format!(
-                                    "{}",
-                                    param.description.clone().unwrap_or_default()
-                                )),
-                                Line::from(""),
-                            ]);
-
-                            Some(ListItem::new(text))
-                        })
-                        .collect::<Vec<_>>();
-
-                    let select_item_index = app
-                        .endpoints_details_parameters_list_state
-                        .selected()
-                        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
-                    let items_len = items.len();
-
-                    let parameters_list = List::new(items)
-                        .block(
-                            if app.endpoints_details_focused {
-                                Block::bordered().border_style(Style::default().blue())
-                            } else {
-                                Block::bordered()
-                            }
-                            .title_bottom(
-                                Line::from(format!("{}/{}", select_item_index, items_len))
-                                    .right_aligned(),
-                            ),
-                        )
-                        .style(Style::default().white())
-                        .highlight_style(Style::default().blue().bold())
-                        .highlight_symbol(">>")
-                        .repeat_highlight_symbol(false)
-                        .direction(ListDirection::TopToBottom);
-
-                    if app
-                        .endpoints_details_parameters_list_state
-                        .selected()
-                        .is_none()
-                    {
-                        app.endpoints_details_parameters_list_state.select_first();
-                    }
-
-                    f.render_stateful_widget(
-                        parameters_list,
-                        layout_1_v[1],
-                        &mut app.endpoints_details_parameters_list_state,
-                    );
+                    render_parameter(f, app, &op, layout_1_v[1]);
                 }
                 EndpointTab::Responses => {
-                    let items = op
-                        .responses
-                        .iter()
-                        .filter_map(|(name, response)| {
-                            let response = match response {
-                                ResponseOrRef::Item(param) => Some(param),
-                                ResponseOrRef::Ref { reference } => {
-                                    app.spec.as_ref().unwrap().resolve_response(reference)
-                                }
-                            }?;
-
-                            let text = Text::from(vec![
-                                // Line::from(vec![
-                                //     Span::styled(
-                                //         param.name.as_str(),
-                                //         if param.required {
-                                //             Style::default().bold().fg(Color::Red)
-                                //         } else {
-                                //             Style::default().bold()
-                                //         },
-                                //     ),
-                                //     Span::styled(
-                                //         format!(" ({})", param.in_.to_string().to_uppercase()),
-                                //         Style::default().fg(Color::DarkGray),
-                                //     ),
-                                // ]),
-                                Line::from(response.description.as_str()),
-                                Line::from(""),
-                            ]);
-
-                            Some(ListItem::new(text))
-                        })
-                        .collect::<Vec<_>>();
-
-                    let select_item_index = app
-                        .endpoints_details_responses_list_state
-                        .selected()
-                        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
-                    let items_len = items.len();
-
-                    let response_list = List::new(items)
-                        .block(
-                            if app.endpoints_details_focused {
-                                Block::bordered().border_style(Style::default().blue())
-                            } else {
-                                Block::bordered()
-                            }
-                            .title_bottom(
-                                Line::from(format!("{}/{}", select_item_index, items_len))
-                                    .right_aligned(),
-                            ),
-                        )
-                        .style(Style::default().white())
-                        .highlight_style(Style::default().blue().bold())
-                        .highlight_symbol(">>")
-                        .repeat_highlight_symbol(false)
-                        .direction(ListDirection::TopToBottom);
-
-                    if app
-                        .endpoints_details_responses_list_state
-                        .selected()
-                        .is_none()
-                    {
-                        app.endpoints_details_responses_list_state.select_first();
-                    }
-
-                    f.render_stateful_widget(
-                        response_list,
-                        layout_1_v[1],
-                        &mut app.endpoints_details_responses_list_state,
-                    );
+                    render_response(f, app, &op, layout_1_v[1]);
                 }
             }
 
@@ -418,4 +214,253 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
     }
 
     // TODO: Add support to render Request Body, Parameters, Responses, and Components in full screen mode
+}
+
+fn render_body(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
+    let Some(spec) = app.spec.as_ref() else {
+        return;
+    };
+
+    let body = op
+        .request_body
+        .as_ref()
+        .expect("Request Body should be available here");
+
+    let body = match body {
+        RequestBodyOrRef::Item(body) => body,
+        RequestBodyOrRef::Ref { reference } => app
+            .spec
+            .as_ref()
+            .unwrap()
+            .resolve_request_body(reference)
+            .expect("Request Body struct should be available here"),
+    };
+
+    let items = body
+        .content
+        .iter()
+        .flat_map(|(media_type, media)| {
+            let (name, schema, reference) = match media.schema.as_ref() {
+                Some(SchemaOrRef::Item(schema)) => (None, Some(schema), None),
+                Some(SchemaOrRef::Ref { reference }) => (
+                    reference.split("/").last(),
+                    spec.resolve_schema(&reference),
+                    Some(reference),
+                ),
+                None => (None, None, None),
+            };
+
+            let mut lines = vec![Line::from(media_type.as_str())];
+
+            if let Some(schema) = schema {
+                let name = name.map_or_else(|| "Custom Schema".to_owned(), |t| t.to_owned());
+
+                lines.extend(components::render_schema(spec, schema, name, 2, true));
+            } else if let Some(reference) = reference {
+                lines.push(Line::from(Span::from(format!(
+                    "{}{media_type}: {reference}",
+                    " ".repeat(2)
+                ))));
+            } else {
+                lines.push(Line::from(Span::from(format!(
+                    "{}{media_type}: <unknown>",
+                    " ".repeat(2)
+                ))));
+            }
+
+            lines
+        })
+        .collect::<Vec<_>>();
+
+    let select_item_index = app
+        .endpoints_details_body_scroll_pos
+        .checked_add(1)
+        .unwrap_or(1);
+    let items_len = items.len();
+
+    let content = Paragraph::new(Text::from(items))
+        .block(
+            if app.endpoints_details_focused {
+                Block::bordered().border_style(Style::default().blue())
+            } else {
+                Block::bordered()
+            }
+            .title_bottom(
+                Line::from(format!("{}/{}", select_item_index, items_len)).right_aligned(),
+            ),
+        )
+        .wrap(Wrap { trim: false });
+
+    let lines = content.line_count(area.width);
+    let scroll_pos = app
+        .endpoints_details_body_scroll_pos
+        .clamp(0, u16::try_from(items_len).unwrap_or(u16::MAX));
+
+    let content = content.scroll((scroll_pos, 0));
+
+    f.render_widget(content, area);
+
+    // Add scrollbar
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+    app.endpoints_details_body_scroll_pos = scroll_pos;
+    let mut scroll_bar_state =
+        ScrollbarState::new(lines).position(app.endpoints_details_body_scroll_pos as usize);
+
+    f.render_stateful_widget(
+        scrollbar,
+        area.inner(Margin {
+            // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut scroll_bar_state,
+    );
+}
+
+fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
+    let items = op
+        .parameters
+        .iter()
+        .filter_map(|param| {
+            let param = match param {
+                ParameterOrRef::Item(param) => Some(param),
+                ParameterOrRef::Ref { reference } => {
+                    app.spec.as_ref().unwrap().resolve_parameter(reference)
+                }
+            }?;
+
+            let text = Text::from(vec![
+                Line::from(vec![
+                    Span::styled(
+                        param.name.as_str(),
+                        if param.required {
+                            Style::default().bold().fg(Color::Red)
+                        } else {
+                            Style::default().bold()
+                        },
+                    ),
+                    Span::styled(
+                        format!(" ({})", param.in_.to_string().to_uppercase()),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]),
+                Line::from(format!("{}", param.description.clone().unwrap_or_default())),
+                Line::from(""),
+            ]);
+
+            Some(ListItem::new(text))
+        })
+        .collect::<Vec<_>>();
+
+    let select_item_index = app
+        .endpoints_details_parameters_list_state
+        .selected()
+        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
+    let items_len = items.len();
+
+    let parameters_list = List::new(items)
+        .block(
+            if app.endpoints_details_focused {
+                Block::bordered().border_style(Style::default().blue())
+            } else {
+                Block::bordered()
+            }
+            .title_bottom(
+                Line::from(format!("{}/{}", select_item_index, items_len)).right_aligned(),
+            ),
+        )
+        .style(Style::default().white())
+        .highlight_style(Style::default().blue().bold())
+        .highlight_symbol(">>")
+        .repeat_highlight_symbol(false)
+        .direction(ListDirection::TopToBottom);
+
+    if app
+        .endpoints_details_parameters_list_state
+        .selected()
+        .is_none()
+    {
+        app.endpoints_details_parameters_list_state.select_first();
+    }
+
+    f.render_stateful_widget(
+        parameters_list,
+        area,
+        &mut app.endpoints_details_parameters_list_state,
+    );
+}
+
+fn render_response(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
+    let items = op
+        .responses
+        .iter()
+        .filter_map(|(name, response)| {
+            let response = match response {
+                ResponseOrRef::Item(param) => Some(param),
+                ResponseOrRef::Ref { reference } => {
+                    app.spec.as_ref().unwrap().resolve_response(reference)
+                }
+            }?;
+
+            let text = Text::from(vec![
+                // Line::from(vec![
+                //     Span::styled(
+                //         param.name.as_str(),
+                //         if param.required {
+                //             Style::default().bold().fg(Color::Red)
+                //         } else {
+                //             Style::default().bold()
+                //         },
+                //     ),
+                //     Span::styled(
+                //         format!(" ({})", param.in_.to_string().to_uppercase()),
+                //         Style::default().fg(Color::DarkGray),
+                //     ),
+                // ]),
+                Line::from(response.description.as_str()),
+                Line::from(""),
+            ]);
+
+            Some(ListItem::new(text))
+        })
+        .collect::<Vec<_>>();
+
+    let select_item_index = app
+        .endpoints_details_responses_list_state
+        .selected()
+        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
+    let items_len = items.len();
+
+    let response_list = List::new(items)
+        .block(
+            if app.endpoints_details_focused {
+                Block::bordered().border_style(Style::default().blue())
+            } else {
+                Block::bordered()
+            }
+            .title_bottom(
+                Line::from(format!("{}/{}", select_item_index, items_len)).right_aligned(),
+            ),
+        )
+        .style(Style::default().white())
+        .highlight_style(Style::default().blue().bold())
+        .highlight_symbol(">>")
+        .repeat_highlight_symbol(false)
+        .direction(ListDirection::TopToBottom);
+
+    if app
+        .endpoints_details_responses_list_state
+        .selected()
+        .is_none()
+    {
+        app.endpoints_details_responses_list_state.select_first();
+    }
+
+    f.render_stateful_widget(
+        response_list,
+        area,
+        &mut app.endpoints_details_responses_list_state,
+    );
 }

@@ -43,7 +43,7 @@ pub fn run(source: PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyhow::Result<bool> {
+fn run_app<'a, B: Backend>(terminal: &mut Terminal<B>, app: &'a mut App) -> anyhow::Result<bool> {
     let rx_ticker = tick(Duration::from_millis(100));
 
     loop {
@@ -62,32 +62,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyhow::Res
                     }
                     Ok(WorkerResults::SpecParsed(spec)) => {
                         app.set_parsed(spec);
-                //         app.health_report = report;
-                //         app.mode = Mode::DisplayingHealthReport;
-                //         app.selected_tab = 0;
-                //         app.unused_code_list_state.select(None);
-                //         app.unused_code_selected_item_types_list_state.select(None);
-                //         app.memory_leak_table_state.select(None);
-                //         app.dependencies_list_state.select(None);
-                //         app.dependencies_selected_item_types_list_state.select(None);
-
-                //         if app.health_report.unused_types.is_empty() {
-                //             app.selected_tab = 1;
-                //         } else {
-                //             app.unused_code_list_state.select(Some(0));
-                //         }
-
-                //         if app.health_report.types_with_memory_leak.is_empty() {
-                //             app.selected_tab = 0;
-                //         } else {
-                //             app.memory_leak_table_state.select(Some(0));
-                //         }
-
-                //         if app.health_report.dependencies.is_empty() {
-                //             app.selected_tab = 0;
-                //         } else {
-                //             app.dependencies_list_state.select(Some(0));
-                //         }
                     }
                     Ok(WorkerResults::Error(err)) => {
                         app.state = state::State::Error(err);
@@ -129,7 +103,12 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     0 if app.endpoints_details_focused => {
                         app.endpoints_details_path_selected_tab_idx = 1;
                     }
-                    _ => app.selected_tab = 1,
+                    _ => {
+                        app.selected_tab = 1;
+                        if app.components_list_state.selected().is_none() {
+                            app.components_list_state.select_first();
+                        }
+                    }
                 },
                 event::KeyCode::Char('3') if app.state == State::Parsed => match app.selected_tab {
                     0 if app.endpoints_details_focused => {
@@ -150,6 +129,9 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     0 if app.endpoints_list_state.selected().is_some() => {
                         app.endpoints_details_focused = true;
                     }
+                    1 if app.components_list_state.selected().is_some() => {
+                        app.components_details_focused = true;
+                    }
                     // 2 if app.dependencies_list_state.selected().is_some() => {
                     //     app.is_depencies_dependents_focused = true;
                     // }
@@ -157,6 +139,7 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                 },
                 event::KeyCode::Left if app.state == State::Parsed => match app.selected_tab {
                     0 => app.endpoints_details_focused = false,
+                    1 => app.components_details_focused = false,
                     // 2 => app.is_depencies_dependents_focused = false,
                     _ => (),
                 },
@@ -191,7 +174,8 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
                             .scroll_down_by(1);
                     }
                     EndpointTab::Body => {
-                        app.endpoints_details_body_list_state.scroll_down_by(1);
+                        app.endpoints_details_body_scroll_pos =
+                            app.endpoints_details_body_scroll_pos.saturating_add(1);
                     }
                     EndpointTab::Responses => {
                         app.endpoints_details_responses_list_state.scroll_down_by(1);
@@ -208,19 +192,12 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
 
                 // app.endpoints_list_state.scroll_down_by(scroll_by);
             } else {
-                let scroll_by: u16 = if scroll_page {
-                    // app.unused_code_list_viewport.try_into().unwrap_or(1)
-                    1
-                } else {
-                    1
-                };
-
                 let current_idx = app.endpoints_list_state.selected();
 
-                app.endpoints_list_state.scroll_down_by(scroll_by);
+                app.endpoints_list_state.scroll_down_by(1);
 
                 if app.endpoints_list_state.selected() != current_idx {
-                    app.endpoints_details_body_list_state.select(None);
+                    app.endpoints_details_body_scroll_pos = 0;
                     app.endpoints_details_parameters_list_state.select(None);
                     app.endpoints_details_responses_list_state.select(None);
                 }
@@ -228,6 +205,8 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
         }
         1 => {
             if app.components_details_focused {
+                app.components_details_scroll_pos =
+                    app.components_details_scroll_pos.saturating_add(1);
                 // match app.endpoints_details_path_selected_tab {
                 //     EndpointTab::Parameters => {
                 //         app.endpoints_details_parameters_list_state
@@ -304,7 +283,8 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                         app.endpoints_details_parameters_list_state.scroll_up_by(1);
                     }
                     EndpointTab::Body => {
-                        app.endpoints_details_body_list_state.scroll_up_by(1);
+                        app.endpoints_details_body_scroll_pos =
+                            app.endpoints_details_body_scroll_pos.saturating_sub(1);
                     }
                     EndpointTab::Responses => {
                         app.endpoints_details_responses_list_state.scroll_up_by(1);
@@ -326,7 +306,7 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                 app.endpoints_list_state.scroll_up_by(1);
 
                 if app.endpoints_list_state.selected() != current_idx {
-                    app.endpoints_details_body_list_state.select(None);
+                    app.endpoints_details_body_scroll_pos = 0;
                     app.endpoints_details_parameters_list_state.select(None);
                     app.endpoints_details_responses_list_state.select(None);
                 }
@@ -334,6 +314,8 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
         }
         1 => {
             if app.components_details_focused {
+                app.components_details_scroll_pos =
+                    app.components_details_scroll_pos.saturating_sub(1);
                 // match app.endpoints_details_path_selected_tab {
                 //     EndpointTab::Parameters => {
                 //         app.endpoints_details_parameters_list_state.scroll_up_by(1);

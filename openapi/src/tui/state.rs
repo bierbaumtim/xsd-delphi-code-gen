@@ -26,7 +26,7 @@ pub struct App {
     pub endpoints_details_path_selected_tab_idx: usize,
     pub endpoints_details_path_selected_tab: EndpointTab,
     pub endpoints_details_path_tabs_count: usize,
-    pub endpoints_details_body_list_state: ListState,
+    pub endpoints_details_body_scroll_pos: u16,
     pub endpoints_details_parameters_list_state: ListState,
     pub endpoints_details_responses_list_state: ListState,
     pub endpoints_selected_index: Option<usize>,
@@ -35,6 +35,7 @@ pub struct App {
     pub components_list_state: ListState,
     pub components_details_focused: bool,
     pub components_selected_index: Option<usize>,
+    pub components_details_scroll_pos: u16,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -89,7 +90,7 @@ impl App {
             endpoints_details_path_selected_tab_idx: 0,
             endpoints_details_path_selected_tab: EndpointTab::Parameters,
             endpoints_details_path_tabs_count: 0,
-            endpoints_details_body_list_state: ListState::default(),
+            endpoints_details_body_scroll_pos: 0,
             endpoints_details_parameters_list_state: ListState::default(),
             endpoints_details_responses_list_state: ListState::default(),
             endpoints_selected_index: None,
@@ -97,6 +98,7 @@ impl App {
             components_list_state: ListState::default(),
             components_details_focused: false,
             components_selected_index: None,
+            components_details_scroll_pos: 0,
         }
     }
 
@@ -114,7 +116,7 @@ impl App {
         self.endpoints_details_path_selected_tab_idx = 0;
         self.endpoints_details_path_selected_tab = EndpointTab::Parameters;
         self.endpoints_details_path_tabs_count = 0;
-        self.endpoints_details_body_list_state = ListState::default();
+        self.endpoints_details_body_scroll_pos = 0;
         self.endpoints_details_parameters_list_state = ListState::default();
         self.endpoints_details_responses_list_state = ListState::default();
         self.endpoints_selected_index = None;
@@ -123,6 +125,7 @@ impl App {
         self.components_list_state = ListState::default();
         self.components_details_focused = false;
         self.components_selected_index = None;
+        self.components_details_scroll_pos = 0;
     }
 
     pub fn set_parsed(&mut self, spec: OpenAPI) {
@@ -139,7 +142,7 @@ impl App {
         self.endpoints_details_path_selected_tab_idx = 0;
         self.endpoints_details_path_selected_tab = EndpointTab::Parameters;
         self.endpoints_details_path_tabs_count = 0;
-        self.endpoints_details_body_list_state = ListState::default();
+        self.endpoints_details_body_scroll_pos = 0;
         self.endpoints_details_parameters_list_state = ListState::default();
         self.endpoints_details_responses_list_state = ListState::default();
         self.endpoints_selected_index = None;
@@ -148,6 +151,7 @@ impl App {
         self.components_list_state = ListState::default();
         self.components_details_focused = false;
         self.components_selected_index = None;
+        self.components_details_scroll_pos = 0;
 
         if !self.spec.as_ref().unwrap().paths.is_empty() {
             self.endpoints_list_state.select(Some(0));

@@ -669,7 +669,7 @@ impl OpenAPI {
         self.components
             .as_ref()?
             .parameters
-            .get(reference)
+            .get(reference.split("/").last().unwrap_or(reference))
             .and_then(|pr| match pr {
                 ParameterOrRef::Item(param) => Some(param),
                 ParameterOrRef::Ref { reference } => self.resolve_parameter(reference),
@@ -680,7 +680,7 @@ impl OpenAPI {
         self.components
             .as_ref()?
             .responses
-            .get(reference)
+            .get(reference.split("/").last().unwrap_or(reference))
             .and_then(|rr| match rr {
                 ResponseOrRef::Item(resp) => Some(resp),
                 ResponseOrRef::Ref { reference } => self.resolve_response(reference),
@@ -691,7 +691,7 @@ impl OpenAPI {
         self.components
             .as_ref()?
             .request_bodies
-            .get(reference)
+            .get(reference.split("/").last().unwrap_or(reference))
             .and_then(|rr| match rr {
                 RequestBodyOrRef::Item(rb) => Some(rb),
                 RequestBodyOrRef::Ref { reference } => self.resolve_request_body(reference),
