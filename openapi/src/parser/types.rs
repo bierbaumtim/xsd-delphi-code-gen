@@ -697,4 +697,15 @@ impl OpenAPI {
                 RequestBodyOrRef::Ref { reference } => self.resolve_request_body(reference),
             })
     }
+
+    pub fn resolve_header(&self, reference: &str) -> Option<&Header> {
+        self.components
+            .as_ref()?
+            .headers
+            .get(reference.split("/").last().unwrap_or(reference))
+            .and_then(|hr| match hr {
+                HeaderOrRef::Item(header) => Some(header),
+                HeaderOrRef::Ref { reference } => self.resolve_header(reference),
+            })
+    }
 }

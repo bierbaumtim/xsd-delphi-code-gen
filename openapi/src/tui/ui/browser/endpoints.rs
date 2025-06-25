@@ -354,11 +354,12 @@ fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
         })
         .collect::<Vec<_>>();
 
+    let items_len = items.len();
     let select_item_index = app
         .endpoints_details_parameters_list_state
         .selected()
-        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
-    let items_len = items.len();
+        .map_or(0, |i| i.checked_add(1).unwrap_or(1))
+        .min(items_len);
 
     let parameters_list = List::new(items)
         .block(

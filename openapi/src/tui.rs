@@ -163,12 +163,12 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                         .worker_sender
                         .send(WorkerCommands::ParseSpec(app.source.clone()));
                 }
-                //     event::KeyCode::PageUp if app.mode == Mode::DisplayingHealthReport => {
-                //         handle_scroll_up(app, true);
-                //     }
-                //     event::KeyCode::PageDown if app.mode == Mode::DisplayingHealthReport => {
-                //         handle_scroll_down(app, true);
-                //     }
+                event::KeyCode::PageUp if app.state == State::Parsed => {
+                    handle_scroll_up(app, true);
+                }
+                event::KeyCode::PageDown if app.state == State::Parsed => {
+                    handle_scroll_down(app, true);
+                }
                 _ => (),
             }
         }
@@ -220,6 +220,7 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
             match app.components_focused_region {
                 ComponentsRegion::Navigation => {
                     app.components_navigation_list_state.scroll_down_by(1);
+                    app.components_list_state.select_first();
                 }
                 ComponentsRegion::List => {
                     let current_idx = app.components_list_state.selected();
@@ -240,45 +241,14 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
                 _ => (),
             }
         }
-        // 2 => {
-        //     if app.is_depencies_dependents_focused {
-        //         let scroll_by: u16 = if scroll_page {
-        //             app.dependencies_selected_item_types_list_viewport
-        //                 .try_into()
-        //                 .unwrap_or(1)
-        //         } else {
-        //             1
-        //         };
-
-        //         app.dependencies_selected_item_types_list_state
-        //             .scroll_down_by(scroll_by);
-        //     } else {
-        //         let scroll_by: u16 = if scroll_page {
-        //             app.dependencies_list_viewport.try_into().unwrap_or(1)
-        //         } else {
-        //             1
-        //         };
-
-        //         let current_idx = app.dependencies_list_state.selected();
-
-        //         app.dependencies_list_state.scroll_down_by(scroll_by);
-
-        //         if app.dependencies_list_state.selected() != current_idx {
-        //             app.dependencies_selected_item_types_list_state.select(None);
-        //         }
-        //     }
-        // }
-        // 3 => {
-        //     let scroll_by: u16 = if scroll_page {
-        //         app.package_build_order_list_viewport
-        //             .try_into()
-        //             .unwrap_or(1)
-        //     } else {
-        //         1
-        //     };
-
-        //     app.package_build_order_list_state.scroll_down_by(scroll_by);
-        // }
+        2 => {
+            let scroll_by: u16 = if scroll_page {
+                app.details_viewport_height
+            } else {
+                1
+            };
+            app.details_scroll_pos = app.details_scroll_pos.saturating_add(scroll_by);
+        }
         _ => (),
     }
 }
@@ -325,6 +295,7 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
             match app.components_focused_region {
                 ComponentsRegion::Navigation => {
                     app.components_navigation_list_state.scroll_up_by(1);
+                    app.components_list_state.select_first();
                 }
                 ComponentsRegion::List => {
                     let current_idx = app.components_list_state.selected();
@@ -344,44 +315,15 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                 }
             }
         }
-        // 2 => {
-        //     if app.is_depencies_dependents_focused {
-        //         let scroll_by: u16 = if scroll_page {
-        //             app.dependencies_selected_item_types_list_viewport
-        //                 .try_into()
-        //                 .unwrap_or(1)
-        //         } else {
-        //             1
-        //         };
+        2 => {
+            let scroll_by: u16 = if scroll_page {
+                app.details_viewport_height
+            } else {
+                1
+            };
 
-        //         app.dependencies_selected_item_types_list_state
-        //             .scroll_up_by(scroll_by);
-        //     } else {
-        //         let scroll_by: u16 = if scroll_page {
-        //             app.dependencies_list_viewport.try_into().unwrap_or(1)
-        //         } else {
-        //             1
-        //         };
-        //         let current_idx = app.dependencies_list_state.selected();
-
-        //         app.dependencies_list_state.scroll_up_by(scroll_by);
-
-        //         if app.dependencies_list_state.selected() != current_idx {
-        //             app.dependencies_selected_item_types_list_state.select(None);
-        //         }
-        //     }
-        // }
-        // 3 => {
-        //     let scroll_by: u16 = if scroll_page {
-        //         app.package_build_order_list_viewport
-        //             .try_into()
-        //             .unwrap_or(1)
-        //     } else {
-        //         1
-        //     };
-
-        //     app.package_build_order_list_state.scroll_up_by(scroll_by);
-        // }
+            app.details_scroll_pos = app.details_scroll_pos.saturating_sub(scroll_by);
+        }
         _ => (),
     }
 }

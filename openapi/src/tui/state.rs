@@ -37,6 +37,10 @@ pub struct App {
     pub components_focused_region: ComponentsRegion,
     pub components_selected_index: Option<usize>,
     pub components_details_scroll_pos: u16,
+
+    // Details tab
+    pub details_scroll_pos: u16,
+    pub details_viewport_height: u16,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -108,6 +112,9 @@ impl App {
             components_focused_region: ComponentsRegion::Navigation,
             components_selected_index: None,
             components_details_scroll_pos: 0,
+            // Details tab
+            details_scroll_pos: 0,
+            details_viewport_height: 0,
         }
     }
 
@@ -136,6 +143,10 @@ impl App {
         self.components_focused_region = ComponentsRegion::Navigation;
         self.components_selected_index = None;
         self.components_details_scroll_pos = 0;
+
+        // Details tab
+        self.details_scroll_pos = 0;
+        self.details_viewport_height = 0;
     }
 
     pub fn set_parsed(&mut self, spec: OpenAPI) {
@@ -163,6 +174,10 @@ impl App {
         self.components_focused_region = ComponentsRegion::Navigation;
         self.components_selected_index = None;
         self.components_details_scroll_pos = 0;
+
+        // Reset the details scroll position
+        self.details_scroll_pos = 0;
+        self.details_viewport_height = 0;
 
         if !self.spec.as_ref().unwrap().paths.is_empty() {
             self.endpoints_list_state.select(Some(0));
@@ -293,6 +308,37 @@ impl App {
         items.get(index).cloned()
     }
 
+    pub fn get_request_bodies_list_items(&self) -> Vec<(&String, &RequestBody)> {
+        let Some(spec) = &self.spec else {
+            return vec![];
+        };
+
+        let Some(components) = spec.components.as_ref() else {
+            return vec![];
+        };
+
+        let mut items = components
+            .request_bodies
+            .iter()
+            .filter_map(|(name, request_body)| match request_body {
+                RequestBodyOrRef::Item(request_body) => Some((name, request_body)),
+                RequestBodyOrRef::Ref { reference } => {
+                    spec.resolve_request_body(reference).map(|s| (name, s))
+                }
+            })
+            .collect::<Vec<_>>();
+
+        items.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+        items
+    }
+
+    pub fn get_request_body_at(&self, index: usize) -> Option<(&String, &RequestBody)> {
+        let items = self.get_request_bodies_list_items();
+
+        items.get(index).cloned()
+    }
+
     pub fn get_response_list_items(&self) -> Vec<(&String, &Response)> {
         let Some(spec) = &self.spec else {
             return vec![];
@@ -320,6 +366,35 @@ impl App {
 
     pub fn get_response_at(&self, index: usize) -> Option<(&String, &Response)> {
         let items = self.get_response_list_items();
+
+        items.get(index).cloned()
+    }
+
+    pub fn get_headers_list_items(&self) -> Vec<(&String, &Header)> {
+        let Some(spec) = &self.spec else {
+            return vec![];
+        };
+
+        let Some(components) = spec.components.as_ref() else {
+            return vec![];
+        };
+
+        let mut items = components
+            .headers
+            .iter()
+            .filter_map(|(name, header)| match header {
+                HeaderOrRef::Item(header) => Some((name, header)),
+                HeaderOrRef::Ref { reference } => spec.resolve_header(reference).map(|s| (name, s)),
+            })
+            .collect::<Vec<_>>();
+
+        items.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+        items
+    }
+
+    pub fn get_header_at(&self, index: usize) -> Option<(&String, &Header)> {
+        let items = self.get_headers_list_items();
 
         items.get(index).cloned()
     }

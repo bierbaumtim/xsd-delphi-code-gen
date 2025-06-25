@@ -67,7 +67,14 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
                 .map(|(name, _)| ListItem::new(format!("{name}")))
                 .collect::<Vec<_>>()
         }
-        // 1 => render_request_bodies(f, app, area),
+        1 => {
+            let items = app.get_request_bodies_list_items();
+
+            items
+                .iter()
+                .map(|(name, _)| ListItem::new(format!("{name}")))
+                .collect::<Vec<_>>()
+        }
         2 => {
             let items = app.get_response_list_items();
 
@@ -94,7 +101,20 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
                 })
                 .collect()
         }
-        // 4 => render_headers(f, app, area),
+        4 => {
+            let items = app.get_headers_list_items();
+
+            items
+                .iter()
+                .map(|(name, header)| {
+                    ListItem::new(format!(
+                        "{}: {}",
+                        name,
+                        header.description.as_ref().cloned().unwrap_or_default()
+                    ))
+                })
+                .collect::<Vec<_>>()
+        }
         _ => vec![],
     };
     let title = match selected_index {
@@ -106,11 +126,12 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
         _ => "Unknown",
     };
 
+    let items_len = items.len();
     let select_item_index = app
         .components_list_state
         .selected()
-        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
-    let items_len = items.len();
+        .map_or(0, |i| i.checked_add(1).unwrap_or(1))
+        .min(items_len);
 
     let list = List::new(items)
         .block(
@@ -146,44 +167,52 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let selected_region = app.components_navigation_list_state.selected().unwrap_or(0);
 
-    let lines: Vec<Line>;
-    let title: String;
+    let mut lines = vec![];
+    let mut title = String::new();
     match selected_region {
         0 => {
-            let Some((name, param)) = app.get_parameter_at(index) else {
-                return;
-            };
-            let name = name.clone();
+            if let Some((name, param)) = app.get_parameter_at(index) {
+                let name = name.clone();
 
-            title = name.clone();
-            lines = parameter::ui(spec, &param, name, 0);
+                title = name.clone();
+                lines = parameter::ui(spec, &param, name, 0);
+            }
         }
-        // 1 => lines = request_body::ui(app),
-        2 => {
-            let Some((name, response)) = app.get_response_at(index) else {
-                return;
-            };
-            let name = name.clone();
+        1 => {
+            if let Some((name, request_body)) = app.get_request_body_at(index) {
+                let name = name.clone();
 
-            title = format!("{} - {}", name, response.description);
-            lines = response::ui(spec, response, name, 0);
+                title = name.clone();
+                lines = request_body::ui(spec, &request_body, name, 0);
+            }
+        }
+        2 => {
+            if let Some((name, response)) = app.get_response_at(index) {
+                let name = name.clone();
+
+                title = format!("{} - {}", name, response.description);
+                lines = response::ui(spec, response, name, 0);
+            }
         }
         3 => {
-            let Some((name, component)) = app.get_schema_at(index) else {
-                return;
-            };
-            let name = name.clone();
+            if let Some((name, component)) = app.get_schema_at(index) {
+                if let Some(type_) = component.r#type.as_ref() {
+                    let name = name.clone();
 
-            let Some(type_) = component.r#type.as_ref() else {
-                return;
-            };
-
-            title = format!("{} - {}", name, type_);
-            lines = schema::ui(spec, &component, name, 0, true);
+                    title = format!("{} - {}", name, type_);
+                    lines = schema::ui(spec, &component, name, 0, true);
+                };
+            }
         }
-        // 4 => lines = header::ui(app),
+        4 => {
+            if let Some((name, header)) = app.get_header_at(index) {
+                let name = name.clone();
+
+                title = name.clone();
+                lines = header::ui(spec, &header, name, 0);
+            }
+        }
         _ => {
-            title = String::new();
             lines = vec![Line::from("No details available")];
         }
     }
