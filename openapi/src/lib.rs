@@ -3,8 +3,6 @@ use std::path::{Path, PathBuf};
 use sw4rm_rs::from_path;
 use tera::Tera;
 
-use crate::parser::types::OpenAPI;
-
 mod endpoint_collector;
 mod helper;
 mod models;
@@ -14,7 +12,7 @@ mod schema_collector;
 pub mod tui;
 mod type_registry;
 
-pub fn start_spec_browser(source: PathBuf) -> anyhow::Result<()> {
+pub fn start_spec_browser(source: String) -> anyhow::Result<()> {
     tui::run(source)
 }
 

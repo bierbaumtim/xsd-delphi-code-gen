@@ -2,6 +2,8 @@ use std::thread;
 
 use crossbeam_channel::{unbounded, Receiver};
 
+use crate::tui::state::Source;
+
 use super::state::{WorkerCommands, WorkerResults};
 
 pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResults> {
@@ -13,14 +15,41 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                 Ok(WorkerCommands::ParseSpec(source)) => {
                     let _ = tx.send(WorkerResults::ParsingSpec(source.clone()));
 
-                    let content = match std::fs::read_to_string(&source) {
-                        Ok(content) => content,
-                        Err(e) => {
-                            let _ = tx.send(WorkerResults::Error(format!(
-                                "Failed to read OpenAPI Spec file: {}",
-                                e
-                            )));
-                            continue;
+                    let content = match source {
+                        Source::File(path_buf) => match std::fs::read_to_string(&path_buf) {
+                            Ok(content) => content,
+                            Err(e) => {
+                                let _ = tx.send(WorkerResults::Error(format!(
+                                    "Failed to read OpenAPI Spec file: {}",
+                                    e
+                                )));
+                                continue;
+                            }
+                        },
+                        Source::Url(url) => {
+                            let res = reqwest::blocking::get(url)
+                                .map_err(|e| {
+                                    WorkerResults::Error(format!(
+                                        "Failed to fetch OpenAPI Spec from URL: {}",
+                                        e
+                                    ))
+                                })
+                                .and_then(|res| {
+                                    res.text().map_err(|e| {
+                                        WorkerResults::Error(format!(
+                                            "Failed to read OpenAPI Spec from URL: {}",
+                                            e
+                                        ))
+                                    })
+                                });
+
+                            match res {
+                                Ok(content) => content,
+                                Err(e) => {
+                                    let _ = tx.send(e);
+                                    continue;
+                                }
+                            }
                         }
                     };
 

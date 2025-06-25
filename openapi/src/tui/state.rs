@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crossbeam_channel::{Receiver, Sender};
 use ratatui::{style::Color, widgets::*};
+use reqwest::Url;
 
 use crate::parser::types::*;
 
@@ -10,7 +11,7 @@ pub struct App {
     pub worker_receiver: Receiver<WorkerResults>,
 
     // Args
-    pub source: PathBuf,
+    pub source: Source,
 
     pub state: State,
 
@@ -43,6 +44,12 @@ pub struct App {
     pub details_viewport_height: u16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Source {
+    File(PathBuf),
+    Url(Url),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum State {
     Initial,
@@ -67,13 +74,13 @@ pub enum ComponentsRegion {
 
 #[derive(Debug, PartialEq)]
 pub enum WorkerCommands {
-    ParseSpec(PathBuf),
+    ParseSpec(Source),
     Shutdown,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum WorkerResults {
-    ParsingSpec(PathBuf),
+    ParsingSpec(Source),
     SpecParsed(OpenAPI),
     Error(String),
 }
@@ -82,7 +89,7 @@ pub type EndpointListItem<'a> = (Color, String, &'static str, &'a PathItem, &'a 
 
 impl App {
     pub fn new(
-        source: PathBuf,
+        source: Source,
         worker_sender: Sender<WorkerCommands>,
         worker_receiver: Receiver<WorkerResults>,
     ) -> Self {
@@ -397,6 +404,24 @@ impl App {
         let items = self.get_headers_list_items();
 
         items.get(index).cloned()
+    }
+}
+
+impl From<String> for Source {
+    fn from(value: String) -> Self {
+        Url::parse(&value).map_or_else(
+            |_| Source::File(PathBuf::from(value)),
+            |url| Source::Url(url),
+        )
+    }
+}
+
+impl ToString for Source {
+    fn to_string(&self) -> String {
+        match self {
+            Source::File(path) => path.to_string_lossy().to_string(),
+            Source::Url(url) => url.to_string(),
+        }
     }
 }
 

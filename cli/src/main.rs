@@ -19,7 +19,11 @@ fn main() {
     };
 
     match &args.source_format {
-        SourceFormat::Xml => generate_xml(&args.input, &output_path, build_code_gen_options(&args)),
+        SourceFormat::Xml => {
+            let paths = args.input.iter().map(PathBuf::from).collect::<Vec<_>>();
+
+            generate_xml(&paths, &output_path, build_code_gen_options(&args));
+        }
         SourceFormat::OpenApi => {
             if args.input.is_empty() {
                 eprintln!("No input files provided for OpenAPI generation");
@@ -95,8 +99,8 @@ fn resolve_output_path(path: &PathBuf) -> Result<PathBuf, String> {
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// One or multiple paths to xsd files. Paths can be relative or absolut.
-    #[arg(short, long, value_hint = clap::ValueHint::DirPath, num_args(1..))]
-    pub(crate) input: Vec<std::path::PathBuf>,
+    #[arg(short, long, value_hint = clap::ValueHint::FilePath, num_args(1..))]
+    pub(crate) input: Vec<String>,
 
     /// Path to output file. Path can be relative or absolut. File will be created or truncated before write.
     #[arg(short, long, required(true))]

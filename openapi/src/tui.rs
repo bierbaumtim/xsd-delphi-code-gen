@@ -17,7 +17,7 @@ mod state;
 mod ui;
 mod worker;
 
-pub fn run(source: PathBuf) -> anyhow::Result<()> {
+pub fn run(source: String) -> anyhow::Result<()> {
     enable_raw_mode()?;
     let mut stderr = std::io::stderr();
     execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
@@ -29,7 +29,11 @@ pub fn run(source: PathBuf) -> anyhow::Result<()> {
 
     let worker_result_recv = worker::start_worker(rx_worker);
 
-    let mut app = App::new(source, tx_worker, worker_result_recv);
+    let mut app = App::new(source.into(), tx_worker, worker_result_recv);
+    let _ = app
+        .worker_sender
+        .send(WorkerCommands::ParseSpec(app.source.clone().into()));
+
     let _res = run_app(&mut terminal, &mut app);
 
     disable_raw_mode()?;
@@ -58,7 +62,7 @@ fn run_app<'a, B: Backend>(terminal: &mut Terminal<B>, app: &'a mut App) -> anyh
             recv(app.worker_receiver) -> msg => {
                 match msg {
                     Ok(WorkerResults::ParsingSpec(path)) => {
-                        app.state = State::Parsing(path.to_string_lossy().to_string());
+                        app.state = State::Parsing(path.to_string());
                     }
                     Ok(WorkerResults::SpecParsed(spec)) => {
                         app.set_parsed(spec);
@@ -84,7 +88,7 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
             }
 
             match key.code {
-                event::KeyCode::Char('q') => match app.state {
+                event::KeyCode::Esc | event::KeyCode::Char('q') => match app.state {
                     State::Initial => {
                         let _ = app.worker_sender.send(WorkerCommands::Shutdown);
                         return Ok(true);
@@ -157,11 +161,14 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     _ => (),
                 },
                 event::KeyCode::Enter | event::KeyCode::Char('p')
-                    if matches!(app.state, State::Initial) =>
+                    if app.state == State::Initial =>
                 {
                     let _ = app
                         .worker_sender
                         .send(WorkerCommands::ParseSpec(app.source.clone()));
+                }
+                event::KeyCode::Char('i') if app.state == State::Initial => {
+                    // TODO: Show overlay to input OpenAPI spec URL or path
                 }
                 event::KeyCode::PageUp if app.state == State::Parsed => {
                     handle_scroll_up(app, true);
