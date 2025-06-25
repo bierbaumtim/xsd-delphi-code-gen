@@ -105,6 +105,9 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     }
                     _ => {
                         app.selected_tab = 1;
+                        if app.components_navigation_list_state.selected().is_none() {
+                            app.components_navigation_list_state.select_first();
+                        }
                         if app.components_list_state.selected().is_none() {
                             app.components_list_state.select_first();
                         }
@@ -129,8 +132,12 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     0 if app.endpoints_list_state.selected().is_some() => {
                         app.endpoints_details_focused = true;
                     }
-                    1 if app.components_list_state.selected().is_some() => {
-                        app.components_details_focused = true;
+                    1 => {
+                        app.components_focused_region = match app.components_focused_region {
+                            ComponentsRegion::Navigation => ComponentsRegion::List,
+                            ComponentsRegion::List => ComponentsRegion::Details,
+                            r => r,
+                        }
                     }
                     // 2 if app.dependencies_list_state.selected().is_some() => {
                     //     app.is_depencies_dependents_focused = true;
@@ -139,7 +146,13 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                 },
                 event::KeyCode::Left if app.state == State::Parsed => match app.selected_tab {
                     0 => app.endpoints_details_focused = false,
-                    1 => app.components_details_focused = false,
+                    1 => {
+                        app.components_focused_region = match app.components_focused_region {
+                            ComponentsRegion::List => ComponentsRegion::Navigation,
+                            ComponentsRegion::Details => ComponentsRegion::List,
+                            r => r,
+                        }
+                    }
                     // 2 => app.is_depencies_dependents_focused = false,
                     _ => (),
                 },
@@ -204,31 +217,27 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
             }
         }
         1 => {
-            if app.components_details_focused {
-                app.components_details_scroll_pos =
-                    app.components_details_scroll_pos.saturating_add(1);
-                // match app.endpoints_details_path_selected_tab {
-                //     EndpointTab::Parameters => {
-                //         app.endpoints_details_parameters_list_state
-                //             .scroll_down_by(1);
-                //     }
-                //     EndpointTab::Body => {
-                //         app.endpoints_details_body_list_state.scroll_down_by(1);
-                //     }
-                //     EndpointTab::Responses => {
-                //         app.endpoints_details_responses_list_state.scroll_down_by(1);
-                //     }
-                // }
-            } else {
-                let current_idx = app.components_list_state.selected();
-
-                app.components_list_state.scroll_down_by(1);
-
-                if app.components_list_state.selected() != current_idx {
-                    // app.endpoints_details_body_list_state.select(None);
-                    // app.endpoints_details_parameters_list_state.select(None);
-                    // app.endpoints_details_responses_list_state.select(None);
+            match app.components_focused_region {
+                ComponentsRegion::Navigation => {
+                    app.components_navigation_list_state.scroll_down_by(1);
                 }
+                ComponentsRegion::List => {
+                    let current_idx = app.components_list_state.selected();
+
+                    app.components_list_state.scroll_down_by(1);
+
+                    if app.components_list_state.selected() != current_idx {
+                        app.components_details_scroll_pos = 0;
+                        // app.endpoints_details_body_list_state.select(None);
+                        // app.endpoints_details_parameters_list_state.select(None);
+                        // app.endpoints_details_responses_list_state.select(None);
+                    }
+                }
+                ComponentsRegion::Details => {
+                    app.components_details_scroll_pos =
+                        app.components_details_scroll_pos.saturating_add(1);
+                }
+                _ => (),
             }
         }
         // 2 => {
@@ -313,29 +322,25 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
             }
         }
         1 => {
-            if app.components_details_focused {
-                app.components_details_scroll_pos =
-                    app.components_details_scroll_pos.saturating_sub(1);
-                // match app.endpoints_details_path_selected_tab {
-                //     EndpointTab::Parameters => {
-                //         app.endpoints_details_parameters_list_state.scroll_up_by(1);
-                //     }
-                //     EndpointTab::Body => {
-                //         app.endpoints_details_body_list_state.scroll_up_by(1);
-                //     }
-                //     EndpointTab::Responses => {
-                //         app.endpoints_details_responses_list_state.scroll_up_by(1);
-                //     }
-                // }
-            } else {
-                let current_idx = app.components_list_state.selected();
+            match app.components_focused_region {
+                ComponentsRegion::Navigation => {
+                    app.components_navigation_list_state.scroll_up_by(1);
+                }
+                ComponentsRegion::List => {
+                    let current_idx = app.components_list_state.selected();
 
-                app.components_list_state.scroll_up_by(1);
+                    app.components_list_state.scroll_up_by(1);
 
-                if app.components_list_state.selected() != current_idx {
-                    // app.endpoints_details_body_list_state.select(None);
-                    // app.endpoints_details_parameters_list_state.select(None);
-                    // app.endpoints_details_responses_list_state.select(None);
+                    if app.components_list_state.selected() != current_idx {
+                        app.components_details_scroll_pos = 0;
+                        // app.endpoints_details_body_list_state.select(None);
+                        // app.endpoints_details_parameters_list_state.select(None);
+                        // app.endpoints_details_responses_list_state.select(None);
+                    }
+                }
+                ComponentsRegion::Details => {
+                    app.components_details_scroll_pos =
+                        app.components_details_scroll_pos.saturating_sub(1);
                 }
             }
         }

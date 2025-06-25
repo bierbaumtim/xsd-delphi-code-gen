@@ -2,7 +2,13 @@ use std::u16;
 
 use ratatui::{prelude::*, widgets::*};
 
-use crate::{parser::types::*, tui::state::App};
+use crate::tui::state::{App, ComponentsRegion};
+
+pub mod header;
+pub mod parameter;
+pub mod request_body;
+pub mod response;
+pub mod schema;
 
 pub fn ui(f: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::new(
@@ -28,32 +34,77 @@ fn render_navigation(f: &mut Frame, app: &mut App, area: Rect) {
         ListItem::new("Schemas"),
         ListItem::new("Headers"),
     ])
-    .block(Block::bordered().title("Navigation"))
+    .block(
+        if app.components_focused_region == ComponentsRegion::Navigation {
+            Block::bordered().border_style(Style::default().blue())
+        } else {
+            Block::bordered()
+        }
+        .title("Navigation"),
+    )
     .style(Style::default().white())
     .highlight_style(Style::default().blue().bold())
     .highlight_symbol(">>")
     .repeat_highlight_symbol(false)
     .direction(ListDirection::TopToBottom);
 
-    f.render_widget(list, area);
+    f.render_stateful_widget(list, area, &mut app.components_navigation_list_state);
+
+    if app.components_navigation_list_state.selected().is_none() {
+        app.components_navigation_list_state.select_first();
+    }
 }
 
 fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
-    let items = app.get_components_list_items();
+    let selected_index = app.components_navigation_list_state.selected().unwrap_or(0);
 
-    let items: Vec<ListItem> = items
-        .iter()
-        .filter_map(|(name, schema)| {
-            let content = format!(
-                "{}: {}",
-                name,
-                schema.title.as_ref().cloned().unwrap_or_default()
-            );
-            let item = ListItem::new(content);
+    let items = match selected_index {
+        0 => {
+            let items = app.get_parameter_list_items();
 
-            Some(item)
-        })
-        .collect();
+            items
+                .iter()
+                .map(|(name, _)| ListItem::new(format!("{name}")))
+                .collect::<Vec<_>>()
+        }
+        // 1 => render_request_bodies(f, app, area),
+        2 => {
+            let items = app.get_response_list_items();
+
+            items
+                .iter()
+                .map(|(name, response)| {
+                    ListItem::new(format!("{}: {}", name, response.description))
+                })
+                .collect::<Vec<_>>()
+        }
+        3 => {
+            let items = app.get_schemas_list_items();
+
+            items
+                .iter()
+                .map(|(name, schema)| {
+                    let content = format!(
+                        "{}: {}",
+                        name,
+                        schema.title.as_ref().cloned().unwrap_or_default()
+                    );
+
+                    ListItem::new(content)
+                })
+                .collect()
+        }
+        // 4 => render_headers(f, app, area),
+        _ => vec![],
+    };
+    let title = match selected_index {
+        0 => "Parameters",
+        1 => "Request Bodies",
+        2 => "Responses",
+        3 => "Schemas",
+        4 => "Headers",
+        _ => "Unknown",
+    };
 
     let select_item_index = app
         .components_list_state
@@ -63,12 +114,12 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
 
     let list = List::new(items)
         .block(
-            if !app.components_details_focused {
+            if app.components_focused_region == ComponentsRegion::List {
                 Block::bordered().border_style(Style::default().blue())
             } else {
                 Block::bordered()
             }
-            .title("Components - Schemas")
+            .title(title)
             .title_bottom(
                 Line::from(format!("{}/{}", select_item_index, items_len)).right_aligned(),
             ),
@@ -87,30 +138,60 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
+    let Some(spec) = app.spec.as_ref() else {
+        return;
+    };
     let Some(index) = app.components_list_state.selected() else {
         return;
     };
-    let Some((name, component)) = app.get_component_at(index) else {
-        return;
-    };
-    let name = name.clone();
-    let component = component.clone();
+    let selected_region = app.components_navigation_list_state.selected().unwrap_or(0);
 
-    let Some(type_) = component.r#type.as_ref() else {
-        return;
-    };
+    let lines: Vec<Line>;
+    let title: String;
+    match selected_region {
+        0 => {
+            let Some((name, param)) = app.get_parameter_at(index) else {
+                return;
+            };
+            let name = name.clone();
 
-    let title = format!("{} - {}", name, type_);
+            title = name.clone();
+            lines = parameter::ui(spec, &param, name, 0);
+        }
+        // 1 => lines = request_body::ui(app),
+        2 => {
+            let Some((name, response)) = app.get_response_at(index) else {
+                return;
+            };
+            let name = name.clone();
 
-    let lines = if let Some(spec) = &app.spec {
-        render_schema(spec, &component, name, 1, false)
-    } else {
-        vec![]
-    };
+            title = format!("{} - {}", name, response.description);
+            lines = response::ui(spec, response, name, 0);
+        }
+        3 => {
+            let Some((name, component)) = app.get_schema_at(index) else {
+                return;
+            };
+            let name = name.clone();
+
+            let Some(type_) = component.r#type.as_ref() else {
+                return;
+            };
+
+            title = format!("{} - {}", name, type_);
+            lines = schema::ui(spec, &component, name, 0, true);
+        }
+        // 4 => lines = header::ui(app),
+        _ => {
+            title = String::new();
+            lines = vec![Line::from("No details available")];
+        }
+    }
+
     let text = Text::from(lines);
     let text = Paragraph::new(text)
         .block(
-            if app.components_details_focused {
+            if app.components_focused_region == ComponentsRegion::Details {
                 Block::bordered().border_style(Style::default().blue())
             } else {
                 Block::bordered()
@@ -148,243 +229,4 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
         }),
         &mut scroll_bar_state,
     );
-}
-
-pub fn render_schema<'a>(
-    spec: &'a OpenAPI,
-    schema: &'a Schema,
-    name: String,
-    indentation: usize,
-    increase_indentation: bool,
-) -> Vec<Line<'a>> {
-    let Some(type_) = schema.r#type.as_ref() else {
-        return vec![Line::from(Span::from(format!(
-            "{}{}: <unknown type>",
-            " ".repeat(indentation),
-            name
-        )))];
-    };
-
-    match type_.as_str() {
-        "object" => {
-            let mut lines = vec![];
-
-            if indentation >= 2 {
-                lines.push(Line::from(Span::from(format!(
-                    "{}{name}: object",
-                    " ".repeat(indentation)
-                ))));
-            }
-
-            let content_lines = schema
-                .properties
-                .iter()
-                .flat_map(|(key, value)| {
-                    let (schema, reference) = match value {
-                        SchemaOrRef::Item(schema) => (Some(schema), None),
-                        SchemaOrRef::Ref { reference } => {
-                            (spec.resolve_schema(reference), Some(reference))
-                        }
-                    };
-
-                    if let Some(schema) = schema {
-                        let indentation = if increase_indentation {
-                            indentation + 2
-                        } else {
-                            indentation
-                        };
-                        render_schema(spec, schema, key.clone(), indentation, true)
-                    } else if let Some(reference) = reference {
-                        vec![Line::from(Span::from(format!(
-                            "{}{key}: {reference}",
-                            " ".repeat(indentation)
-                        )))]
-                    } else {
-                        vec![Line::from(Span::from(format!(
-                            "{}{key}: <unknown>",
-                            " ".repeat(indentation)
-                        )))]
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            lines.extend(content_lines);
-
-            lines
-        }
-        "array" => {
-            let Some(items) = &schema.items else {
-                return vec![];
-            };
-
-            let mut lines = vec![];
-
-            if indentation >= 2 {
-                lines.push(Line::from(Span::from(format!(
-                    "{}{name}: array",
-                    " ".repeat(indentation)
-                ))));
-            }
-
-            let item_schema: &SchemaOrRef = items;
-            let (schema, reference) = match item_schema {
-                SchemaOrRef::Item(schema) => (Some(schema), None),
-                SchemaOrRef::Ref { reference } => (spec.resolve_schema(reference), Some(reference)),
-            };
-
-            if let Some(schema) = schema {
-                let indentation = if increase_indentation {
-                    indentation + 2
-                } else {
-                    indentation
-                };
-                lines.extend(render_schema(spec, schema, name, indentation, true));
-            } else if let Some(reference) = reference {
-                lines.push(Line::from(Span::from(format!(
-                    "{}{name}: {reference}",
-                    " ".repeat(indentation)
-                ))));
-            } else {
-                lines.push(Line::from(Span::from(format!(
-                    "{}{name}: <unknown>",
-                    " ".repeat(indentation)
-                ))));
-            }
-
-            lines
-        }
-        "integer" | "number" => {
-            let format = schema
-                .format
-                .as_ref()
-                .map(|f| Span::styled(format!(" (format: {})", f), Style::default().dark_gray()));
-
-            let default = schema
-                .default
-                .as_ref()
-                .map(|d| Span::styled(format!(" (default: {})", d), Style::default().dark_gray()));
-
-            let mut result = vec![];
-
-            // if !length_range.content.is_empty() {
-            //     result.push(length_range);
-            // }
-            if let Some(format) = format {
-                result.push(format);
-            }
-            if schema.nullable {
-                result.push(Span::styled(" (nullable)", Style::default().dark_gray()));
-            }
-            if let Some(default) = default {
-                result.push(default);
-            }
-            if !schema.enum_.is_empty() {
-                result.push(Span::styled(
-                    format!(
-                        " (enum: {})",
-                        schema
-                            .enum_
-                            .iter()
-                            .map(|v| { format!("{}", v) })
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                    Style::default().dark_gray(),
-                ));
-            }
-
-            let mut text = vec![
-                Span::from(" ".repeat(indentation)),
-                Span::from(name),
-                Span::from(": "),
-                Span::styled(type_, Style::default().dark_gray()),
-            ];
-            text.extend(result);
-
-            vec![Line::from(text)]
-        }
-        "string" => {
-            let length_range = match (schema.min_length, schema.max_length) {
-                (Some(min), Some(max)) => format!(" ({}-{})", min, max),
-                (Some(min), None) => format!(" (min {})", min),
-                (None, Some(max)) => format!(" (max {})", max),
-                (None, None) => String::new(),
-            };
-            let length_range = Span::styled(length_range, Style::default().dark_gray());
-
-            let pattern = schema
-                .pattern
-                .as_ref()
-                .map(|p| Span::styled(format!(" (pattern: {})", p), Style::default().dark_gray()));
-
-            let format = schema
-                .format
-                .as_ref()
-                .map(|f| Span::styled(format!(" (format: {})", f), Style::default().dark_gray()));
-
-            let default = schema
-                .default
-                .as_ref()
-                .map(|d| Span::styled(format!(" (default: {})", d), Style::default().dark_gray()));
-
-            let mut result = vec![];
-            if let Some(pattern) = pattern {
-                result.push(pattern);
-            }
-            if !length_range.content.is_empty() {
-                result.push(length_range);
-            }
-            if let Some(format) = format {
-                result.push(format);
-            }
-            if schema.nullable {
-                result.push(Span::styled(" (nullable)", Style::default().dark_gray()));
-            }
-            if let Some(default) = default {
-                result.push(default);
-            }
-            if !schema.enum_.is_empty() {
-                let trailing = if schema.enum_.len() > 10 {
-                    String::from(" ...")
-                } else {
-                    String::new()
-                };
-
-                result.push(Span::styled(
-                    format!(
-                        " (enum: {}{})",
-                        schema
-                            .enum_
-                            .iter()
-                            .take(10)
-                            .map(|v| { format!("{}", v) })
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                        trailing
-                    ),
-                    Style::default().dark_gray(),
-                ));
-            }
-
-            let mut text = vec![
-                Span::from(" ".repeat(indentation)),
-                Span::from(name),
-                Span::from(": "),
-                Span::styled(type_, Style::default().dark_gray()),
-            ];
-            text.extend(result);
-
-            vec![Line::from(text)]
-        }
-        _ => {
-            let text = vec![
-                Span::from(" ".repeat(indentation)),
-                Span::from(name),
-                Span::from(": "),
-                Span::styled(type_, Style::default().dark_gray()),
-            ];
-
-            vec![Line::from(text)]
-        }
-    }
 }

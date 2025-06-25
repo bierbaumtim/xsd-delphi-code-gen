@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crossbeam_channel::{Receiver, Sender};
 use ratatui::{style::Color, widgets::*};
 
-use crate::parser::types::{OpenAPI, Operation, PathItem, Schema, SchemaOrRef};
+use crate::parser::types::*;
 
 pub struct App {
     pub worker_sender: Sender<WorkerCommands>,
@@ -32,8 +32,9 @@ pub struct App {
     pub endpoints_selected_index: Option<usize>,
 
     // Components tab
+    pub components_navigation_list_state: ListState,
     pub components_list_state: ListState,
-    pub components_details_focused: bool,
+    pub components_focused_region: ComponentsRegion,
     pub components_selected_index: Option<usize>,
     pub components_details_scroll_pos: u16,
 }
@@ -51,6 +52,13 @@ pub enum EndpointTab {
     Parameters,
     Responses,
     Body,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComponentsRegion {
+    Navigation,
+    List,
+    Details,
 }
 
 #[derive(Debug, PartialEq)]
@@ -95,8 +103,9 @@ impl App {
             endpoints_details_responses_list_state: ListState::default(),
             endpoints_selected_index: None,
             // Components tab
+            components_navigation_list_state: ListState::default(),
             components_list_state: ListState::default(),
-            components_details_focused: false,
+            components_focused_region: ComponentsRegion::Navigation,
             components_selected_index: None,
             components_details_scroll_pos: 0,
         }
@@ -122,8 +131,9 @@ impl App {
         self.endpoints_selected_index = None;
 
         // Components tab
+        self.components_navigation_list_state = ListState::default();
         self.components_list_state = ListState::default();
-        self.components_details_focused = false;
+        self.components_focused_region = ComponentsRegion::Navigation;
         self.components_selected_index = None;
         self.components_details_scroll_pos = 0;
     }
@@ -148,8 +158,9 @@ impl App {
         self.endpoints_selected_index = None;
 
         // Reset the components list state
+        self.components_navigation_list_state = ListState::default();
         self.components_list_state = ListState::default();
-        self.components_details_focused = false;
+        self.components_focused_region = ComponentsRegion::Navigation;
         self.components_selected_index = None;
         self.components_details_scroll_pos = 0;
 
@@ -222,7 +233,7 @@ impl App {
     }
 
     // Components Functions
-    pub fn get_components_list_items(&self) -> Vec<(&String, &Schema)> {
+    pub fn get_schemas_list_items(&self) -> Vec<(&String, &Schema)> {
         let Some(spec) = &self.spec else {
             return vec![];
         };
@@ -245,8 +256,70 @@ impl App {
         items
     }
 
-    pub fn get_component_at(&self, index: usize) -> Option<(&String, &Schema)> {
-        let items = self.get_components_list_items();
+    pub fn get_schema_at(&self, index: usize) -> Option<(&String, &Schema)> {
+        let items = self.get_schemas_list_items();
+
+        items.get(index).cloned()
+    }
+
+    pub fn get_parameter_list_items(&self) -> Vec<(&String, &Parameter)> {
+        let Some(spec) = &self.spec else {
+            return vec![];
+        };
+
+        let Some(components) = spec.components.as_ref() else {
+            return vec![];
+        };
+
+        let mut items = components
+            .parameters
+            .iter()
+            .filter_map(|(name, param)| match param {
+                ParameterOrRef::Item(param) => Some((name, param)),
+                ParameterOrRef::Ref { reference } => {
+                    spec.resolve_parameter(reference).map(|s| (name, s))
+                }
+            })
+            .collect::<Vec<_>>();
+
+        items.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+        items
+    }
+
+    pub fn get_parameter_at(&self, index: usize) -> Option<(&String, &Parameter)> {
+        let items = self.get_parameter_list_items();
+
+        items.get(index).cloned()
+    }
+
+    pub fn get_response_list_items(&self) -> Vec<(&String, &Response)> {
+        let Some(spec) = &self.spec else {
+            return vec![];
+        };
+
+        let Some(components) = spec.components.as_ref() else {
+            return vec![];
+        };
+
+        let mut items = components
+            .responses
+            .iter()
+            .filter_map(|(name, response)| match response {
+                ResponseOrRef::Item(response) => Some((name, response)),
+                ResponseOrRef::Ref { reference } => {
+                    spec.resolve_response(reference).map(|s| (name, s))
+                }
+            })
+            .collect::<Vec<_>>();
+
+        items.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+        items
+    }
+
+    pub fn get_response_at(&self, index: usize) -> Option<(&String, &Response)> {
+        let items = self.get_response_list_items();
 
         items.get(index).cloned()
     }
