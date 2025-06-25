@@ -12,7 +12,19 @@ pub fn ui<'a>(
     let mut text = vec![Span::from(" ".repeat(indentation))];
 
     if show_name {
-        text.push(Span::from(format!("{name} ")));
+        if let Ok(value) = name.parse::<usize>() {
+            let style = match value {
+                100..=199 => Style::default().magenta(),
+                200..=299 | 300..=399 => Style::default().green(),
+                400..=499 => Style::default().yellow(),
+                500..=599 => Style::default().red(),
+                _ => Style::default(),
+            };
+
+            text.push(Span::styled(format!("{name} "), style));
+        } else {
+            text.push(Span::from(format!("{name} ")));
+        }
     }
     let header = Line::from(text);
     let description = Line::styled(&response.description, Style::default().dark_gray());

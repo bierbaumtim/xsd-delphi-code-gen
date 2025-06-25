@@ -81,7 +81,12 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
             items
                 .iter()
                 .map(|(name, response)| {
-                    ListItem::new(format!("{}: {}", name, response.description))
+                    if let Ok(value) = name.parse::<usize>() {
+                        ListItem::new(format!("{}: {}", name, response.description))
+                            .style(response::style_from_status_code(value))
+                    } else {
+                        ListItem::new(format!("{}: {}", name, response.description))
+                    }
                 })
                 .collect::<Vec<_>>()
         }

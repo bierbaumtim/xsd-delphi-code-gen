@@ -27,8 +27,8 @@ pub struct App {
     pub endpoints_details_path_selected_tab: EndpointTab,
     pub endpoints_details_path_tabs_count: usize,
     pub endpoints_details_body_scroll_pos: u16,
-    pub endpoints_details_parameters_list_state: ListState,
-    pub endpoints_details_responses_list_state: ListState,
+    pub endpoints_details_parameters_scroll_pos: u16,
+    pub endpoints_details_responses_scroll_pos: u16,
     pub endpoints_selected_index: Option<usize>,
 
     // Components tab
@@ -103,8 +103,8 @@ impl App {
             endpoints_details_path_selected_tab: EndpointTab::Parameters,
             endpoints_details_path_tabs_count: 0,
             endpoints_details_body_scroll_pos: 0,
-            endpoints_details_parameters_list_state: ListState::default(),
-            endpoints_details_responses_list_state: ListState::default(),
+            endpoints_details_parameters_scroll_pos: 0,
+            endpoints_details_responses_scroll_pos: 0,
             endpoints_selected_index: None,
             // Components tab
             components_navigation_list_state: ListState::default(),
@@ -133,8 +133,8 @@ impl App {
         self.endpoints_details_path_selected_tab = EndpointTab::Parameters;
         self.endpoints_details_path_tabs_count = 0;
         self.endpoints_details_body_scroll_pos = 0;
-        self.endpoints_details_parameters_list_state = ListState::default();
-        self.endpoints_details_responses_list_state = ListState::default();
+        self.endpoints_details_parameters_scroll_pos = 0;
+        self.endpoints_details_responses_scroll_pos = 0;
         self.endpoints_selected_index = None;
 
         // Components tab
@@ -164,8 +164,8 @@ impl App {
         self.endpoints_details_path_selected_tab = EndpointTab::Parameters;
         self.endpoints_details_path_tabs_count = 0;
         self.endpoints_details_body_scroll_pos = 0;
-        self.endpoints_details_parameters_list_state = ListState::default();
-        self.endpoints_details_responses_list_state = ListState::default();
+        self.endpoints_details_parameters_scroll_pos = 0;
+        self.endpoints_details_responses_scroll_pos = 0;
         self.endpoints_selected_index = None;
 
         // Reset the components list state

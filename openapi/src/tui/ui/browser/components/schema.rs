@@ -153,7 +153,19 @@ pub fn ui<'a>(
             ];
             text.extend(result);
 
-            vec![Line::from(text)]
+            let mut lines = vec![Line::from(text)];
+
+            if let Some(example) = schema.example.as_ref() {
+                lines.push(Line::from(vec![
+                    Span::from(" ".repeat(indentation + 2)),
+                    Span::styled(
+                        format!(" (example: {})", example),
+                        Style::default().dark_gray(),
+                    ),
+                ]));
+            }
+
+            lines
         }
         "string" => {
             let length_range = match (schema.min_length, schema.max_length) {
@@ -226,7 +238,19 @@ pub fn ui<'a>(
             ];
             text.extend(result);
 
-            vec![Line::from(text)]
+            let mut lines = vec![Line::from(text)];
+
+            if let Some(example) = schema.example.as_ref() {
+                lines.push(Line::from(vec![
+                    Span::from(" ".repeat(indentation + 2)),
+                    Span::styled(
+                        format!(" (example: {})", example),
+                        Style::default().dark_gray(),
+                    ),
+                ]));
+            }
+
+            lines
         }
         _ => {
             let text = vec![

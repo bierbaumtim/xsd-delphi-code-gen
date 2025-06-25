@@ -33,7 +33,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     .block(Block::bordered());
     f.render_widget(paragraph, top_layout[1]);
 
-    let tab_bar = Tabs::new(vec![" Endpoints ", " Components ", " Details "])
+    let tab_bar = Tabs::new(vec![" Endpoints (1) ", " Components (2) ", " Details (3) "])
         .block(Block::bordered().title("GenPhi - OpenAPI"))
         .select(app.selected_tab)
         .style(Style::default().white())

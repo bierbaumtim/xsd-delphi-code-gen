@@ -183,64 +183,51 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
             if app.endpoints_details_focused {
                 match app.endpoints_details_path_selected_tab {
                     EndpointTab::Parameters => {
-                        app.endpoints_details_parameters_list_state
-                            .scroll_down_by(1);
+                        app.endpoints_details_parameters_scroll_pos = app
+                            .endpoints_details_parameters_scroll_pos
+                            .saturating_add(1);
                     }
                     EndpointTab::Body => {
                         app.endpoints_details_body_scroll_pos =
                             app.endpoints_details_body_scroll_pos.saturating_add(1);
                     }
                     EndpointTab::Responses => {
-                        app.endpoints_details_responses_list_state.scroll_down_by(1);
+                        app.endpoints_details_responses_scroll_pos =
+                            app.endpoints_details_responses_scroll_pos.saturating_add(1);
                     }
                 }
-                // let scroll_by: u16 = if scroll_page {
-                //     // app.unused_code_selected_item_types_list_viewport
-                //     //     .try_into()
-                //     //     .unwrap_or(1)
-                //     1
-                // } else {
-                //     1
-                // };
-
-                // app.endpoints_list_state.scroll_down_by(scroll_by);
             } else {
                 let current_idx = app.endpoints_list_state.selected();
 
                 app.endpoints_list_state.scroll_down_by(1);
 
                 if app.endpoints_list_state.selected() != current_idx {
+                    app.endpoints_details_parameters_scroll_pos = 0;
                     app.endpoints_details_body_scroll_pos = 0;
-                    app.endpoints_details_parameters_list_state.select(None);
-                    app.endpoints_details_responses_list_state.select(None);
+                    app.endpoints_details_responses_scroll_pos = 0;
                 }
             }
         }
-        1 => {
-            match app.components_focused_region {
-                ComponentsRegion::Navigation => {
-                    app.components_navigation_list_state.scroll_down_by(1);
-                    app.components_list_state.select_first();
-                }
-                ComponentsRegion::List => {
-                    let current_idx = app.components_list_state.selected();
-
-                    app.components_list_state.scroll_down_by(1);
-
-                    if app.components_list_state.selected() != current_idx {
-                        app.components_details_scroll_pos = 0;
-                        // app.endpoints_details_body_list_state.select(None);
-                        // app.endpoints_details_parameters_list_state.select(None);
-                        // app.endpoints_details_responses_list_state.select(None);
-                    }
-                }
-                ComponentsRegion::Details => {
-                    app.components_details_scroll_pos =
-                        app.components_details_scroll_pos.saturating_add(1);
-                }
-                _ => (),
+        1 => match app.components_focused_region {
+            ComponentsRegion::Navigation => {
+                app.components_navigation_list_state.scroll_down_by(1);
+                app.components_list_state.select_first();
             }
-        }
+            ComponentsRegion::List => {
+                let current_idx = app.components_list_state.selected();
+
+                app.components_list_state.scroll_down_by(1);
+
+                if app.components_list_state.selected() != current_idx {
+                    app.components_details_scroll_pos = 0;
+                }
+            }
+            ComponentsRegion::Details => {
+                app.components_details_scroll_pos =
+                    app.components_details_scroll_pos.saturating_add(1);
+            }
+            _ => (),
+        },
         2 => {
             let scroll_by: u16 = if scroll_page {
                 app.details_viewport_height
@@ -259,62 +246,50 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
             if app.endpoints_details_focused {
                 match app.endpoints_details_path_selected_tab {
                     EndpointTab::Parameters => {
-                        app.endpoints_details_parameters_list_state.scroll_up_by(1);
+                        app.endpoints_details_parameters_scroll_pos = app
+                            .endpoints_details_parameters_scroll_pos
+                            .saturating_sub(1);
                     }
                     EndpointTab::Body => {
                         app.endpoints_details_body_scroll_pos =
                             app.endpoints_details_body_scroll_pos.saturating_sub(1);
                     }
                     EndpointTab::Responses => {
-                        app.endpoints_details_responses_list_state.scroll_up_by(1);
+                        app.endpoints_details_responses_scroll_pos =
+                            app.endpoints_details_responses_scroll_pos.saturating_sub(1);
                     }
                 }
-                // let scroll_by: u16 = if scroll_page {
-                //     app.unused_code_selected_item_types_list_viewport
-                //         .try_into()
-                //         .unwrap_or(1)
-                // } else {
-                //     1
-                // };
-
-                // app.unused_code_selected_item_types_list_state
-                //     .scroll_up_by(scroll_by);
             } else {
                 let current_idx = app.endpoints_list_state.selected();
 
                 app.endpoints_list_state.scroll_up_by(1);
 
                 if app.endpoints_list_state.selected() != current_idx {
+                    app.endpoints_details_parameters_scroll_pos = 0;
                     app.endpoints_details_body_scroll_pos = 0;
-                    app.endpoints_details_parameters_list_state.select(None);
-                    app.endpoints_details_responses_list_state.select(None);
+                    app.endpoints_details_responses_scroll_pos = 0;
                 }
             }
         }
-        1 => {
-            match app.components_focused_region {
-                ComponentsRegion::Navigation => {
-                    app.components_navigation_list_state.scroll_up_by(1);
-                    app.components_list_state.select_first();
-                }
-                ComponentsRegion::List => {
-                    let current_idx = app.components_list_state.selected();
+        1 => match app.components_focused_region {
+            ComponentsRegion::Navigation => {
+                app.components_navigation_list_state.scroll_up_by(1);
+                app.components_list_state.select_first();
+            }
+            ComponentsRegion::List => {
+                let current_idx = app.components_list_state.selected();
 
-                    app.components_list_state.scroll_up_by(1);
+                app.components_list_state.scroll_up_by(1);
 
-                    if app.components_list_state.selected() != current_idx {
-                        app.components_details_scroll_pos = 0;
-                        // app.endpoints_details_body_list_state.select(None);
-                        // app.endpoints_details_parameters_list_state.select(None);
-                        // app.endpoints_details_responses_list_state.select(None);
-                    }
-                }
-                ComponentsRegion::Details => {
-                    app.components_details_scroll_pos =
-                        app.components_details_scroll_pos.saturating_sub(1);
+                if app.components_list_state.selected() != current_idx {
+                    app.components_details_scroll_pos = 0;
                 }
             }
-        }
+            ComponentsRegion::Details => {
+                app.components_details_scroll_pos =
+                    app.components_details_scroll_pos.saturating_sub(1);
+            }
+        },
         2 => {
             let scroll_by: u16 = if scroll_page {
                 app.details_viewport_height

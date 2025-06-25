@@ -21,8 +21,8 @@ pub fn ui(f: &mut Frame, app: &mut App, area: Rect) {
     if app.endpoints_list_state.selected() != app.endpoints_selected_index {
         app.endpoints_selected_index = app.endpoints_list_state.selected();
         app.endpoints_details_body_scroll_pos = 0;
-        app.endpoints_details_parameters_list_state = ListState::default();
-        app.endpoints_details_responses_list_state = ListState::default();
+        app.endpoints_details_parameters_scroll_pos = 0;
+        app.endpoints_details_responses_scroll_pos = 0;
     }
 }
 
@@ -170,13 +170,17 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
             return;
         }
 
-        let tab_bar = Tabs::new(tabs.iter().map(|t| t.as_str()))
-            .block(Block::bordered())
-            .select(app.endpoints_details_path_selected_tab_idx)
-            .style(Style::default().white())
-            .highlight_style(Style::default().white().bg(Color::Blue))
-            .divider(symbols::DOT)
-            .padding(" ", " ");
+        let tab_bar = Tabs::new(
+            tabs.iter()
+                .enumerate()
+                .map(|(i, t)| format!(" {} ({}) ", t.as_str(), i + 1)),
+        )
+        .block(Block::bordered())
+        .select(app.endpoints_details_path_selected_tab_idx)
+        .style(Style::default().white())
+        .highlight_style(Style::default().white().bg(Color::Blue))
+        .divider(symbols::DOT)
+        .padding(" ", " ");
 
         f.render_widget(tab_bar, layout_1_v[0]);
 
@@ -322,28 +326,43 @@ fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
     let items = op
         .parameters
         .iter()
-        .filter_map(|param| {
-            let param = match param {
-                ParameterOrRef::Item(param) => Some(param),
+        .flat_map(|param| {
+            let (param, reference) = match param {
+                ParameterOrRef::Item(param) => (Some(param), None),
                 ParameterOrRef::Ref { reference } => {
-                    app.spec.as_ref().unwrap().resolve_parameter(reference)
+                    (spec.resolve_parameter(reference), Some(reference))
                 }
-            }?;
+            };
 
-            let lines = components::parameter::ui(spec, &param, param.name.clone(), 0, true);
+            if let Some(param) = param {
+                let mut lines =
+                    components::parameter::ui(spec, &param, param.name.clone(), 0, true);
+                if !lines.is_empty() {
+                    lines.push(Line::from(""));
+                }
 
-            (!lines.is_empty()).then(|| ListItem::new(Text::from(lines)))
+                lines
+            } else if let Some(reference) = reference {
+                vec![Line::from(Span::from(format!(
+                    "{}Unknown: {reference}",
+                    " ".repeat(2)
+                )))]
+            } else {
+                vec![Line::from(Span::from(format!(
+                    "{}Unknown: <unknown>",
+                    " ".repeat(2)
+                )))]
+            }
         })
         .collect::<Vec<_>>();
 
-    let items_len = items.len();
     let select_item_index = app
-        .endpoints_details_parameters_list_state
-        .selected()
-        .map_or(0, |i| i.checked_add(1).unwrap_or(1))
-        .min(items_len);
+        .endpoints_details_parameters_scroll_pos
+        .checked_add(1)
+        .unwrap_or(1);
+    let items_len = items.len();
 
-    let parameters_list = List::new(items)
+    let content = Paragraph::new(Text::from(items))
         .block(
             if app.endpoints_details_focused {
                 Block::bordered().border_style(Style::default().blue())
@@ -354,24 +373,33 @@ fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
                 Line::from(format!("{}/{}", select_item_index, items_len)).right_aligned(),
             ),
         )
-        .style(Style::default().white())
-        .highlight_style(Style::default().blue().bold())
-        .highlight_symbol(">>")
-        .repeat_highlight_symbol(false)
-        .direction(ListDirection::TopToBottom);
+        .wrap(Wrap { trim: false });
 
-    if app
-        .endpoints_details_parameters_list_state
-        .selected()
-        .is_none()
-    {
-        app.endpoints_details_parameters_list_state.select_first();
-    }
+    let lines = content.line_count(area.width);
+    let scroll_pos = app
+        .endpoints_details_parameters_scroll_pos
+        .clamp(0, u16::try_from(items_len).unwrap_or(u16::MAX));
+
+    let content = content.scroll((scroll_pos, 0));
+
+    f.render_widget(content, area);
+
+    // Add scrollbar
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+    app.endpoints_details_parameters_scroll_pos = scroll_pos;
+    let mut scroll_bar_state =
+        ScrollbarState::new(lines).position(app.endpoints_details_parameters_scroll_pos as usize);
 
     f.render_stateful_widget(
-        parameters_list,
-        area,
-        &mut app.endpoints_details_parameters_list_state,
+        scrollbar,
+        area.inner(Margin {
+            // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut scroll_bar_state,
     );
 }
 
@@ -383,25 +411,43 @@ fn render_response(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
     let items = op
         .responses
         .iter()
-        .filter_map(|(name, response)| {
-            let response = match response {
-                ResponseOrRef::Item(param) => Some(param),
-                ResponseOrRef::Ref { reference } => spec.resolve_response(reference),
-            }?;
+        .flat_map(|(name, response)| {
+            let (response, reference) = match response {
+                ResponseOrRef::Item(param) => (Some(param), None),
+                ResponseOrRef::Ref { reference } => {
+                    (spec.resolve_response(reference), Some(reference))
+                }
+            };
 
-            let lines = components::response::ui(spec, response, name.clone(), 0, true);
+            if let Some(response) = response {
+                let mut lines = components::response::ui(spec, response, name.clone(), 0, true);
 
-            (!lines.is_empty()).then(|| ListItem::new(Text::from(lines)))
+                if !lines.is_empty() {
+                    lines.push(Line::from(""));
+                }
+
+                lines
+            } else if let Some(reference) = reference {
+                vec![Line::from(Span::from(format!(
+                    "{}Unknown: {reference}",
+                    " ".repeat(2)
+                )))]
+            } else {
+                vec![Line::from(Span::from(format!(
+                    "{}Unknown: <unknown>",
+                    " ".repeat(2)
+                )))]
+            }
         })
         .collect::<Vec<_>>();
 
     let select_item_index = app
-        .endpoints_details_responses_list_state
-        .selected()
-        .map_or(0, |i| i.checked_add(1).unwrap_or(1));
+        .endpoints_details_responses_scroll_pos
+        .checked_add(1)
+        .unwrap_or(1);
     let items_len = items.len();
 
-    let response_list = List::new(items)
+    let content = Paragraph::new(Text::from(items))
         .block(
             if app.endpoints_details_focused {
                 Block::bordered().border_style(Style::default().blue())
@@ -412,23 +458,32 @@ fn render_response(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
                 Line::from(format!("{}/{}", select_item_index, items_len)).right_aligned(),
             ),
         )
-        .style(Style::default().white())
-        .highlight_style(Style::default().blue().bold())
-        .highlight_symbol(">>")
-        .repeat_highlight_symbol(false)
-        .direction(ListDirection::TopToBottom);
+        .wrap(Wrap { trim: false });
 
-    if app
-        .endpoints_details_responses_list_state
-        .selected()
-        .is_none()
-    {
-        app.endpoints_details_responses_list_state.select_first();
-    }
+    let lines = content.line_count(area.width);
+    let scroll_pos = app
+        .endpoints_details_responses_scroll_pos
+        .clamp(0, u16::try_from(items_len).unwrap_or(u16::MAX));
+
+    let content = content.scroll((scroll_pos, 0));
+
+    f.render_widget(content, area);
+
+    // Add scrollbar
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+    app.endpoints_details_responses_scroll_pos = scroll_pos;
+    let mut scroll_bar_state =
+        ScrollbarState::new(lines).position(app.endpoints_details_responses_scroll_pos as usize);
 
     f.render_stateful_widget(
-        response_list,
-        area,
-        &mut app.endpoints_details_responses_list_state,
+        scrollbar,
+        area.inner(Margin {
+            // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut scroll_bar_state,
     );
 }
