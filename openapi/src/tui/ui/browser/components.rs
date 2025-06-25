@@ -175,7 +175,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
                 let name = name.clone();
 
                 title = name.clone();
-                lines = parameter::ui(spec, &param, name, 0);
+                lines = parameter::ui(spec, &param, name, 0, true);
             }
         }
         1 => {
@@ -191,7 +191,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
                 let name = name.clone();
 
                 title = format!("{} - {}", name, response.description);
-                lines = response::ui(spec, response, name, 0);
+                lines = response::ui(spec, response, name, 0, true);
             }
         }
         3 => {

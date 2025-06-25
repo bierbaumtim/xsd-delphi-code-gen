@@ -7,10 +7,11 @@ pub fn ui<'a>(
     param: &'a Parameter,
     name: String,
     indentation: usize,
+    show_name: bool,
 ) -> Vec<Line<'a>> {
     let mut text = vec![Span::from(" ".repeat(indentation))];
 
-    if indentation >= 2 {
+    if show_name {
         text.push(Span::from(format!("{name} ")));
     }
 

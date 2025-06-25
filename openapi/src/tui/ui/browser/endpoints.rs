@@ -116,11 +116,6 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(header, main_layout[0]);
 
     if app.endpoints_details_layout == 0 {
-        // TODO: Layout 1:
-        // TODO: Top 25% = Description Paragraph + ScrollBar
-        // TODO: Main 1 50% or 75% if focused = Request Body or Parameters
-        // TODO: Main 2 50% or 75% if focused = Responses
-
         let layout_1_main = Layout::new(
             Direction::Vertical,
             [Constraint::Percentage(25), Constraint::Percentage(75)],
@@ -320,6 +315,10 @@ fn render_body(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
 }
 
 fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
+    let Some(spec) = app.spec.as_ref() else {
+        return;
+    };
+
     let items = op
         .parameters
         .iter()
@@ -331,26 +330,9 @@ fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
                 }
             }?;
 
-            let text = Text::from(vec![
-                Line::from(vec![
-                    Span::styled(
-                        param.name.as_str(),
-                        if param.required {
-                            Style::default().bold().fg(Color::Red)
-                        } else {
-                            Style::default().bold()
-                        },
-                    ),
-                    Span::styled(
-                        format!(" ({})", param.in_.to_string().to_uppercase()),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]),
-                Line::from(format!("{}", param.description.clone().unwrap_or_default())),
-                Line::from(""),
-            ]);
+            let lines = components::parameter::ui(spec, &param, param.name.clone(), 0, true);
 
-            Some(ListItem::new(text))
+            (!lines.is_empty()).then(|| ListItem::new(Text::from(lines)))
         })
         .collect::<Vec<_>>();
 
@@ -394,37 +376,22 @@ fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
 }
 
 fn render_response(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
+    let Some(spec) = app.spec.as_ref() else {
+        return;
+    };
+
     let items = op
         .responses
         .iter()
         .filter_map(|(name, response)| {
             let response = match response {
                 ResponseOrRef::Item(param) => Some(param),
-                ResponseOrRef::Ref { reference } => {
-                    app.spec.as_ref().unwrap().resolve_response(reference)
-                }
+                ResponseOrRef::Ref { reference } => spec.resolve_response(reference),
             }?;
 
-            let text = Text::from(vec![
-                // Line::from(vec![
-                //     Span::styled(
-                //         param.name.as_str(),
-                //         if param.required {
-                //             Style::default().bold().fg(Color::Red)
-                //         } else {
-                //             Style::default().bold()
-                //         },
-                //     ),
-                //     Span::styled(
-                //         format!(" ({})", param.in_.to_string().to_uppercase()),
-                //         Style::default().fg(Color::DarkGray),
-                //     ),
-                // ]),
-                Line::from(response.description.as_str()),
-                Line::from(""),
-            ]);
+            let lines = components::response::ui(spec, response, name.clone(), 0, true);
 
-            Some(ListItem::new(text))
+            (!lines.is_empty()).then(|| ListItem::new(Text::from(lines)))
         })
         .collect::<Vec<_>>();
 

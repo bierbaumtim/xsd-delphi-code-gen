@@ -7,17 +7,21 @@ pub fn ui<'a>(
     response: &'a Response,
     name: String,
     indentation: usize,
+    show_name: bool,
 ) -> Vec<Line<'a>> {
     let mut text = vec![Span::from(" ".repeat(indentation))];
 
-    if indentation >= 2 {
+    if show_name {
         text.push(Span::from(format!("{name} ")));
     }
+    let header = Line::from(text);
+    let description = Line::styled(&response.description, Style::default().dark_gray());
 
-    let mut lines = vec![
-        Line::from(text),
-        Line::styled(&response.description, Style::default().dark_gray()),
-    ];
+    let mut lines = if header.width() > 0 {
+        vec![header, description]
+    } else {
+        vec![description]
+    };
 
     let content_lines = response
         .content
