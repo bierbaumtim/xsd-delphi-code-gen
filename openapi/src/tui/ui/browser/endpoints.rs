@@ -92,7 +92,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
     let Some(index) = app.endpoints_list_state.selected() else {
         return;
     };
-    let Some((color, path, method, endpoint, op)) = app.get_endpoint_at(index) else {
+    let Some((color, path, method, _, op)) = app.get_endpoint_at(index) else {
         return;
     };
     let op = op.clone();

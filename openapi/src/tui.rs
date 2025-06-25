@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 use crossbeam_channel::{select, tick, unbounded};
 use ratatui::{
@@ -233,7 +233,6 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
                 app.components_details_scroll_pos =
                     app.components_details_scroll_pos.saturating_add(1);
             }
-            _ => (),
         },
         2 => {
             let scroll_by: u16 = if scroll_page {

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
-use openapi::{generate_openapi_client, start_spec_browser};
+use openapi::start_spec_browser;
 use xml::{generate_xml, generator::code_generator_trait::CodeGenOptions};
 
 fn main() {
@@ -32,7 +32,6 @@ fn main() {
             }
 
             let _ = start_spec_browser(args.input.first().expect("").clone());
-            // generate_openapi_client(&args.input, &output_path, &args.type_prefix)
         }
     }
 }

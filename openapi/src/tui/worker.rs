@@ -20,8 +20,7 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                             Ok(content) => content,
                             Err(e) => {
                                 let _ = tx.send(WorkerResults::Error(format!(
-                                    "Failed to read OpenAPI Spec file: {}",
-                                    e
+                                    "Failed to read OpenAPI Spec file: {e}",
                                 )));
                                 continue;
                             }
@@ -30,15 +29,13 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                             let res = reqwest::blocking::get(url)
                                 .map_err(|e| {
                                     WorkerResults::Error(format!(
-                                        "Failed to fetch OpenAPI Spec from URL: {}",
-                                        e
+                                        "Failed to fetch OpenAPI Spec from URL: {e}",
                                     ))
                                 })
                                 .and_then(|res| {
                                     res.text().map_err(|e| {
                                         WorkerResults::Error(format!(
-                                            "Failed to read OpenAPI Spec from URL: {}",
-                                            e
+                                            "Failed to read OpenAPI Spec from URL: {e}",
                                         ))
                                     })
                                 });
@@ -58,8 +55,7 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                         Ok(spec) => spec,
                         Err(e) => {
                             let _ = tx.send(WorkerResults::Error(format!(
-                                "Failed to parse OpenAPI Spec: {}",
-                                e
+                                "Failed to parse OpenAPI Spec: {e}",
                             )));
                             continue;
                         }
