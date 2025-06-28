@@ -4,17 +4,14 @@ mod helper;
 mod type_alias;
 mod union_type;
 
-use crate::{
-    parser::types::{CustomTypeDefinition, OrderIndicator, ParsedData},
-    type_registry::TypeRegistry,
-};
+use crate::parser::types::{CustomTypeDefinition, OrderIndicator, ParsedData};
 
 use self::class_type::collect_variables;
 
-pub use super::{
-    dependency_graph::DependencyGraph,
-    types::{ClassType, DataType, Enumeration, TypeAlias, UnionType, Variable, XMLSource},
+pub use super::types::{
+    ClassType, DataType, Enumeration, TypeAlias, UnionType, Variable, XMLSource,
 };
+pub use genphi_core::{dependency_graph::DependencyGraph, type_registry::TypeRegistry};
 
 /// The name of the document class type.
 pub const DOCUMENT_NAME: &str = "Document";
@@ -121,7 +118,7 @@ impl InternalRepresentation {
     ///
     /// let ir = InternalRepresentation::build(&data, &type_registry);
     /// ```
-    pub fn build(data: &ParsedData, registry: &TypeRegistry) -> Self {
+    pub fn build(data: &ParsedData, registry: &TypeRegistry<CustomTypeDefinition>) -> Self {
         let mut classes_dep_graph = DependencyGraph::<String, ClassType>::new();
         let mut aliases_dep_graph = DependencyGraph::<String, TypeAlias>::new();
         let mut union_types_dep_graph = DependencyGraph::<String, UnionType>::new();

@@ -5,7 +5,8 @@ use quick_xml::{
     Reader,
 };
 
-use crate::type_registry::TypeRegistry;
+use crate::parser::types::CustomTypeDefinition;
+use genphi_core::type_registry::TypeRegistry;
 
 use super::{
     annotations::AnnotationsParser,
@@ -72,7 +73,7 @@ impl SimpleTypeParser {
     /// ```
     pub fn parse(
         reader: &mut Reader<BufReader<File>>,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
         xml_parser: &XmlParser,
         name: String,
         qualified_parent: Option<String>,
@@ -219,7 +220,7 @@ impl SimpleTypeParser {
     fn parse_union_local_variants(
         node: &BytesStart,
         reader: &mut Reader<BufReader<File>>,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
         xml_parser: &XmlParser,
         name: &String,
         qualified_parent: &str,

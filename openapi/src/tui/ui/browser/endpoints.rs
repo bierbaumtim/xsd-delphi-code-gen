@@ -254,7 +254,9 @@ fn render_body(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
             if let Some(schema) = schema {
                 let name = name.map_or_else(|| "Custom Schema".to_owned(), |t| t.to_owned());
 
-                lines.extend(components::schema::ui(spec, schema, name, 2, true));
+                lines.extend(components::schema::ui(
+                    spec, schema, name, reference, 2, true,
+                ));
             } else if let Some(reference) = reference {
                 lines.push(Line::from(Span::from(format!(
                     "{}{media_type}: {reference}",

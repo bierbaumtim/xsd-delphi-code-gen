@@ -11,8 +11,10 @@ use generator::{
     delphi::code_generator::DelphiCodeGenerator,
     internal_representation::InternalRepresentation,
 };
+use genphi_core::type_registry::TypeRegistry;
 use parser::{types::ParsedData, xml::XmlParser};
-use type_registry::TypeRegistry;
+
+use crate::parser::types::CustomTypeDefinition;
 
 pub fn generate_xml(source: &[PathBuf], output_path: &PathBuf, options: CodeGenOptions) {
     let overall_instant = Instant::now();
@@ -26,7 +28,7 @@ pub fn generate_xml(source: &[PathBuf], output_path: &PathBuf, options: CodeGenO
     };
 
     let mut parser = XmlParser::default();
-    let mut type_registry = TypeRegistry::new();
+    let mut type_registry = TypeRegistry::<CustomTypeDefinition>::new();
 
     let data: ParsedData = if source.len() == 1 {
         match parser.parse_file(source.first().unwrap(), &mut type_registry) {

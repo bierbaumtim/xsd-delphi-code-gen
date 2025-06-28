@@ -1,12 +1,13 @@
 [package]
 name = "xml"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 
+genphi_core = { path = "../genphi_core" }
 quick-xml = "0.34.0"
 unicode-segmentation = "1.11.0"
 chrono = "0.4.38"

@@ -6,6 +6,7 @@ use crate::parser::types::CustomTypeDefinition;
 ///
 /// This is used to resolve types that are referenced by other types
 #[derive(Debug)]
+#[deprecated]
 pub struct TypeRegistry {
     pub types: HashMap<String, CustomTypeDefinition>,
     gen_type_count: i64,

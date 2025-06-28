@@ -6,6 +6,7 @@ pub fn ui<'a>(
     spec: &'a OpenAPI,
     schema: &'a Schema,
     name: String,
+    reference: Option<&'a String>,
     indentation: usize,
     increase_indentation: bool,
 ) -> Vec<Line<'a>> {
@@ -22,10 +23,19 @@ pub fn ui<'a>(
             let mut lines = vec![];
 
             if indentation >= 2 {
-                lines.push(Line::from(Span::from(format!(
+                let mut spans = vec![Span::from(format!(
                     "{}{name}: object",
                     " ".repeat(indentation)
-                ))));
+                ))];
+
+                if let Some(reference) = reference {
+                    spans.push(Span::styled(
+                        format!(" (reference: {reference})"),
+                        Style::default().dark_gray(),
+                    ));
+                }
+
+                lines.push(Line::from(spans));
             }
 
             let content_lines = schema
@@ -45,7 +55,7 @@ pub fn ui<'a>(
                         } else {
                             indentation
                         };
-                        ui(spec, schema, key.clone(), indentation, true)
+                        ui(spec, schema, key.clone(), reference, indentation, true)
                     } else if let Some(reference) = reference {
                         vec![Line::from(Span::from(format!(
                             "{}{key}: {reference}",
@@ -90,7 +100,7 @@ pub fn ui<'a>(
                 } else {
                     indentation
                 };
-                lines.extend(ui(spec, schema, name, indentation, true));
+                lines.extend(ui(spec, schema, name, reference, indentation, true));
             } else if let Some(reference) = reference {
                 lines.push(Line::from(Span::from(format!(
                     "{}{name}: {reference}",

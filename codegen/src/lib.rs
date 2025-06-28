@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-pub mod types;
-
-use types::*;
+use genphi_core::ir::types::*;
 
 /// Represents a parsed code section with its content and manual additions
 #[derive(Debug, Clone)]
@@ -198,67 +196,6 @@ interface"#,
         self.parse_marked_sections(existing_code);
     }
 
-    // fn extract_custom_code_blocks(&mut self, code: &str) {
-    //     // Extract method implementations that might have custom logic
-    //     let lines: Vec<&str> = code.lines().collect();
-    //     let mut in_method = false;
-    //     let mut method_name = String::new();
-    //     let mut method_lines = Vec::new();
-
-    //     for line in lines {
-    //         let trimmed = line.trim();
-
-    //         // Detect method start
-    //         if trimmed.starts_with("constructor ")
-    //             || trimmed.starts_with("destructor ")
-    //             || trimmed.starts_with("function ")
-    //             || trimmed.starts_with("procedure ")
-    //         {
-    //             if in_method && !method_name.is_empty() {
-    //                 self.existing_code_blocks
-    //                     .insert(method_name.clone(), method_lines.join("\n"));
-    //             }
-    //             in_method = true;
-    //             method_name = self.extract_method_name(trimmed);
-    //             method_lines.clear();
-    //         }
-
-    //         if in_method {
-    //             method_lines.push(line.to_string());
-    //         }
-
-    //         // Detect method end
-    //         if trimmed == "end;" && in_method {
-    //             if !method_name.is_empty() {
-    //                 self.existing_code_blocks
-    //                     .insert(method_name.clone(), method_lines.join("\n"));
-    //             }
-    //             in_method = false;
-    //             method_name.clear();
-    //             method_lines.clear();
-    //         }
-    //     }
-    // }
-
-    // fn extract_method_name(&self, line: &str) -> String {
-    //     // Extract method name from declaration line
-    //     let parts: Vec<&str> = line.split_whitespace().collect();
-    //     if parts.len() >= 2 {
-    //         let name_part = parts[1];
-    //         if let Some(dot_pos) = name_part.find('.') {
-    //             name_part[dot_pos + 1..]
-    //                 .split('(')
-    //                 .next()
-    //                 .unwrap_or("")
-    //                 .to_string()
-    //         } else {
-    //             name_part.split('(').next().unwrap_or("").to_string()
-    //         }
-    //     } else {
-    //         String::new()
-    //     }
-    // }
-
     /// Generate complete Delphi unit
     pub fn generate_unit(&self, unit: &DelphiUnit) -> Result<String, Box<dyn std::error::Error>> {
         let mut output = String::new();
@@ -304,9 +241,7 @@ interface"#,
 
             for enum_def in &unit.enums {
                 self.generate_enum_declaration(&mut output, enum_def)?;
-                if enum_def.generate_helper {
-                    self.generate_enum_helper_declaration(&mut output, enum_def)?;
-                }
+                self.generate_enum_helper_declaration(&mut output, enum_def)?;
             }
 
             writeln!(output, "{}", self.end_marker("enums"))?;
@@ -381,13 +316,11 @@ interface"#,
         }
 
         // Enum helpers implementation
-        if !unit.enums.is_empty() && unit.enums.iter().any(|e| e.generate_helper) {
+        if !unit.enums.is_empty() {
             writeln!(output, "{{$REGION 'Enum Helpers'}}")?;
             writeln!(output, "{}", self.begin_marker("enum_helpers_impl"))?;
             for enum_def in &unit.enums {
-                if enum_def.generate_helper {
-                    self.generate_enum_helper_implementation(&mut output, enum_def)?;
-                }
+                self.generate_enum_helper_implementation(&mut output, enum_def)?;
             }
             writeln!(output, "{}", self.end_marker("enum_helpers_impl"))?;
             output.push_str(&self.get_manual_additions("enum_helpers_impl"));
@@ -462,8 +395,8 @@ interface"#,
     ) -> Result<(), Box<dyn std::error::Error>> {
         writeln!(
             output,
-            "  {} = record helper for {}",
-            enum_def.helper_name, enum_def.name
+            "  {}Helper = record helper for {}",
+            enum_def.name, enum_def.name
         )?;
         writeln!(
             output,
@@ -482,13 +415,13 @@ interface"#,
         output: &mut String,
         enum_def: &DelphiEnum,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        writeln!(output, "{{ {} }}", enum_def.helper_name)?;
+        writeln!(output, "{{ {}Helper }}", enum_def.name)?;
 
         // FromString method
         writeln!(
             output,
-            "class function {}.FromString(const pValue: String): {};",
-            enum_def.helper_name, enum_def.name
+            "class function {}Helper.FromString(const pValue: String): {};",
+            enum_def.name, enum_def.name
         )?;
         writeln!(output, "begin")?;
 
@@ -513,11 +446,7 @@ interface"#,
         writeln!(output)?;
 
         // ToString method
-        writeln!(
-            output,
-            "function {}.ToString: String;",
-            enum_def.helper_name
-        )?;
+        writeln!(output, "function {}Helper.ToString: String;", enum_def.name)?;
         writeln!(output, "begin")?;
         writeln!(output, "  case Self of")?;
 
@@ -686,7 +615,7 @@ interface"#,
         if let Some(comment) = &field.comment {
             writeln!(output, "{}// {}", indent, comment)?;
         }
-        writeln!(output, "{}F{}: {};", indent, field.name, field.field_type)?;
+        // writeln!(output, "{}F{}: {};", indent, field.name, field.field_type)?;
 
         Ok(())
     }
@@ -734,7 +663,7 @@ interface"#,
                     method_line.push_str("out ");
                 }
 
-                method_line.push_str(&format!("{}: {}", param.name, param.param_type));
+                // method_line.push_str(&format!("{}: {}", param.name, param.param_type));
 
                 if let Some(default) = &param.default_value {
                     method_line.push_str(&format!(" = {}", default));
@@ -776,7 +705,9 @@ interface"#,
 
         let mut prop_line = format!(
             "{}property {}: {}",
-            indent, property.name, property.property_type
+            indent,
+            property.name,
+            "", //property.property_type
         );
 
         if let Some(getter) = &property.getter {
@@ -911,7 +842,7 @@ interface"#,
                     method_signature.push_str("out ");
                 }
 
-                method_signature.push_str(&format!("{}: {}", param.name, param.param_type));
+                // method_signature.push_str(&format!("{}: {}", param.name, param.param_type));
             }
             method_signature.push(')');
         }
@@ -1024,11 +955,11 @@ interface"#,
             if let Some(_json_key) = &field.json_key {
                 let const_name = format!("cn{}Key", field.name);
                 if field.is_reference_type {
-                    writeln!(
-                        output,
-                        "  F{} := {}.FromJsonRaw(pJson.GetValue<TJSONObject>({}));",
-                        field.name, field.field_type, const_name
-                    )?;
+                    // writeln!(
+                    //     output,
+                    //     "  F{} := {}.FromJsonRaw(pJson.GetValue<TJSONObject>({}));",
+                    //     field.name, field.field_type, const_name
+                    // )?;
                 } else {
                     writeln!(output, "  F{} := TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {}, '');",
                             field.name, const_name)?;
@@ -1194,298 +1125,4 @@ interface"#,
         // If we can't find the section, return the original code
         Ok(existing_code.to_string())
     }
-}
-
-/// Builder for DelphiEnum
-pub struct DelphiEnumBuilder {
-    enum_def: DelphiEnum,
-}
-
-impl DelphiEnumBuilder {
-    pub fn new(name: &str) -> Self {
-        Self {
-            enum_def: DelphiEnum {
-                name: name.to_string(),
-                variants: Vec::new(),
-                helper_name: format!("{}Helper", name),
-                generate_helper: true,
-                scoped: true,
-                comment: None,
-            },
-        }
-    }
-
-    pub fn add_variant(mut self, name: &str) -> Self {
-        self.enum_def.variants.push(DelphiEnumVariant {
-            name: name.to_string(),
-            value: None,
-            comment: None,
-        });
-        self
-    }
-
-    pub fn add_variant_with_value(mut self, name: &str, value: &str) -> Self {
-        self.enum_def.variants.push(DelphiEnumVariant {
-            name: name.to_string(),
-            value: Some(value.to_string()),
-            comment: None,
-        });
-        self
-    }
-
-    pub fn helper_name(mut self, name: &str) -> Self {
-        self.enum_def.helper_name = name.to_string();
-        self
-    }
-
-    pub fn generate_helper(mut self, generate: bool) -> Self {
-        self.enum_def.generate_helper = generate;
-        self
-    }
-
-    pub fn comment(mut self, comment: &str) -> Self {
-        self.enum_def.comment = Some(comment.to_string());
-        self
-    }
-
-    pub fn build(self) -> DelphiEnum {
-        self.enum_def
-    }
-}
-
-/// Builder for DelphiClass
-pub struct DelphiClassBuilder {
-    class: DelphiClass,
-}
-
-impl DelphiClassBuilder {
-    pub fn new(name: &str) -> Self {
-        Self {
-            class: DelphiClass {
-                name: name.to_string(),
-                parent_class: None,
-                fields: Vec::new(),
-                methods: Vec::new(),
-                properties: Vec::new(),
-                generate_json_support: true,
-                generate_xml_support: false,
-                comment: None,
-            },
-        }
-    }
-
-    pub fn parent_class(mut self, parent: &str) -> Self {
-        self.class.parent_class = Some(parent.to_string());
-        self
-    }
-
-    pub fn add_field(mut self, field: DelphiField) -> Self {
-        self.class.fields.push(field);
-        self
-    }
-
-    pub fn add_string_field(mut self, name: &str, json_key: Option<&str>) -> Self {
-        self.class.fields.push(DelphiField {
-            name: name.to_string(),
-            field_type: "String".to_string(),
-            visibility: DelphiVisibility::StrictPrivate,
-            is_reference_type: false,
-            json_key: json_key.map(|s| s.to_string()),
-            xml_attribute: None,
-            comment: None,
-            default_value: None,
-        });
-        self
-    }
-
-    pub fn add_reference_field(
-        mut self,
-        name: &str,
-        field_type: &str,
-        json_key: Option<&str>,
-    ) -> Self {
-        self.class.fields.push(DelphiField {
-            name: name.to_string(),
-            field_type: field_type.to_string(),
-            visibility: DelphiVisibility::StrictPrivate,
-            is_reference_type: true,
-            json_key: json_key.map(|s| s.to_string()),
-            xml_attribute: None,
-            comment: None,
-            default_value: None,
-        });
-        self
-    }
-
-    pub fn add_property(mut self, name: &str, property_type: &str) -> Self {
-        self.class.properties.push(DelphiProperty {
-            name: name.to_string(),
-            property_type: property_type.to_string(),
-            getter: Some(format!("F{}", name)),
-            setter: None,
-            visibility: DelphiVisibility::Public,
-            comment: None,
-        });
-        self
-    }
-
-    pub fn json_support(mut self, enable: bool) -> Self {
-        self.class.generate_json_support = enable;
-        self
-    }
-
-    pub fn xml_support(mut self, enable: bool) -> Self {
-        self.class.generate_xml_support = enable;
-        self
-    }
-
-    pub fn comment(mut self, comment: &str) -> Self {
-        self.class.comment = Some(comment.to_string());
-        self
-    }
-
-    pub fn build(self) -> DelphiClass {
-        self.class
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_enum_generation() {
-        let enum_def = DelphiEnumBuilder::new("TStatus")
-            .add_variant("None")
-            .add_variant("Active")
-            .add_variant("Inactive")
-            .build();
-
-        let generator = DelphiCodeGenerator::new(CodeGenConfig::default());
-        let mut output = String::new();
-
-        generator
-            .generate_enum_declaration(&mut output, &enum_def)
-            .unwrap();
-
-        assert!(output.contains("TStatus = (None, Active, Inactive);"));
-    }
-
-    #[test]
-    fn test_class_generation() {
-        let class = DelphiClassBuilder::new("TUser")
-            .add_string_field("Name", Some("name"))
-            .add_string_field("Email", Some("email"))
-            .add_property("Name", "String")
-            .add_property("Email", "String")
-            .build();
-
-        let generator = DelphiCodeGenerator::new(CodeGenConfig::default());
-        let mut output = String::new();
-
-        generator
-            .generate_class_declaration(&mut output, &class)
-            .unwrap();
-
-        assert!(output.contains("TUser = class"));
-        assert!(output.contains("FName: String;"));
-        assert!(output.contains("FEmail: String;"));
-        assert!(output.contains("property Name: String read FName;"));
-    }
-
-    #[test]
-    fn test_unit_generation() {
-        let mut unit = DelphiUnit {
-            unit_name: "Test".to_string(),
-            forward_declarations: vec!["TUser".to_string()],
-            enums: vec![],
-            records: vec![],
-            classes: vec![],
-            uses_interface: vec!["System.Classes".to_string()],
-            uses_implementation: vec![],
-            constants: HashMap::new(),
-            comment: None,
-        };
-
-        let class = DelphiClassBuilder::new("TUser")
-            .add_string_field("Name", Some("name"))
-            .add_property("Name", "String")
-            .build();
-
-        unit.classes.push(class);
-
-        let generator = DelphiCodeGenerator::new(CodeGenConfig::default());
-        let result = generator.generate_unit(&unit).unwrap();
-
-        assert!(result.contains("unit uTestModels;"));
-        assert!(result.contains("uses"));
-        assert!(result.contains("System.Classes"));
-        assert!(result.contains("TUser"));
-        assert!(result.contains("implementation"));
-        assert!(result.contains("end."));
-    }
-}
-
-/// Example main function demonstrating the Delphi code generator
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a complete example unit with enum, class, and JSON support
-    let status_enum = DelphiEnumBuilder::new("TUserStatus")
-        .add_variant("Active")
-        .add_variant("Inactive")
-        .add_variant("Pending")
-        .add_variant("Suspended")
-        .comment("User account status")
-        .build();
-
-    let user_class = DelphiClassBuilder::new("TUser")
-        .add_string_field("Id", Some("id"))
-        .add_string_field("Name", Some("name"))
-        .add_string_field("Email", Some("email"))
-        .add_string_field("CreatedAt", Some("createdAt"))
-        .add_property("Id", "String")
-        .add_property("Name", "String")
-        .add_property("Email", "String")
-        .add_property("CreatedAt", "String")
-        .comment("User model with JSON serialization support")
-        .build();
-
-    let mut unit = DelphiUnit {
-        unit_name: "UserApi".to_string(),
-        forward_declarations: vec!["TUser".to_string()],
-        enums: vec![status_enum],
-        records: vec![],
-        classes: vec![user_class],
-        uses_interface: vec!["System.Classes".to_string(), "System.JSON".to_string()],
-        uses_implementation: vec![],
-        constants: HashMap::new(),
-        comment: Some("Generated User API models".to_string()),
-    };
-
-    // Add some JSON key constants
-    unit.constants
-        .insert("cnIdKey".to_string(), "id".to_string());
-    unit.constants
-        .insert("cnNameKey".to_string(), "name".to_string());
-    unit.constants
-        .insert("cnEmailKey".to_string(), "email".to_string());
-
-    // Configure the generator
-    let config = CodeGenConfig {
-        generate_json_helpers: true,
-        generate_xml_helpers: false,
-        json_helper_unit: "uJsonHelper".to_string(),
-        xml_helper_unit: "uXmlHelper".to_string(),
-        date_format: "yyyy-mm-dd".to_string(),
-        indent_size: 2,
-        preserve_existing_code: true,
-    };
-
-    let generator = DelphiCodeGenerator::new(config);
-    let generated_code = generator.generate_unit(&unit)?;
-
-    println!("Generated Delphi Unit:");
-    println!("=====================");
-    println!("{}", generated_code);
-
-    Ok(())
 }

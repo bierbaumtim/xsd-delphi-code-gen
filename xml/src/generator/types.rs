@@ -1,4 +1,4 @@
-use super::dependency_graph::Dependable;
+use genphi_core::dependency_graph::Dependable;
 
 #[derive(Clone, Debug)]
 pub enum DataType {

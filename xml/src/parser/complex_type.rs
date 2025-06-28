@@ -3,7 +3,7 @@ use std::{fs::File, io::BufReader};
 use crate::parser::node::NodeParser;
 use quick_xml::{events::Event, Reader};
 
-use crate::type_registry::TypeRegistry;
+use genphi_core::type_registry::TypeRegistry;
 
 use super::{
     annotations::AnnotationsParser,
@@ -32,7 +32,7 @@ impl ComplexTypeParser {
     /// * `qualified_parent` - Qualified name of the parent type. Important for nested types
     pub fn parse(
         reader: &mut Reader<BufReader<File>>,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
         xml_parser: &XmlParser,
         name: String,
         qualified_parent: Option<String>,

@@ -170,6 +170,13 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                 event::KeyCode::Char('i') if app.state == State::Initial => {
                     // TODO: Show overlay to input OpenAPI spec URL or path
                 }
+                event::KeyCode::Char('g') if app.state == State::Parsed => {
+                    if let Some(spec) = &app.spec {
+                        let _ = app
+                            .worker_sender
+                            .send(WorkerCommands::GenerateCode(spec.clone()));
+                    }
+                }
                 event::KeyCode::PageUp if app.state == State::Parsed => {
                     handle_scroll_up(app, true);
                 }

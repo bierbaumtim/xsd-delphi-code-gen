@@ -1,8 +1,8 @@
 use crate::{
     generator::types::{DataType, UnionType, UnionVariant},
     parser::types::{CustomTypeDefinition, SimpleType},
-    type_registry::TypeRegistry,
 };
+use genphi_core::type_registry::TypeRegistry;
 
 /// Builds the internal representation for a union type.
 ///
@@ -47,7 +47,10 @@ use crate::{
 ///
 /// assert_eq!(ir.union_types.len(), 1);
 /// ```
-pub fn build_union_type_ir(st: &SimpleType, registry: &TypeRegistry) -> UnionType {
+pub fn build_union_type_ir(
+    st: &SimpleType,
+    registry: &TypeRegistry<CustomTypeDefinition>,
+) -> UnionType {
     UnionType {
         name: st.name.clone(),
         qualified_name: st.qualified_name.clone(),

@@ -1,11 +1,13 @@
 [package]
 name = "openapi"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+genphi_core = { path = "../genphi_core" }
+
 anyhow = "1.0.98"
 crossbeam-channel = "0.5.15"
 indexmap = { version = "2.9.0", features = ["std", "serde"] }

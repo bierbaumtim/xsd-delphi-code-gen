@@ -1,8 +1,8 @@
 use crate::{
     generator::types::{BinaryEncoding, DataType},
     parser::types::{CustomTypeDefinition, NodeBaseType, NodeType},
-    type_registry::TypeRegistry,
 };
+use genphi_core::type_registry::TypeRegistry;
 
 /// Converts a node base type to a data type.
 /// This is used to convert the base types of the nodes to the data types of the variables.
@@ -43,7 +43,10 @@ pub const fn node_base_type_to_datatype(base_type: &NodeBaseType) -> DataType {
 /// * `registry` - The type registry.
 /// # Returns
 /// The converted data type.
-pub fn list_type_to_data_type(list_type: &NodeType, registry: &TypeRegistry) -> Option<DataType> {
+pub fn list_type_to_data_type(
+    list_type: &NodeType,
+    registry: &TypeRegistry<CustomTypeDefinition>,
+) -> Option<DataType> {
     match list_type {
         NodeType::Standard(s) => Some(super::helper::node_base_type_to_datatype(s)),
         NodeType::Custom(c) => {

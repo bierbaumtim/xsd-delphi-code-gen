@@ -6,10 +6,9 @@ use quick_xml::{
     Reader,
 };
 
-use crate::{
-    parser::{helper::XmlParserHelper, types::OrderIndicator},
-    type_registry::TypeRegistry,
-};
+use genphi_core::type_registry::TypeRegistry;
+
+use crate::parser::{helper::XmlParserHelper, types::OrderIndicator};
 
 use super::{
     annotations::AnnotationsParser,
@@ -59,7 +58,7 @@ impl NodeParser {
 
     pub fn parse_node_group(
         reader: &mut Reader<BufReader<File>>,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
         xml_parser: &XmlParser,
         start: &BytesStart,
         qualified_name: String,

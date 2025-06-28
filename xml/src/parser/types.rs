@@ -1,5 +1,7 @@
 use std::{error::Error, fmt::Display};
 
+use genphi_core::type_registry::RegisteredType;
+
 /// xsd value for unbounded occurance is represented as -1
 pub const UNBOUNDED_OCCURANCE: i64 = -1;
 /// xsd default occurance is 1
@@ -118,6 +120,12 @@ impl CustomTypeDefinition {
             Self::Simple(t) => t.qualified_name.clone(),
             Self::Complex(t) => t.qualified_name.clone(),
         }
+    }
+}
+
+impl RegisteredType for CustomTypeDefinition {
+    fn get_qualified_name(&self) -> String {
+        self.get_qualified_name()
     }
 }
 

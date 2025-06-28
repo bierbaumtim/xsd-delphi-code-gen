@@ -64,6 +64,19 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                     // Send the health report back to the UI
                     let _ = tx.send(WorkerResults::SpecParsed(spec));
                 }
+                Ok(WorkerCommands::GenerateCode(spec)) => {
+                    // TODO: Set generating event
+
+                    let units = match crate::generator::generate_code(&spec) {
+                        Ok(units) => units,
+                        Err(e) => {
+                            let _ = tx.send(WorkerResults::Error(format!(
+                                "Failed to generate code: {e}",
+                            )));
+                            continue;
+                        }
+                    };
+                }
                 Ok(WorkerCommands::Shutdown) => break,
                 Err(_) => (),
             }

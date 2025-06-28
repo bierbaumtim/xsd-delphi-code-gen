@@ -5,7 +5,8 @@ use quick_xml::{
     Reader,
 };
 
-use crate::type_registry::TypeRegistry;
+use crate::parser::types::CustomTypeDefinition;
+use genphi_core::type_registry::TypeRegistry;
 
 use super::{
     annotations::AnnotationsParser,
@@ -20,7 +21,7 @@ pub struct CustomAttributeParser;
 impl CustomAttributeParser {
     pub fn parse(
         reader: &mut Reader<BufReader<File>>,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
         xml_parser: &XmlParser,
         qualified_parent: Option<String>,
         start: &BytesStart<'_>,

@@ -75,6 +75,7 @@ pub enum ComponentsRegion {
 #[derive(Debug, PartialEq)]
 pub enum WorkerCommands {
     ParseSpec(Source),
+    GenerateCode(OpenAPI),
     Shutdown,
 }
 

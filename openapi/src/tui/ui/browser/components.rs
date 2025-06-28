@@ -205,7 +205,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
                     let name = name.clone();
 
                     title = format!("{} - {}", name, type_);
-                    lines = schema::ui(spec, &component, name, 0, true);
+                    lines = schema::ui(spec, &component, name, None, 0, true);
                 };
             }
         }

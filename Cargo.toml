@@ -2,7 +2,7 @@
 
 resolver = "2"
 
-members = ["codegen", "cli", "openapi", "xml"]
+members = ["cli", "codegen", "genphi_core", "openapi", "xml"]
 
 # [package]
 # name = "xsd-delphi-code-gen"

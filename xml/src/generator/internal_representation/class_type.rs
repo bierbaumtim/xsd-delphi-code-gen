@@ -4,8 +4,8 @@ use crate::{
         CustomTypeDefinition, Node, NodeType, OrderIndicator, SingleNode, DEFAULT_OCCURANCE,
         UNBOUNDED_OCCURANCE,
     },
-    type_registry::TypeRegistry,
 };
+use genphi_core::type_registry::TypeRegistry;
 
 use super::helper::*;
 
@@ -58,7 +58,7 @@ use super::helper::*;
 /// ```
 pub fn build_class_type_ir(
     ct: &crate::parser::types::ComplexType,
-    registry: &TypeRegistry,
+    registry: &TypeRegistry<CustomTypeDefinition>,
 ) -> ClassType {
     let mut variables = collect_variables(&ct.children, registry, &ct.order);
 
@@ -148,7 +148,7 @@ pub fn build_class_type_ir(
 
 pub fn collect_variables(
     nodes: &[Node],
-    registry: &TypeRegistry,
+    registry: &TypeRegistry<CustomTypeDefinition>,
     order: &OrderIndicator,
 ) -> Vec<Variable> {
     nodes
@@ -163,7 +163,7 @@ pub fn collect_variables(
 
 fn single_node_to_variable(
     node: &SingleNode,
-    registry: &TypeRegistry,
+    registry: &TypeRegistry<CustomTypeDefinition>,
     order: &OrderIndicator,
 ) -> Option<Variable> {
     let min_occurs = match order {

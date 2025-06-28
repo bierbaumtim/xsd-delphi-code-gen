@@ -4,13 +4,13 @@ use sw4rm_rs::from_path;
 use tera::Tera;
 
 mod endpoint_collector;
+mod generator;
 mod helper;
 mod models;
 mod parser;
 mod render;
 mod schema_collector;
 pub mod tui;
-mod type_registry;
 
 pub fn start_spec_browser(source: String) -> anyhow::Result<()> {
     tui::run(source)

@@ -57,7 +57,7 @@ pub fn ui<'a>(
             if let Some(schema) = schema {
                 let name = name.map_or_else(|| "Custom Schema".to_owned(), |t| t.to_owned());
 
-                super::schema::ui(spec, schema, name, indentation + 2, true)
+                super::schema::ui(spec, schema, name, reference, indentation + 2, true)
             } else if let Some(reference) = reference {
                 vec![Line::from(Span::from(format!(
                     "{}{media_type}: {reference}",

@@ -12,7 +12,7 @@ use super::{
         BaseAttributes, CustomTypeDefinition, Node, NodeType, ParsedData, ParserError, SingleNode,
     },
 };
-use crate::type_registry::TypeRegistry;
+use genphi_core::type_registry::TypeRegistry;
 
 /// A parser for XML files.
 ///
@@ -71,7 +71,7 @@ impl XmlParser {
     pub fn parse_file<P: AsRef<Path>>(
         &mut self,
         path: P,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
     ) -> Result<ParsedData, ParserError> {
         let Ok(mut reader) = Reader::from_file(path) else {
             return Err(ParserError::UnableToReadFile);
@@ -112,7 +112,7 @@ impl XmlParser {
     pub fn parse_files<P: AsRef<Path>>(
         &mut self,
         paths: &[P],
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
     ) -> Result<ParsedData, ParserError> {
         let mut nodes = Vec::new();
         let mut documentations = Vec::new();
@@ -139,7 +139,7 @@ impl XmlParser {
     fn parse_nodes(
         &mut self,
         reader: &mut Reader<BufReader<File>>,
-        registry: &mut TypeRegistry,
+        registry: &mut TypeRegistry<CustomTypeDefinition>,
     ) -> Result<ParsedData, ParserError> {
         let mut nodes = Vec::new();
         let mut documentations = Vec::new();
