@@ -187,7 +187,42 @@ impl App {
         self.details_scroll_pos = 0;
         self.details_viewport_height = 0;
 
-        if !self.spec.as_ref().unwrap().paths.is_empty() {
+        if let Some(spec) = self.spec.as_mut() {
+            for (_, item) in spec.paths.iter_mut() {
+                if let Some(get) = item.get.as_mut() {
+                    get.responses.sort_by(|ak, _, bk, _| {
+                        let ak_value = ak.parse::<usize>().unwrap_or(0);
+                        let bk_value = bk.parse::<usize>().unwrap_or(0);
+
+                        ak_value.cmp(&bk_value)
+                    });
+                }
+                if let Some(post) = item.post.as_mut() {
+                    post.responses.sort_by(|ak, _, bk, _| {
+                        let ak_value = ak.parse::<usize>().unwrap_or(0);
+                        let bk_value = bk.parse::<usize>().unwrap_or(0);
+
+                        ak_value.cmp(&bk_value)
+                    });
+                }
+                if let Some(put) = item.put.as_mut() {
+                    put.responses.sort_by(|ak, _, bk, _| {
+                        let ak_value = ak.parse::<usize>().unwrap_or(0);
+                        let bk_value = bk.parse::<usize>().unwrap_or(0);
+
+                        ak_value.cmp(&bk_value)
+                    });
+                }
+                if let Some(delete) = item.delete.as_mut() {
+                    delete.responses.sort_by(|ak, _, bk, _| {
+                        let ak_value = ak.parse::<usize>().unwrap_or(0);
+                        let bk_value = bk.parse::<usize>().unwrap_or(0);
+
+                        ak_value.cmp(&bk_value)
+                    });
+                }
+            }
+
             self.endpoints_list_state.select(Some(0));
         }
     }
