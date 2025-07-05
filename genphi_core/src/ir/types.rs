@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use crate::ir::{IrTypeId, type_registry::TypeRegistry};
+use crate::ir::{IrTypeIdOrName, type_registry::TypeRegistry};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DelphiType {
     List(Box<DelphiType>),
-    Enum(IrTypeId),
-    Class(IrTypeId),
+    Enum(IrTypeIdOrName),
+    Class(IrTypeIdOrName),
     String,
     Integer,
     Float,
@@ -15,6 +15,15 @@ pub enum DelphiType {
     Pointer,
     DateTime,
     Binary,
+}
+
+pub enum DelphiReturnType {
+    Reference(String),
+    Value(String),
+    Array(String),
+    Enum(String),
+    BuiltIn(String),
+    Void,
 }
 
 /// Represents visibility levels in Delphi
@@ -31,17 +40,15 @@ pub enum DelphiVisibility {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct DelphiUnit {
     pub unit_name: String,
-    pub forward_declarations: Vec<String>,
     pub enums: Vec<DelphiEnum>,
     pub records: Vec<DelphiRecord>,
     pub classes: Vec<DelphiClass>,
     pub uses_interface: Vec<String>,
     pub uses_implementation: Vec<String>,
-    pub constants: HashMap<String, String>,
     pub comment: Option<String>,
 }
 
-/// Represents a Delphi class
+/// Represents a Delphi class‘
 #[derive(Debug, Clone, PartialEq)]
 pub struct DelphiClass {
     pub name: String,
@@ -158,6 +165,61 @@ impl DelphiClass {
             generate_json_support: false,
             generate_xml_support: false,
             comment: None,
+        }
+    }
+}
+
+impl DelphiType {
+    pub fn resolve(&self, registry: &TypeRegistry) -> Self {
+        match self {
+            DelphiType::Class(IrTypeIdOrName::Id(id)) => {
+                registry.get_class_name_by_id(id).map_or_else(
+                    || DelphiType::Pointer,
+                    |n| DelphiType::Class(IrTypeIdOrName::Name(n.clone())),
+                )
+            }
+            DelphiType::Enum(IrTypeIdOrName::Id(id)) => {
+                registry.get_enum_name_by_id(id).map_or_else(
+                    || DelphiType::Pointer,
+                    |n| DelphiType::Enum(IrTypeIdOrName::Name(n.clone())),
+                )
+            }
+            DelphiType::List(inner) => DelphiType::List(Box::new(inner.resolve(registry))),
+            e => e.clone(),
+        }
+    }
+
+    pub fn as_type_name(&self) -> String {
+        match self {
+            DelphiType::List(delphi_type) => {
+                let list_type = if matches!(delphi_type.as_ref(), DelphiType::Class(_)) {
+                    "TObjectList".to_owned()
+                } else {
+                    "TList".to_owned()
+                };
+
+                format!("{list_type}<{}>", delphi_type.as_type_name())
+            }
+            DelphiType::Enum(e) => match e {
+                IrTypeIdOrName::Id(_) => {
+                    unimplemented!("Support for type references in field types is not supported")
+                }
+                IrTypeIdOrName::Name(name) => name.clone(),
+            },
+            DelphiType::Class(c) => match c {
+                IrTypeIdOrName::Id(_) => {
+                    unimplemented!("Support for type references in field types is not supported")
+                }
+                IrTypeIdOrName::Name(name) => name.clone(),
+            },
+            DelphiType::String => "String".to_owned(),
+            DelphiType::Integer => "Integer".to_owned(),
+            DelphiType::Float => "Float".to_owned(),
+            DelphiType::Double => "Double".to_owned(),
+            DelphiType::Boolean => "Boolean".to_owned(),
+            DelphiType::Pointer => "Pointer".to_owned(),
+            DelphiType::DateTime => "TDateTime".to_owned(),
+            DelphiType::Binary => "TBytes".to_owned(),
         }
     }
 }

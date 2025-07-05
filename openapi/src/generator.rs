@@ -2,8 +2,9 @@ use anyhow::Ok;
 
 use crate::parser::types::*;
 
+use codegen::*;
 use genphi_core::ir::{
-    type_id_provider::UNRESOLVED_TYPE_ID, type_registry::TypeRegistry, types::*,
+    IrTypeIdOrName, type_id_provider::UNRESOLVED_TYPE_ID, type_registry::TypeRegistry, types::*,
 };
 
 // TODO: Odir-like type registry as central place for all types
@@ -12,8 +13,6 @@ use genphi_core::ir::{
 
 pub fn generate_code(spec: &OpenAPI) -> anyhow::Result<(String, String)> {
     let mut models_registry = TypeRegistry::new();
-
-    let models_unit = generate_models_unit(spec, &mut models_registry);
 
     let mut client_unit = DelphiUnit::default();
     client_unit.unit_name = build_unit_name(spec, "Client");
@@ -35,12 +34,13 @@ pub fn generate_code(spec: &OpenAPI) -> anyhow::Result<(String, String)> {
                     continue;
                 };
 
-                for (m_name, media_type) in response.content.iter() {
+                for (_, media_type) in response.content.iter() {
                     let (schema, reference) = match media_type.schema.as_ref() {
                         Some(SchemaOrRef::Item(schema)) => (Some(schema), None),
-                        Some(SchemaOrRef::Ref { reference }) => {
-                            (spec.resolve_schema(reference), Some(reference))
-                        }
+                        Some(SchemaOrRef::Ref { reference }) => (
+                            spec.resolve_schema(reference),
+                            reference.split("/").last().map(|v| v.to_owned()),
+                        ),
                         None => (None, None),
                     };
 
@@ -48,102 +48,86 @@ pub fn generate_code(spec: &OpenAPI) -> anyhow::Result<(String, String)> {
                         continue;
                     };
 
-                    let delphi_type = register_schema(spec, &mut models_registry, schema, None);
+                    let _ = register_schema(spec, &mut models_registry, schema, reference);
                 }
             }
-
-            // let method_name = build_operation_method_name(&get.operation_id, name);
-
-            // let method = DelphiMethod {
-            //     name: method_name,
-            //     visibility: DelphiVisibility::Public,
-            //     return_type: DelphiType::Void,
-            //     parameters: vec![],
-            // };
         }
     }
 
     client_unit.classes.push(client_class);
 
-    Ok((String::new(), String::new()))
+    let models_unit = generate_models_unit(spec, &mut models_registry);
+    let cg = DelphiCodeGenerator::new(CodeGenConfig::default());
+    let models_code = cg.generate_unit(&models_unit)?;
+
+    Ok((String::new(), models_code))
 }
 
 fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> DelphiUnit {
     let mut unit = DelphiUnit::default();
     unit.unit_name = build_unit_name(spec, "Models");
 
-    let mut class = DelphiClass::new(
-        format!(
-            "TM{}Models",
-            spec.info.title.replace(['-', '.', ':', ' '], "")
-        ),
-        "",
-    );
-
-    let Some(components) = &spec.components else {
-        return unit;
-    };
-
-    for (name, schema) in components.schemas.iter() {
-        let schema = match schema {
-            SchemaOrRef::Item(schema) => Some(schema),
-            SchemaOrRef::Ref { reference } => spec.resolve_schema(reference),
+    for enum_type in models_registry.enum_iter() {
+        let enum_class = DelphiEnum {
+            name: enum_type.name.clone(),
+            internal_name: enum_type.internal_name.clone(),
+            comment: enum_type.comment.clone(),
+            variants: enum_type
+                .variants
+                .iter()
+                .map(|v| DelphiEnumVariant {
+                    name: v.name.clone(),
+                    value: v.value.clone(),
+                    comment: v.comment.clone(),
+                })
+                .collect(),
         };
 
-        let Some(schema) = schema else {
-            continue;
-        };
-
-        let r#type = register_schema(spec, models_registry, schema, Some(name.clone()));
+        unit.enums.push(enum_class);
     }
 
-    // for (name, body) in components.request_bodies.iter() {
-    //     let body = match body {
-    //         RequestBodyOrRef::Item(request_body) => Some(request_body),
-    //         RequestBodyOrRef::Ref { reference } => spec.resolve_request_body(reference),
-    //     };
+    for class_type in models_registry.classes_iter() {
+        let class = DelphiClass {
+            name: class_type.name.clone(),
+            internal_name: class_type.internal_name.clone(),
+            comment: class_type.comment.clone(),
+            parent_class: None, // TODO:
+            generate_json_support: true,
+            generate_xml_support: false,
+            fields: class_type
+                .fields
+                .iter()
+                .map(|f| DelphiField {
+                    name: capitalize(&f.name),
+                    field_type: f.field_type.resolve(&models_registry),
+                    comment: f.comment.clone(),
+                    visibility: f.visibility.clone(),
+                    is_reference_type: matches!(
+                        f.field_type,
+                        DelphiType::Class(_) | DelphiType::List(_)
+                    ),
+                    json_key: f.json_key.clone(),
+                    xml_attribute: None,
+                    default_value: None,
+                })
+                .collect(),
+            properties: class_type
+                .properties
+                .iter()
+                .map(|p| DelphiProperty {
+                    name: capitalize(&p.name),
+                    property_type: p.property_type.resolve(&models_registry),
+                    getter: None,
+                    setter: None,
+                    visibility: p.visibility.clone(),
+                    comment: p.comment.clone(),
+                })
+                .collect(),
+            methods: vec![],
+        };
 
-    //     let Some(body) = body else {
-    //         continue;
-    //     };
-
-    //     let base_class = if body.content.len() > 1 {
-    //         let mut temp = DelphiClass::new("TM{name}Base");
-    //         temp.methods.push(DelphiMethod {
-    //             comment: None,
-    //             name: "AsString".to_owned(),
-    //             is_class_method: false,
-    //             is_constructor: false,
-    //             is_destructor: false,
-    //             is_override: false,
-    //             is_static: false,
-    //             is_virtual: false,
-    //             parameters: vec![],
-    //             visibility: DelphiVisibility::Public,
-    //             return_type: Some("String".to_owned()),
-    //         });
-
-    //         Some(temp)
-    //     } else {
-    //         None
-    //     };
-
-    //     for (c_name, content) in body.content.iter() {
-    //         let Some(schema) = &content.schema else {
-    //             continue;
-    //         };
-
-    //         let (schema, reference) = match schema {
-    //             SchemaOrRef::Item(schema) => Some(schema),
-    //             SchemaOrRef::Ref { reference } => spec.resolve_schema(reference),
-    //         };
-
-    //         let Some(schema) = schema else {
-    //             continue;
-    //         };
-
-    //     }
-    // }
+        unit.classes.push(class);
+    }
 
     unit
 }
@@ -168,10 +152,10 @@ fn register_schema(
                     |n| (UNRESOLVED_TYPE_ID, n),
                 );
 
-                let name = format!("T{}", name);
+                let name = format!("T{}", capitalize(&name));
                 let id = models_registry.find_enum_type_id_by_name(&name, "schema");
                 if let Some(id) = id {
-                    return Some(DelphiType::Enum(id));
+                    return Some(DelphiType::Enum(IrTypeIdOrName::Id(id)));
                 }
 
                 let variants = schema
@@ -204,7 +188,7 @@ fn register_schema(
                     gen_id
                 };
 
-                Some(DelphiType::Enum(id))
+                Some(DelphiType::Enum(IrTypeIdOrName::Id(id)))
             }
         }
         "integer" => Some(DelphiType::Integer),
@@ -238,14 +222,14 @@ fn register_schema(
         "object" => {
             // Handle object type
             let (gen_id, name) = class_name.or(schema.title.clone()).map_or_else(
-                || TypeRegistry::generate_name("Enum"),
+                || TypeRegistry::generate_name("Class"),
                 |n| (UNRESOLVED_TYPE_ID, n),
             );
 
-            let name = format!("T{}", name);
+            let name = format!("T{}", capitalize(&name));
             let id = models_registry.find_class_type_id_by_name(&name, "schema");
             if let Some(id) = id {
-                return Some(DelphiType::Class(id));
+                return Some(DelphiType::Class(IrTypeIdOrName::Id(id)));
             }
 
             let mut class = DelphiClass::new(name, "schema");
@@ -289,7 +273,7 @@ fn register_schema(
                 gen_id
             };
 
-            Some(DelphiType::Class(id))
+            Some(DelphiType::Class(IrTypeIdOrName::Id(id)))
         }
         _ => None,
     };
@@ -346,5 +330,14 @@ fn build_operation_method_name(operation_id: &Option<String>, path: &str) -> Str
             .unwrap_or("unknown");
 
         format!("Get{path_part}")
+    }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
 }

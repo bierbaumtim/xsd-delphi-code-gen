@@ -1,6 +1,6 @@
 use ratatui::{prelude::*, widgets::*};
 
-use crate::tui::state::App;
+use crate::tui::state::{App, BrowserTab};
 
 mod components;
 mod endpoints;
@@ -33,21 +33,26 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     .block(Block::bordered());
     f.render_widget(paragraph, top_layout[1]);
 
-    let tab_bar = Tabs::new(vec![" Endpoints (1) ", " Components (2) ", " Details (3) "])
-        .block(Block::bordered().title("GenPhi - OpenAPI"))
-        .select(app.selected_tab)
-        .style(Style::default().white())
-        .highlight_style(Style::default().white().bg(Color::Blue))
-        .divider(symbols::DOT)
-        .padding(" ", " ");
+    let tab_bar = Tabs::new(vec![
+        " Endpoints (1) ",
+        " Components (2) ",
+        " Details (3) ",
+        " Generated Code (4) ",
+    ])
+    .block(Block::bordered().title("GenPhi - OpenAPI"))
+    .select(app.selected_tab.index())
+    .style(Style::default().white())
+    .highlight_style(Style::default().white().bg(Color::Blue))
+    .divider(symbols::DOT)
+    .padding(" ", " ");
 
     f.render_widget(tab_bar, top_layout[0]);
 
     match app.selected_tab {
-        0 => endpoints::ui(f, app, chunks[1]),
-        1 => components::ui(f, app, chunks[1]),
-        2 => render_details(f, app, chunks[1]),
-        _ => {}
+        BrowserTab::Endpoints => endpoints::ui(f, app, chunks[1]),
+        BrowserTab::Components => components::ui(f, app, chunks[1]),
+        BrowserTab::Details => render_details(f, app, chunks[1]),
+        BrowserTab::GeneratedCode => render_code(f, app, chunks[1]),
     }
 }
 
@@ -152,4 +157,48 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
     );
 
     app.details_viewport_height = area.height;
+}
+
+fn render_code(f: &mut Frame, app: &mut App, area: Rect) {
+    let text = if let Some(code) = app.generated_models_code.as_ref() {
+        Text::from(code.as_str())
+    } else {
+        Text::from("No code generated")
+    };
+
+    let paragraph = Paragraph::new(text)
+        .block(Block::bordered().border_style(Style::default().blue()))
+        .wrap(Wrap { trim: false });
+
+    let lines = paragraph.line_count(area.width);
+    let scroll_pos = app.generated_code_scroll_pos.clamp(
+        0,
+        u16::try_from(lines)
+            .unwrap_or(u16::MAX)
+            .saturating_sub(area.height),
+    );
+
+    let paragraph = paragraph.scroll((scroll_pos, 0));
+
+    f.render_widget(paragraph, area);
+
+    // Add scrollbar
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+    app.generated_code_scroll_pos = scroll_pos;
+    let mut scroll_bar_state =
+        ScrollbarState::new(lines).position(app.generated_code_scroll_pos as usize);
+
+    f.render_stateful_widget(
+        scrollbar,
+        area.inner(Margin {
+            // using an inner vertical margin of 1 unit makes the scrollbar inside the block
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut scroll_bar_state,
+    );
+
+    app.generated_code_viewport_height = area.height;
 }

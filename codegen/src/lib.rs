@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use genphi_core::ir::types::*;
+use genphi_core::ir::{IrTypeIdOrName, types::*};
 
 /// Represents a parsed code section with its content and manual additions
 #[derive(Debug, Clone)]
@@ -197,7 +197,7 @@ interface"#,
     }
 
     /// Generate complete Delphi unit
-    pub fn generate_unit(&self, unit: &DelphiUnit) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn generate_unit(&self, unit: &DelphiUnit) -> anyhow::Result<String> {
         let mut output = String::new();
 
         // Unit header with manual edit instructions
@@ -221,11 +221,11 @@ interface"#,
         writeln!(output, "type")?;
 
         // Forward declarations
-        if !unit.forward_declarations.is_empty() {
+        if !unit.classes.is_empty() {
             writeln!(output, "  {{$REGION 'Forward Declarations'}}")?;
             writeln!(output, "{}", self.begin_marker("forward_declarations"))?;
-            for decl in &unit.forward_declarations {
-                writeln!(output, "  {};", decl)?;
+            for decl in &unit.classes {
+                writeln!(output, "  {};", decl.name)?;
             }
             writeln!(output, "{}", self.end_marker("forward_declarations"))?;
             output.push_str(&self.get_manual_additions("forward_declarations"));
@@ -307,13 +307,13 @@ interface"#,
         }
 
         // Constants
-        if !unit.constants.is_empty() {
-            for (name, value) in &unit.constants {
-                writeln!(output, "const")?;
-                writeln!(output, "  {}: string = '{}';", name, value)?;
-            }
-            writeln!(output)?;
-        }
+        // if !unit.constants.is_empty() {
+        //     for (name, value) in &unit.constants {
+        //         writeln!(output, "const")?;
+        //         writeln!(output, "  {}: string = '{}';", name, value)?;
+        //     }
+        //     writeln!(output)?;
+        // }
 
         // Enum helpers implementation
         if !unit.enums.is_empty() {
@@ -363,7 +363,7 @@ interface"#,
         &self,
         output: &mut String,
         enum_def: &DelphiEnum,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         if let Some(comment) = &enum_def.comment {
             writeln!(output, "  // {}", comment)?;
         }
@@ -392,7 +392,7 @@ interface"#,
         &self,
         output: &mut String,
         enum_def: &DelphiEnum,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         writeln!(
             output,
             "  {}Helper = record helper for {}",
@@ -414,7 +414,7 @@ interface"#,
         &self,
         output: &mut String,
         enum_def: &DelphiEnum,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         writeln!(output, "{{ {}Helper }}", enum_def.name)?;
 
         // FromString method
@@ -473,7 +473,7 @@ interface"#,
         &self,
         output: &mut String,
         record: &DelphiRecord,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         if let Some(comment) = &record.comment {
             writeln!(output, "  // {}", comment)?;
         }
@@ -505,7 +505,7 @@ interface"#,
         &self,
         output: &mut String,
         class: &DelphiClass,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         if let Some(comment) = &class.comment {
             writeln!(output, "  // {}", comment)?;
         }
@@ -611,11 +611,16 @@ interface"#,
         output: &mut String,
         field: &DelphiField,
         indent: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         if let Some(comment) = &field.comment {
             writeln!(output, "{}// {}", indent, comment)?;
         }
-        // writeln!(output, "{}F{}: {};", indent, field.name, field.field_type)?;
+        writeln!(
+            output,
+            "{indent}F{}: {};",
+            field.name,
+            field.field_type.as_type_name()
+        )?;
 
         Ok(())
     }
@@ -625,7 +630,7 @@ interface"#,
         output: &mut String,
         method: &DelphiMethod,
         indent: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         if let Some(comment) = &method.comment {
             writeln!(output, "{}// {}", indent, comment)?;
         }
@@ -698,7 +703,7 @@ interface"#,
         output: &mut String,
         property: &DelphiProperty,
         indent: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         if let Some(comment) = &property.comment {
             writeln!(output, "{}// {}", indent, comment)?;
         }
@@ -729,7 +734,7 @@ interface"#,
         &self,
         output: &mut String,
         record: &DelphiRecord,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         // Generate method implementations
         for method in &record.methods {
             self.generate_method_implementation(
@@ -748,16 +753,21 @@ interface"#,
         &self,
         output: &mut String,
         class: &DelphiClass,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         let class_impl_marker = format!("class_impl_{}", class.name.to_lowercase());
         writeln!(output, "{}", self.begin_marker(&class_impl_marker))?;
 
         // Generate constants for JSON keys
         if class.generate_json_support {
+            writeln!(output, "const")?;
+
             for field in &class.fields {
                 if let Some(json_key) = &field.json_key {
-                    writeln!(output, "const")?;
-                    writeln!(output, "  cn{}Key: string = '{}';", field.name, json_key)?;
+                    writeln!(
+                        output,
+                        "  cn{}JsonKey: string = '{}';",
+                        field.name, json_key
+                    )?;
                     writeln!(output)?;
                 }
             }
@@ -775,13 +785,13 @@ interface"#,
         }
 
         // Auto-generate JSON constructors if needed
-        if class.generate_json_support && !class.methods.iter().any(|m| m.name == "FromJson") {
+        if class.generate_json_support {
             self.generate_auto_json_constructor(output, class)?;
         }
 
         // Auto-generate destructor if needed
         let has_reference_types = class.fields.iter().any(|f| f.is_reference_type);
-        if has_reference_types && !class.methods.iter().any(|m| m.is_destructor) {
+        if has_reference_types {
             self.generate_auto_destructor(output, class)?;
         }
 
@@ -798,7 +808,7 @@ interface"#,
         type_name: &str,
         json_support: bool,
         _xml_support: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         // Check if we have existing implementation to preserve
         // let method_key = format!("{}.{}", type_name, method.name);
         // if let Some(existing_impl) = self.existing_code_blocks.get(&method_key) {
@@ -884,7 +894,7 @@ interface"#,
         &self,
         output: &mut String,
         _method: &DelphiMethod,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         writeln!(output, "  var vRoot := TJSONObject.ParseJSONValue(pJson);")?;
         writeln!(output)?;
         writeln!(output, "  try")?;
@@ -900,7 +910,7 @@ interface"#,
         &self,
         output: &mut String,
         _method: &DelphiMethod,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         writeln!(output, "  inherited Create;")?;
         writeln!(output)?;
         writeln!(output, "  // TODO: Parse JSON fields")?;
@@ -908,10 +918,7 @@ interface"#,
         Ok(())
     }
 
-    fn generate_destructor_body(
-        &self,
-        output: &mut String,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generate_destructor_body(&self, output: &mut String) -> anyhow::Result<()> {
         writeln!(output, "  // TODO: Free reference types")?;
         writeln!(output)?;
         writeln!(output, "  inherited;")?;
@@ -923,7 +930,7 @@ interface"#,
         &self,
         output: &mut String,
         class: &DelphiClass,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         // FromJson constructor
         writeln!(
             output,
@@ -953,7 +960,7 @@ interface"#,
 
         for field in &class.fields {
             if let Some(_json_key) = &field.json_key {
-                let const_name = format!("cn{}Key", field.name);
+                let const_name = format!("cn{}JsonKey", field.name);
                 if field.is_reference_type {
                     // writeln!(
                     //     output,
@@ -961,8 +968,11 @@ interface"#,
                     //     field.name, field.field_type, const_name
                     // )?;
                 } else {
-                    writeln!(output, "  F{} := TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {}, '');",
-                            field.name, const_name)?;
+                    writeln!(
+                        output,
+                        "  F{} := TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {}, '');",
+                        field.name, const_name
+                    )?;
                 }
             }
         }
@@ -977,7 +987,7 @@ interface"#,
         &self,
         output: &mut String,
         class: &DelphiClass,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         writeln!(output, "destructor {}.Destroy;", class.name)?;
         writeln!(output, "begin")?;
 
@@ -1010,7 +1020,7 @@ interface"#,
         &mut self,
         existing_code: &str,
         new_unit: &DelphiUnit,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<String> {
         // Parse the existing code to extract manual additions
         self.parse_existing_unit(existing_code);
 

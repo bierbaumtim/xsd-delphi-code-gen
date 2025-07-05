@@ -32,6 +32,14 @@ impl TypeRegistry {
         (id, name)
     }
 
+    pub fn enum_iter(&self) -> impl Iterator<Item = &DelphiEnum> {
+        self.enums.values()
+    }
+
+    pub fn classes_iter(&self) -> impl Iterator<Item = &DelphiClass> {
+        self.classes.values()
+    }
+
     pub fn register_class(&mut self, class: DelphiClass) -> IrTypeId {
         let id = TYPE_ID_PROVIDER.next_id();
 
@@ -69,6 +77,10 @@ impl TypeRegistry {
             .map(|(id, _)| *id)
     }
 
+    pub fn get_class_name_by_id(&self, id: &IrTypeId) -> Option<String> {
+        self.classes.get(id).map(|c| c.name.clone())
+    }
+
     pub fn register_enum(&mut self, enum_: DelphiEnum) -> IrTypeId {
         let id = TYPE_ID_PROVIDER.next_id();
 
@@ -104,5 +116,9 @@ impl TypeRegistry {
             .iter()
             .find(|(_, e)| e.internal_name == internal_name)
             .map(|(id, _)| *id)
+    }
+
+    pub fn get_enum_name_by_id(&self, id: &IrTypeId) -> Option<String> {
+        self.enums.get(id).map(|e| e.name.clone())
     }
 }

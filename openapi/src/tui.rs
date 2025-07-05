@@ -2,13 +2,13 @@ use std::time::Duration;
 
 use crossbeam_channel::{select, tick, unbounded};
 use ratatui::{
+    Terminal,
     backend::{Backend, CrosstermBackend},
     crossterm::{
         event::{self, DisableMouseCapture, EnableMouseCapture, Event},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
-    Terminal,
 };
 
 use crate::tui::state::*;
@@ -67,6 +67,11 @@ fn run_app<'a, B: Backend>(terminal: &mut Terminal<B>, app: &'a mut App) -> anyh
                     Ok(WorkerResults::SpecParsed(spec)) => {
                         app.set_parsed(spec);
                     }
+                    Ok(WorkerResults::GeneratedCode(client_code, model_code)) => {
+                        app.generated_client_code = Some(client_code);
+                        app.generated_models_code = Some(model_code);
+                        app.selected_tab = BrowserTab::GeneratedCode;
+                    }
                     Ok(WorkerResults::Error(err)) => {
                         app.state = state::State::Error(err);
                     }
@@ -98,17 +103,17 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     }
                 },
                 event::KeyCode::Char('1') if app.state == State::Parsed => match app.selected_tab {
-                    0 if app.endpoints_details_focused => {
+                    BrowserTab::Endpoints if app.endpoints_details_focused => {
                         app.endpoints_details_path_selected_tab_idx = 0;
                     }
-                    _ => app.selected_tab = 0,
+                    _ => app.selected_tab = BrowserTab::Endpoints,
                 },
                 event::KeyCode::Char('2') if app.state == State::Parsed => match app.selected_tab {
-                    0 if app.endpoints_details_focused => {
+                    BrowserTab::Endpoints if app.endpoints_details_focused => {
                         app.endpoints_details_path_selected_tab_idx = 1;
                     }
                     _ => {
-                        app.selected_tab = 1;
+                        app.selected_tab = BrowserTab::Components;
                         if app.components_navigation_list_state.selected().is_none() {
                             app.components_navigation_list_state.select_first();
                         }
@@ -118,14 +123,14 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     }
                 },
                 event::KeyCode::Char('3') if app.state == State::Parsed => match app.selected_tab {
-                    0 if app.endpoints_details_focused => {
+                    BrowserTab::Endpoints if app.endpoints_details_focused => {
                         app.endpoints_details_path_selected_tab_idx = 2;
                     }
-                    _ => app.selected_tab = 2,
+                    _ => app.selected_tab = BrowserTab::Details,
                 },
-                //     event::KeyCode::Char('4') if app.mode == Mode::DisplayingHealthReport => {
-                //         app.selected_tab = 3
-                //     }
+                event::KeyCode::Char('4') if app.state == State::Parsed => {
+                    app.selected_tab = BrowserTab::GeneratedCode
+                }
                 event::KeyCode::Down if app.state == State::Parsed => {
                     handle_scroll_down(app, false);
                 }
@@ -133,10 +138,10 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     handle_scroll_up(app, false);
                 }
                 event::KeyCode::Right if app.state == State::Parsed => match app.selected_tab {
-                    0 if app.endpoints_list_state.selected().is_some() => {
+                    BrowserTab::Endpoints if app.endpoints_list_state.selected().is_some() => {
                         app.endpoints_details_focused = true;
                     }
-                    1 => {
+                    BrowserTab::Components => {
                         app.components_focused_region = match app.components_focused_region {
                             ComponentsRegion::Navigation => ComponentsRegion::List,
                             ComponentsRegion::List => ComponentsRegion::Details,
@@ -149,8 +154,8 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                     _ => (),
                 },
                 event::KeyCode::Left if app.state == State::Parsed => match app.selected_tab {
-                    0 => app.endpoints_details_focused = false,
-                    1 => {
+                    BrowserTab::Endpoints => app.endpoints_details_focused = false,
+                    BrowserTab::Components => {
                         app.components_focused_region = match app.components_focused_region {
                             ComponentsRegion::List => ComponentsRegion::Navigation,
                             ComponentsRegion::Details => ComponentsRegion::List,
@@ -193,7 +198,7 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
 
 fn handle_scroll_down(app: &mut App, scroll_page: bool) {
     match app.selected_tab {
-        0 => {
+        BrowserTab::Endpoints => {
             if app.endpoints_details_focused {
                 match app.endpoints_details_path_selected_tab {
                     EndpointTab::Parameters => {
@@ -222,7 +227,7 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
                 }
             }
         }
-        1 => match app.components_focused_region {
+        BrowserTab::Components => match app.components_focused_region {
             ComponentsRegion::Navigation => {
                 app.components_navigation_list_state.scroll_down_by(1);
                 app.components_list_state.select_first();
@@ -241,7 +246,7 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
                     app.components_details_scroll_pos.saturating_add(1);
             }
         },
-        2 => {
+        BrowserTab::Details => {
             let scroll_by: u16 = if scroll_page {
                 app.details_viewport_height
             } else {
@@ -249,13 +254,20 @@ fn handle_scroll_down(app: &mut App, scroll_page: bool) {
             };
             app.details_scroll_pos = app.details_scroll_pos.saturating_add(scroll_by);
         }
-        _ => (),
+        BrowserTab::GeneratedCode => {
+            let scroll_by: u16 = if scroll_page {
+                app.generated_code_viewport_height
+            } else {
+                1
+            };
+            app.generated_code_scroll_pos = app.generated_code_scroll_pos.saturating_add(scroll_by);
+        }
     }
 }
 
 fn handle_scroll_up(app: &mut App, scroll_page: bool) {
     match app.selected_tab {
-        0 => {
+        BrowserTab::Endpoints => {
             if app.endpoints_details_focused {
                 match app.endpoints_details_path_selected_tab {
                     EndpointTab::Parameters => {
@@ -284,7 +296,7 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                 }
             }
         }
-        1 => match app.components_focused_region {
+        BrowserTab::Components => match app.components_focused_region {
             ComponentsRegion::Navigation => {
                 app.components_navigation_list_state.scroll_up_by(1);
                 app.components_list_state.select_first();
@@ -303,7 +315,7 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
                     app.components_details_scroll_pos.saturating_sub(1);
             }
         },
-        2 => {
+        BrowserTab::Details => {
             let scroll_by: u16 = if scroll_page {
                 app.details_viewport_height
             } else {
@@ -311,6 +323,14 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
             };
 
             app.details_scroll_pos = app.details_scroll_pos.saturating_sub(scroll_by);
+        }
+        BrowserTab::GeneratedCode => {
+            let scroll_by: u16 = if scroll_page {
+                app.generated_code_viewport_height
+            } else {
+                1
+            };
+            app.generated_code_scroll_pos = app.generated_code_scroll_pos.saturating_sub(scroll_by);
         }
         _ => (),
     }

@@ -7,3 +7,5 @@ edition = "2024"
 
 [dependencies]
 genphi_core = { path = "../genphi_core" }
+
+anyhow = "1.0.98"

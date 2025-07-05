@@ -17,7 +17,9 @@ pub struct App {
 
     // Parsed state
     pub spec: Option<OpenAPI>,
-    pub selected_tab: usize,
+    pub selected_tab: BrowserTab,
+    pub generated_models_code: Option<String>,
+    pub generated_client_code: Option<String>,
     // Endpoints tab
     pub endpoints_list_state: ListState,
     pub endpoints_details_focused: bool,
@@ -42,6 +44,11 @@ pub struct App {
     // Details tab
     pub details_scroll_pos: u16,
     pub details_viewport_height: u16,
+
+    // Generated code tab
+    pub generated_code_tab: usize,
+    pub generated_code_scroll_pos: u16,
+    pub generated_code_viewport_height: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,6 +63,14 @@ pub enum State {
     Parsing(String),
     Parsed,
     Error(String),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum BrowserTab {
+    Endpoints,
+    Components,
+    Details,
+    GeneratedCode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +98,7 @@ pub enum WorkerCommands {
 pub enum WorkerResults {
     ParsingSpec(Source),
     SpecParsed(OpenAPI),
+    GeneratedCode(String, String),
     Error(String),
 }
 
@@ -99,8 +115,10 @@ impl App {
             worker_receiver,
             source,
             state: State::Initial,
-            selected_tab: 0,
+            selected_tab: BrowserTab::Endpoints,
             spec: None,
+            generated_client_code: None,
+            generated_models_code: None,
             // Endpoints tab
             endpoints_list_state: ListState::default(),
             endpoints_details_focused: false,
@@ -123,13 +141,19 @@ impl App {
             // Details tab
             details_scroll_pos: 0,
             details_viewport_height: 0,
+            // Generated code
+            generated_code_tab: 0,
+            generated_code_scroll_pos: 0,
+            generated_code_viewport_height: 0,
         }
     }
 
     pub fn reset(&mut self) {
         self.state = State::Initial;
         self.spec = None;
-        self.selected_tab = 0;
+        self.selected_tab = BrowserTab::Endpoints;
+        self.generated_client_code = None;
+        self.generated_models_code = None;
 
         // Endpoints tab
         self.endpoints_list_state = ListState::default();
@@ -155,12 +179,19 @@ impl App {
         // Details tab
         self.details_scroll_pos = 0;
         self.details_viewport_height = 0;
+
+        // Generated code tab
+        self.generated_code_tab = 0;
+        self.generated_code_scroll_pos = 0;
+        self.generated_code_viewport_height = 0;
     }
 
     pub fn set_parsed(&mut self, spec: OpenAPI) {
         self.state = State::Parsed;
         self.spec = Some(spec);
-        self.selected_tab = 0;
+        self.selected_tab = BrowserTab::Endpoints;
+        self.generated_client_code = None;
+        self.generated_models_code = None;
 
         // Reset the endpoints list state
         self.endpoints_list_state = ListState::default();
@@ -186,6 +217,11 @@ impl App {
         // Reset the details scroll position
         self.details_scroll_pos = 0;
         self.details_viewport_height = 0;
+
+        // Reset the generated code state
+        self.generated_code_tab = 0;
+        self.generated_code_scroll_pos = 0;
+        self.generated_code_viewport_height = 0;
 
         if let Some(spec) = self.spec.as_mut() {
             for (_, item) in spec.paths.iter_mut() {
@@ -457,6 +493,35 @@ impl ToString for Source {
         match self {
             Source::File(path) => path.to_string_lossy().to_string(),
             Source::Url(url) => url.to_string(),
+        }
+    }
+}
+
+impl BrowserTab {
+    pub const fn next(&self) -> Self {
+        match self {
+            BrowserTab::Endpoints => BrowserTab::Components,
+            BrowserTab::Components => BrowserTab::Details,
+            BrowserTab::Details => BrowserTab::GeneratedCode,
+            BrowserTab::GeneratedCode => BrowserTab::GeneratedCode,
+        }
+    }
+
+    pub const fn previous(&self) -> Self {
+        match self {
+            BrowserTab::Endpoints => BrowserTab::GeneratedCode,
+            BrowserTab::Components => BrowserTab::Endpoints,
+            BrowserTab::Details => BrowserTab::Components,
+            BrowserTab::GeneratedCode => BrowserTab::Details,
+        }
+    }
+
+    pub const fn index(&self) -> usize {
+        match self {
+            BrowserTab::Endpoints => 0,
+            BrowserTab::Components => 1,
+            BrowserTab::Details => 2,
+            BrowserTab::GeneratedCode => 3,
         }
     }
 }

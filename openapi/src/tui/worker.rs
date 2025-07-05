@@ -1,6 +1,6 @@
 use std::thread;
 
-use crossbeam_channel::{unbounded, Receiver};
+use crossbeam_channel::{Receiver, unbounded};
 
 use crate::tui::state::Source;
 
@@ -67,7 +67,7 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                 Ok(WorkerCommands::GenerateCode(spec)) => {
                     // TODO: Set generating event
 
-                    let units = match crate::generator::generate_code(&spec) {
+                    let (client_code, model_code) = match crate::generator::generate_code(&spec) {
                         Ok(units) => units,
                         Err(e) => {
                             let _ = tx.send(WorkerResults::Error(format!(
@@ -76,6 +76,8 @@ pub fn start_worker(receiver: Receiver<WorkerCommands>) -> Receiver<WorkerResult
                             continue;
                         }
                     };
+
+                    let _ = tx.send(WorkerResults::GeneratedCode(client_code, model_code));
                 }
                 Ok(WorkerCommands::Shutdown) => break,
                 Err(_) => (),

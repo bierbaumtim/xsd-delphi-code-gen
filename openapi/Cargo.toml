@@ -6,6 +6,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+codegen = { path = "../codegen" }
 genphi_core = { path = "../genphi_core" }
 
 anyhow = "1.0.98"

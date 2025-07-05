@@ -10,3 +10,9 @@ pub trait IrLookupType {
     fn get_id(&self) -> IrTypeId;
     fn get_lookup_name(&self) -> &String;
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum IrTypeIdOrName {
+    Id(IrTypeId),
+    Name(String),
+}
