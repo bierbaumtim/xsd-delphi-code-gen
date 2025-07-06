@@ -203,17 +203,19 @@ fn register_schema(
             if let Some(items) = &schema.items {
                 let items: &SchemaOrRef = items;
 
-                let schema = match items {
-                    SchemaOrRef::Item(s) => s,
-                    SchemaOrRef::Ref { reference } => spec.resolve_schema(reference)?,
+                let (schema, reference) = match items {
+                    SchemaOrRef::Item(schema) => (Some(schema), None),
+                    SchemaOrRef::Ref { reference } => (
+                        spec.resolve_schema(reference),
+                        reference.split("/").last().map(|v| v.to_owned()),
+                    ),
                 };
 
-                let inner_type = register_schema(
-                    spec,
-                    models_registry,
-                    schema,
-                    schema.title.as_ref().cloned(),
-                )?;
+                let Some(schema) = schema else {
+                    return None;
+                };
+
+                let inner_type = register_schema(spec, models_registry, schema, reference)?;
 
                 Some(DelphiType::List(Box::new(inner_type)))
             } else {
