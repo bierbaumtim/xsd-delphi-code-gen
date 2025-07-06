@@ -98,7 +98,6 @@ pub struct DelphiMethod {
     pub return_type: Option<String>,
     pub visibility: DelphiVisibility,
     pub is_constructor: bool,
-    pub is_destructor: bool,
     pub is_class_method: bool,
     pub is_static: bool,
     pub is_virtual: bool,

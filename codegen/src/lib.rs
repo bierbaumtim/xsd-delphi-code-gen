@@ -643,8 +643,6 @@ interface"#,
 
         if method.is_constructor {
             method_line.push_str("constructor ");
-        } else if method.is_destructor {
-            method_line.push_str("destructor ");
         } else if method.return_type.is_some() {
             method_line.push_str("function ");
         } else {
@@ -828,8 +826,6 @@ interface"#,
 
         if method.is_constructor {
             method_signature.push_str("constructor ");
-        } else if method.is_destructor {
-            method_signature.push_str("destructor ");
         } else if method.return_type.is_some() {
             method_signature.push_str("function ");
         } else {
@@ -872,8 +868,6 @@ interface"#,
             self.generate_json_constructor_body(output, method)?;
         } else if method.is_constructor && method.name == "FromJsonRaw" && json_support {
             self.generate_json_raw_constructor_body(output, method)?;
-        } else if method.is_destructor {
-            self.generate_destructor_body(output)?;
         } else {
             writeln!(output, "  // TODO: Implement {}", method.name)?;
             if method.return_type.is_some() {
@@ -915,14 +909,6 @@ interface"#,
         writeln!(output, "  inherited Create;")?;
         writeln!(output)?;
         writeln!(output, "  // TODO: Parse JSON fields")?;
-
-        Ok(())
-    }
-
-    fn generate_destructor_body(&self, output: &mut String) -> anyhow::Result<()> {
-        writeln!(output, "  // TODO: Free reference types")?;
-        writeln!(output)?;
-        writeln!(output, "  inherited;")?;
 
         Ok(())
     }
