@@ -498,24 +498,6 @@ impl ToString for Source {
 }
 
 impl BrowserTab {
-    pub const fn next(&self) -> Self {
-        match self {
-            BrowserTab::Endpoints => BrowserTab::Components,
-            BrowserTab::Components => BrowserTab::Details,
-            BrowserTab::Details => BrowserTab::GeneratedCode,
-            BrowserTab::GeneratedCode => BrowserTab::GeneratedCode,
-        }
-    }
-
-    pub const fn previous(&self) -> Self {
-        match self {
-            BrowserTab::Endpoints => BrowserTab::GeneratedCode,
-            BrowserTab::Components => BrowserTab::Endpoints,
-            BrowserTab::Details => BrowserTab::Components,
-            BrowserTab::GeneratedCode => BrowserTab::Details,
-        }
-    }
-
     pub const fn index(&self) -> usize {
         match self {
             BrowserTab::Endpoints => 0,

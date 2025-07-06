@@ -332,6 +332,5 @@ fn handle_scroll_up(app: &mut App, scroll_page: bool) {
             };
             app.generated_code_scroll_pos = app.generated_code_scroll_pos.saturating_sub(scroll_by);
         }
-        _ => (),
     }
 }
