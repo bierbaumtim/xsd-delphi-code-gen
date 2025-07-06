@@ -7,14 +7,14 @@ pub enum DelphiType {
     List(Box<DelphiType>),
     Enum(IrTypeIdOrName),
     Class(IrTypeIdOrName),
-    String,
-    Integer,
-    Float,
-    Double,
-    Boolean,
-    Pointer,
-    DateTime,
     Binary,
+    Boolean,
+    DateTime,
+    Double,
+    Float,
+    Integer,
+    Pointer,
+    String,
 }
 
 pub enum DelphiReturnType {
@@ -139,6 +139,7 @@ pub struct DelphiField {
     pub xml_attribute: Option<String>,
     pub comment: Option<String>,
     pub default_value: Option<String>,
+    pub is_required: bool,
 }
 
 pub enum ExpressionOrStatement {
@@ -192,7 +193,10 @@ impl DelphiType {
     pub fn as_type_name(&self) -> String {
         match self {
             DelphiType::List(delphi_type) => {
-                let list_type = if matches!(delphi_type.as_ref(), DelphiType::Class(_)) {
+                let list_type = if matches!(
+                    delphi_type.as_ref(),
+                    DelphiType::Class(_) | DelphiType::List(_)
+                ) {
                     "TObjectList".to_owned()
                 } else {
                     "TList".to_owned()

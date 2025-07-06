@@ -107,8 +107,9 @@ fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> D
                         DelphiType::Class(_) | DelphiType::List(_)
                     ),
                     json_key: f.json_key.clone(),
+                    is_required: f.is_required,
+                    default_value: f.default_value.clone(),
                     xml_attribute: None,
-                    default_value: None,
                 })
                 .collect(),
             properties: class_type
@@ -249,6 +250,18 @@ fn register_schema(
                     register_schema(spec, models_registry, prop, Some(prop_name.clone()));
 
                 if let Some(delphi_type) = delphi_type {
+                    let default_value = match delphi_type {
+                        DelphiType::Binary
+                        | DelphiType::Boolean
+                        | DelphiType::Enum(_)
+                        | DelphiType::DateTime
+                        | DelphiType::Double
+                        | DelphiType::Float
+                        | DelphiType::Integer
+                        | DelphiType::String => prop.default.as_ref().map(|dv| dv.to_string()),
+                        _ => None,
+                    };
+
                     class.fields.push(DelphiField {
                         name: prop_name.clone(),
                         is_reference_type: matches!(
@@ -256,11 +269,12 @@ fn register_schema(
                             DelphiType::List(_) | DelphiType::Class(_)
                         ),
                         field_type: delphi_type,
+                        default_value,
                         visibility: DelphiVisibility::Public,
                         json_key: Some(prop_name.clone()),
+                        is_required: schema.required.contains(prop_name),
                         xml_attribute: None,
                         comment: None,
-                        default_value: None,
                     });
                 }
             }

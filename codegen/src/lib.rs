@@ -768,9 +768,10 @@ interface"#,
                         "  cn{}JsonKey: string = '{}';",
                         field.name, json_key
                     )?;
-                    writeln!(output)?;
                 }
             }
+
+            writeln!(output)?;
         }
 
         // Generate method implementations
@@ -961,17 +962,140 @@ interface"#,
         for field in &class.fields {
             if let Some(_json_key) = &field.json_key {
                 let const_name = format!("cn{}JsonKey", field.name);
-                if field.is_reference_type {
-                    // writeln!(
-                    //     output,
-                    //     "  F{} := {}.FromJsonRaw(pJson.GetValue<TJSONObject>({}));",
-                    //     field.name, field.field_type, const_name
-                    // )?;
-                } else {
+                let default_value = field
+                    .default_value
+                    .as_ref()
+                    .map(|v| v.as_str())
+                    .unwrap_or("");
+
+                if let DelphiType::Class(IrTypeIdOrName::Name(name)) = &field.field_type {
+                    if field.is_required {
+                        writeln!(
+                            output,
+                            "  F{} := {name}.FromJsonRaw(pJson.GetValue<TJSONObject>({const_name}));",
+                            field.name
+                        )?;
+                    } else {
+                        writeln!(output, "  var __{}Obj: TJSONObject;", field.name)?;
+                        writeln!(
+                            output,
+                            "  if pJson.TryGetValue<TJSONObject>({const_name}, __{}Obj) then begin",
+                            field.name
+                        )?;
+                        writeln!(
+                            output,
+                            "    F{} := {name}.FromJsonRaw(__{}Obj);",
+                            field.name, field.name
+                        )?;
+                        writeln!(output, "  end else begin")?;
+                        writeln!(output, "  F{} := nil;", field.name)?;
+                        writeln!(output, "  end;")?;
+                    }
+                } else if let DelphiType::Enum(IrTypeIdOrName::Name(name)) = &field.field_type {
                     writeln!(
                         output,
-                        "  F{} := TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {}, '');",
-                        field.name, const_name
+                        "  F{} := {name}.FromString(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {const_name}, '{default_value}'));",
+                        field.name
+                    )?;
+                } else if let DelphiType::List(inner_type) = &field.field_type {
+                    let is_object_list = matches!(
+                        inner_type.as_ref(),
+                        DelphiType::Class(_) | DelphiType::List(_)
+                    );
+                    let helper_function = match (is_object_list, field.is_required) {
+                        (true, true) => "TJSONHelper.DeserializeObjectList",
+                        (true, false) => "TJSONHelper.DeserializeOptionalObjectList",
+                        (false, true) => "TJSONHelper.DeserializeList",
+                        (false, false) => "TJSONHelper.DeserializeOptionalList",
+                    };
+
+                    writeln!(
+                        output,
+                        "  F{} := {helper_function}<{}>(",
+                        field.name,
+                        inner_type.as_ref().as_type_name()
+                    )?;
+                    writeln!(output, "    pJson,")?;
+                    writeln!(output, "    {const_name},")?;
+                    writeln!(
+                        output,
+                        "    function (pJson: TJSONValue): {}",
+                        inner_type.as_ref().as_type_name()
+                    )?;
+                    writeln!(output, "    begin")?;
+                    match inner_type.as_ref() {
+                        DelphiType::List(_) => writeln!(
+                            output,
+                            "      // TODO: Implement nested list conversion logic"
+                        )?,
+                        DelphiType::Enum(IrTypeIdOrName::Name(name)) => writeln!(
+                            output,
+                            "      Result := {name}.FromString(TJSONString(pJson).Value);"
+                        )?,
+                        DelphiType::Class(IrTypeIdOrName::Name(name)) => {
+                            writeln!(output, "      Result := {name}.FromJsonRaw(pJson);")?
+                        }
+                        DelphiType::Binary => {
+                            writeln!(output, "      Result := TJSONBool(pJson).AsBoolean;")?
+                        }
+                        DelphiType::Boolean => {
+                            writeln!(output, "      Result := TJSONBool(pJson).AsBoolean;")?
+                        }
+                        DelphiType::DateTime => writeln!(
+                            output,
+                            "      Result := ISO8601ToDate(TJSONString(pJson).Value);"
+                        )?,
+                        DelphiType::Double | DelphiType::Float => {
+                            writeln!(output, "      Result := TJSONNumber(pJson).AsDouble;")?
+                        }
+                        DelphiType::Integer => {
+                            writeln!(output, "      Result := TJSONNumber(pJson).AsInt;")?
+                        }
+                        DelphiType::Pointer => writeln!(output, "      Result := nil;")?,
+                        DelphiType::String => {
+                            writeln!(output, "      Result := TJSONString(pJson).Value;")?
+                        }
+                        _ => writeln!(output, "      // TODO: Implement conversion logic")?,
+                    }
+                    writeln!(output, "    end")?;
+                    writeln!(output, "  );")?;
+                } else if field.field_type == DelphiType::Binary {
+                    writeln!(
+                        output,
+                        "  F{} := TNetEncoding.Base64.DecodeStringToBytes(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {const_name}, '{default_value}'));",
+                        field.name
+                    )?;
+                } else if field.field_type == DelphiType::DateTime {
+                    writeln!(
+                        output,
+                        "  var __{} := TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {const_name}, '{default_value}');",
+                        field.name
+                    )?;
+                    writeln!(output, "  if __{} <> '' then begin", field.name)?;
+                    writeln!(
+                        output,
+                        "    F{} := ISO8601ToDate(__{});",
+                        field.name, field.name
+                    )?;
+                    writeln!(output, "  end else begin")?;
+                    writeln!(output, "    F{} := 0;", field.name,)?;
+                    writeln!(output, "  end;")?;
+                } else if field.field_type == DelphiType::Pointer {
+                    writeln!(output, "  F{} := nil;", field.name)?;
+                } else {
+                    let (json_type, data_type, default_value) = match &field.field_type {
+                        DelphiType::Boolean => ("TJSONBool", "Boolean", "False"),
+                        DelphiType::Double => ("TJSONNumber", "Double", "0.0"),
+                        DelphiType::Float => ("TJSONNumber", "Float", "0.0"),
+                        DelphiType::Integer => ("TJSONNumber", "Integer", "0"),
+                        DelphiType::String => ("TJSONString", "String", "''"),
+                        _ => continue,
+                    };
+
+                    writeln!(
+                        output,
+                        "  F{} := TJsonHelper.TryGetValueOrDefault<{json_type}, {data_type}>(pJson, {const_name}, {default_value});",
+                        field.name
                     )?;
                 }
             }
