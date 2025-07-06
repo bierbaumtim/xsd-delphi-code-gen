@@ -17,40 +17,42 @@ pub fn generate_code(spec: &OpenAPI) -> anyhow::Result<(String, String)> {
     let mut client_unit = DelphiUnit::default();
     client_unit.unit_name = build_unit_name(spec, "Client");
 
-    let mut client_class = DelphiClass::new(
+    let client_class = DelphiClass::new(
         format!("TM{}", spec.info.title.replace(['-', '.', ':', ' '], "")),
         "__internal__",
     );
 
-    for (name, path) in spec.paths.iter() {
+    for (_, path) in spec.paths.iter() {
         if let Some(get) = &path.get {
-            for (r_name, response) in get.responses.iter() {
-                let response = match response {
-                    ResponseOrRef::Item(response) => Some(response),
-                    ResponseOrRef::Ref { reference } => spec.resolve_response(reference),
-                };
+            register_operation_schema(spec, &mut models_registry, get);
+        }
 
-                let Some(response) = response else {
-                    continue;
-                };
+        if let Some(post) = &path.post {
+            register_operation_schema(spec, &mut models_registry, post);
+        }
 
-                for (_, media_type) in response.content.iter() {
-                    let (schema, reference) = match media_type.schema.as_ref() {
-                        Some(SchemaOrRef::Item(schema)) => (Some(schema), None),
-                        Some(SchemaOrRef::Ref { reference }) => (
-                            spec.resolve_schema(reference),
-                            reference.split("/").last().map(|v| v.to_owned()),
-                        ),
-                        None => (None, None),
-                    };
+        if let Some(put) = &path.put {
+            register_operation_schema(spec, &mut models_registry, put);
+        }
 
-                    let Some(schema) = schema else {
-                        continue;
-                    };
+        if let Some(delete) = &path.delete {
+            register_operation_schema(spec, &mut models_registry, delete);
+        }
 
-                    let _ = register_schema(spec, &mut models_registry, schema, reference);
-                }
-            }
+        if let Some(patch) = &path.patch {
+            register_operation_schema(spec, &mut models_registry, patch);
+        }
+
+        if let Some(head) = &path.head {
+            register_operation_schema(spec, &mut models_registry, head);
+        }
+
+        if let Some(options) = &path.options {
+            register_operation_schema(spec, &mut models_registry, options);
+        }
+
+        if let Some(trace) = &path.trace {
+            register_operation_schema(spec, &mut models_registry, trace);
         }
     }
 
@@ -61,6 +63,40 @@ pub fn generate_code(spec: &OpenAPI) -> anyhow::Result<(String, String)> {
     let models_code = cg.generate_unit(&models_unit)?;
 
     Ok((String::new(), models_code))
+}
+
+fn register_operation_schema(
+    spec: &OpenAPI,
+    models_registry: &mut TypeRegistry,
+    operation: &Operation,
+) {
+    for (r_name, response) in operation.responses.iter() {
+        let response = match response {
+            ResponseOrRef::Item(response) => Some(response),
+            ResponseOrRef::Ref { reference } => spec.resolve_response(reference),
+        };
+
+        let Some(response) = response else {
+            continue;
+        };
+
+        for (_, media_type) in response.content.iter() {
+            let (schema, reference) = match media_type.schema.as_ref() {
+                Some(SchemaOrRef::Item(schema)) => (Some(schema), None),
+                Some(SchemaOrRef::Ref { reference }) => (
+                    spec.resolve_schema(reference),
+                    reference.split("/").last().map(|v| v.to_owned()),
+                ),
+                None => (None, None),
+            };
+
+            let Some(schema) = schema else {
+                continue;
+            };
+
+            let _ = register_schema(spec, models_registry, schema, reference);
+        }
+    }
 }
 
 fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> DelphiUnit {
@@ -101,7 +137,7 @@ fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> D
                     name: capitalize(&f.name),
                     field_type: f.field_type.resolve(&models_registry),
                     comment: f.comment.clone(),
-                    visibility: f.visibility.clone(),
+                    visibility: DelphiVisibility::StrictPrivate,
                     is_reference_type: matches!(
                         f.field_type,
                         DelphiType::Class(_) | DelphiType::List(_)
@@ -113,15 +149,19 @@ fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> D
                 })
                 .collect(),
             properties: class_type
-                .properties
+                .fields
                 .iter()
-                .map(|p| DelphiProperty {
-                    name: capitalize(&p.name),
-                    property_type: p.property_type.resolve(&models_registry),
-                    getter: None,
-                    setter: None,
-                    visibility: p.visibility.clone(),
-                    comment: p.comment.clone(),
+                .map(|f| DelphiProperty {
+                    name: capitalize(&f.name),
+                    property_type: f.field_type.resolve(&models_registry),
+                    getter: Some(capitalize(&f.name)),
+                    setter: if !matches!(f.field_type, DelphiType::Class(_) | DelphiType::List(_)) {
+                        Some(capitalize(&f.name))
+                    } else {
+                        None
+                    },
+                    visibility: DelphiVisibility::Public,
+                    comment: f.comment.clone(),
                 })
                 .collect(),
             methods: vec![],
@@ -223,7 +263,6 @@ fn register_schema(
             }
         }
         "object" => {
-            // Handle object type
             let (gen_id, name) = class_name.or(schema.title.clone()).map_or_else(
                 || TypeRegistry::generate_name("Class"),
                 |n| (UNRESOLVED_TYPE_ID, n),
@@ -293,40 +332,6 @@ fn register_schema(
         }
         _ => None,
     };
-
-    // let mut class = DelphiClass::new(class_name, "");
-
-    // // Process properties
-    // for (name, prop) in schema.properties.iter() {
-    //     let prop_type = match &prop {
-    //         SchemaOrRef::Item(s) => Some(s),
-    //         SchemaOrRef::Ref { reference } => spec.resolve_schema(reference),
-    //     };
-
-    //     let Some(prop) = prop_type else {
-    //         continue;
-    //     };
-
-    //     let delphi_type = data_type_from_schema(spec, prop, name);
-    //     let Some(delphi_type) = delphi_type else {
-    //         continue;
-    //     };
-
-    //     class.fields.push(DelphiField {
-    //         name: name.clone(),
-    //         field_type: delphi_type,
-    //         visibility: DelphiVisibility::Public,
-    //         is_reference_type: false,
-    //         json_key: None,
-    //         xml_attribute: None,
-    //         comment: None,
-    //         default_value: None,
-    //     });
-    // }
-
-    // Add other properties like methods, constructors, etc. as needed
-
-    // Some(class)
 }
 
 fn build_unit_name(spec: &OpenAPI, trailing: &str) -> String {

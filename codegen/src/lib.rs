@@ -205,11 +205,16 @@ interface"#,
         writeln!(output)?;
         writeln!(output)?;
 
+        let mut interface_uses = unit.uses_interface.clone();
+        if unit.classes.iter().any(|c| c.generate_json_support) {
+            interface_uses.push("System.JSON".to_owned());
+        }
+
         // Uses clause (interface)
-        if !unit.uses_interface.is_empty() {
+        if !interface_uses.is_empty() {
             writeln!(output, "uses")?;
-            for (i, use_unit) in unit.uses_interface.iter().enumerate() {
-                if i == unit.uses_interface.len() - 1 {
+            for (i, use_unit) in interface_uses.iter().enumerate() {
+                if i == interface_uses.len() - 1 {
                     writeln!(output, "  {};", use_unit)?;
                 } else {
                     writeln!(output, "  {},", use_unit)?;
@@ -547,10 +552,13 @@ interface"#,
             DelphiVisibility::Published,
         ];
 
-        for visibility in &visibility_order {
-            if let Some((fields, methods)) = visibility_groups.get(visibility) {
-                if !fields.is_empty() || !methods.is_empty() {
-                    writeln!(output, "  {}:", self.visibility_to_string(visibility))?;
+        for visibility in visibility_order {
+            if let Some((fields, methods)) = visibility_groups.get(&visibility) {
+                if !fields.is_empty()
+                    || !methods.is_empty()
+                    || (visibility == DelphiVisibility::Public && class.generate_json_support)
+                {
+                    writeln!(output, "  {}", self.visibility_to_string(&visibility))?;
 
                     // Generate fields with markers
                     if !fields.is_empty() {
@@ -563,15 +571,35 @@ interface"#,
                         output.push_str(&self.get_manual_additions(&fields_marker));
                     }
 
-                    if !fields.is_empty() && !methods.is_empty() {
+                    if !fields.is_empty()
+                        && (!methods.is_empty()
+                            || (visibility == DelphiVisibility::Public
+                                && class.generate_json_support))
+                    {
                         writeln!(output)?;
+                    }
+
+                    if visibility == DelphiVisibility::Public && class.generate_json_support {
+                        let json_marker = format!("json_support_{}", class.name.to_lowercase());
+                        writeln!(output, "{}", self.begin_marker(&json_marker))?;
+                        writeln!(output, "    constructor FromJson(const pJson: string);")?;
+                        writeln!(
+                            output,
+                            "    constructor FromJsonRaw(const pJson: TJSONValue);"
+                        )?;
+                        writeln!(output, "{}", self.end_marker(&json_marker))?;
+                        output.push_str(&self.get_manual_additions(&json_marker));
+
+                        if !methods.is_empty() {
+                            writeln!(output)?;
+                        }
                     }
 
                     // Generate methods with markers
                     if !methods.is_empty() {
                         let methods_marker = format!(
                             "methods_{}_{}",
-                            self.visibility_to_string(visibility).replace(" ", "_"),
+                            self.visibility_to_string(&visibility).replace(" ", "_"),
                             class.name.to_lowercase()
                         );
                         writeln!(output, "{}", self.begin_marker(&methods_marker))?;
@@ -581,9 +609,19 @@ interface"#,
                         writeln!(output, "{}", self.end_marker(&methods_marker))?;
                         output.push_str(&self.get_manual_additions(&methods_marker));
                     }
-
-                    writeln!(output)?;
                 }
+            } else if visibility == DelphiVisibility::Public && class.generate_json_support {
+                writeln!(output, "  {}", self.visibility_to_string(&visibility))?;
+
+                let json_marker = format!("json_support_{}", class.name.to_lowercase());
+                writeln!(output, "{}", self.begin_marker(&json_marker))?;
+                writeln!(output, "    constructor FromJson(const pJson: string);")?;
+                writeln!(
+                    output,
+                    "    constructor FromJsonRaw(const pJson: TJSONValue);"
+                )?;
+                writeln!(output, "{}", self.end_marker(&json_marker))?;
+                output.push_str(&self.get_manual_additions(&json_marker));
             }
         }
 
@@ -597,7 +635,6 @@ interface"#,
             }
             writeln!(output, "{}", self.end_marker(&properties_marker))?;
             output.push_str(&self.get_manual_additions(&properties_marker));
-            writeln!(output)?;
         }
 
         writeln!(output, "  end;")?;
@@ -666,7 +703,11 @@ interface"#,
                     method_line.push_str("out ");
                 }
 
-                // method_line.push_str(&format!("{}: {}", param.name, param.param_type));
+                method_line.push_str(&format!(
+                    "{}: {}",
+                    param.name,
+                    param.param_type.as_type_name()
+                ));
 
                 if let Some(default) = &param.default_value {
                     method_line.push_str(&format!(" = {}", default));
@@ -710,7 +751,7 @@ interface"#,
             "{}property {}: {}",
             indent,
             property.name,
-            "", //property.property_type
+            property.property_type.as_type_name(),
         );
 
         if let Some(getter) = &property.getter {
@@ -849,7 +890,11 @@ interface"#,
                     method_signature.push_str("out ");
                 }
 
-                // method_signature.push_str(&format!("{}: {}", param.name, param.param_type));
+                method_signature.push_str(&format!(
+                    "{}: {}",
+                    param.name,
+                    param.param_type.as_type_name()
+                ));
             }
             method_signature.push(')');
         }
