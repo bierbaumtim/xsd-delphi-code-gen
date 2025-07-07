@@ -80,7 +80,7 @@ fn register_operation_schema(
             continue;
         };
 
-        for (_, media_type) in response.content.iter() {
+        for (m_name, media_type) in response.content.iter() {
             let (schema, reference) = match media_type.schema.as_ref() {
                 Some(SchemaOrRef::Item(schema)) => (Some(schema), None),
                 Some(SchemaOrRef::Ref { reference }) => (
@@ -94,7 +94,7 @@ fn register_operation_schema(
                 continue;
             };
 
-            let _ = register_schema(spec, models_registry, schema, reference);
+            let _ = register_schema(spec, models_registry, schema, reference, &m_name);
         }
     }
 }
@@ -178,6 +178,7 @@ fn register_schema(
     models_registry: &mut TypeRegistry,
     schema: &Schema,
     class_name: Option<String>,
+    media_type: &str,
 ) -> Option<DelphiType> {
     let Some(r#type) = schema.r#type.as_ref() else {
         return None;
@@ -186,7 +187,15 @@ fn register_schema(
     return match r#type.as_str() {
         "string" => {
             if schema.enum_.is_empty() {
-                Some(DelphiType::String)
+                if let Some(format) = &schema.format {
+                    match format.as_str() {
+                        "byte" => Some(DelphiType::Binary(BinaryFormat::Base64)),
+                        "binary" => Some(DelphiType::Binary(BinaryFormat::Binary)),
+                        _ => Some(DelphiType::String),
+                    }
+                } else {
+                    Some(DelphiType::String)
+                }
             } else {
                 let (gen_id, name) = class_name.or(schema.title.clone()).map_or_else(
                     || TypeRegistry::generate_name("Enum"),
@@ -255,7 +264,8 @@ fn register_schema(
                     return None;
                 };
 
-                let inner_type = register_schema(spec, models_registry, schema, reference)?;
+                let inner_type =
+                    register_schema(spec, models_registry, schema, reference, media_type)?;
 
                 Some(DelphiType::List(Box::new(inner_type)))
             } else {
@@ -271,10 +281,18 @@ fn register_schema(
             let name = format!("T{}", capitalize(&name));
             let id = models_registry.find_class_type_id_by_name(&name, "schema");
             if let Some(id) = id {
+                let class = models_registry.get_class_mut(&id).expect("");
+                class.generate_json_support =
+                    class.generate_json_support || media_type == "application/json";
+                class.generate_xml_support =
+                    class.generate_xml_support || media_type == "application/xml";
+
                 return Some(DelphiType::Class(IrTypeIdOrName::Id(id)));
             }
 
             let mut class = DelphiClass::new(name, "schema");
+            class.generate_json_support = media_type == "application/json";
+            class.generate_xml_support = media_type == "application/xml";
 
             // Process properties
             for (prop_name, prop) in schema.properties.iter() {
@@ -287,12 +305,17 @@ fn register_schema(
                     continue;
                 };
 
-                let delphi_type =
-                    register_schema(spec, models_registry, prop, Some(prop_name.clone()));
+                let delphi_type = register_schema(
+                    spec,
+                    models_registry,
+                    prop,
+                    Some(prop_name.clone()),
+                    media_type,
+                );
 
                 if let Some(delphi_type) = delphi_type {
                     let default_value = match delphi_type {
-                        DelphiType::Binary
+                        DelphiType::Binary(_)
                         | DelphiType::Boolean
                         | DelphiType::Enum(_)
                         | DelphiType::DateTime

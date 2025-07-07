@@ -311,15 +311,6 @@ interface"#,
             writeln!(output)?;
         }
 
-        // Constants
-        // if !unit.constants.is_empty() {
-        //     for (name, value) in &unit.constants {
-        //         writeln!(output, "const")?;
-        //         writeln!(output, "  {}: string = '{}';", name, value)?;
-        //     }
-        //     writeln!(output)?;
-        // }
-
         // Enum helpers implementation
         if !unit.enums.is_empty() {
             writeln!(output, "{{$REGION 'Enum Helpers'}}")?;
@@ -1066,9 +1057,15 @@ interface"#,
                         DelphiType::Class(IrTypeIdOrName::Name(name)) => {
                             writeln!(output, "      Result := {name}.FromJsonRaw(pJson);")?
                         }
-                        DelphiType::Binary => {
-                            writeln!(output, "      Result := TJSONBool(pJson).AsBoolean;")?
-                        }
+                        DelphiType::Binary(format) => match format {
+                            BinaryFormat::Base64 => writeln!(
+                                output,
+                                "      Result := TNetEncoding.Base64.DecodeStringToBytes(TJSONString(pJson).Value);"
+                            )?,
+                            BinaryFormat::Binary => {
+                                writeln!(output, "      Result := Default(TBytes);")?
+                            }
+                        },
                         DelphiType::Boolean => {
                             writeln!(output, "      Result := TJSONBool(pJson).AsBoolean;")?
                         }
@@ -1090,12 +1087,17 @@ interface"#,
                     }
                     writeln!(output, "    end")?;
                     writeln!(output, "  );")?;
-                } else if field.field_type == DelphiType::Binary {
-                    writeln!(
-                        output,
-                        "  F{} := TNetEncoding.Base64.DecodeStringToBytes(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {const_name}, '{default_value}'));",
-                        field.name
-                    )?;
+                } else if let DelphiType::Binary(format) = &field.field_type {
+                    match format {
+                        BinaryFormat::Base64 => writeln!(
+                            output,
+                            "  F{} := TNetEncoding.Base64.DecodeStringToBytes(TJsonHelper.TryGetValueOrDefault<TJSONString, String>(pJson, {const_name}, '{default_value}'));",
+                            field.name
+                        )?,
+                        BinaryFormat::Binary => {
+                            writeln!(output, "  F{} := Default(TBytes);", field.name)?
+                        }
+                    }
                 } else if field.field_type == DelphiType::DateTime {
                     writeln!(
                         output,

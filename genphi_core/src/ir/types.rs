@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::ir::{IrTypeIdOrName, type_registry::TypeRegistry};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -7,7 +5,7 @@ pub enum DelphiType {
     List(Box<DelphiType>),
     Enum(IrTypeIdOrName),
     Class(IrTypeIdOrName),
-    Binary,
+    Binary(BinaryFormat),
     Boolean,
     DateTime,
     Double,
@@ -15,6 +13,12 @@ pub enum DelphiType {
     Integer,
     Pointer,
     String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BinaryFormat {
+    Base64,
+    Binary,
 }
 
 pub enum DelphiReturnType {
@@ -222,7 +226,7 @@ impl DelphiType {
             DelphiType::Boolean => "Boolean".to_owned(),
             DelphiType::Pointer => "Pointer".to_owned(),
             DelphiType::DateTime => "TDateTime".to_owned(),
-            DelphiType::Binary => "TBytes".to_owned(),
+            DelphiType::Binary(_) => "TBytes".to_owned(),
         }
     }
 }
