@@ -145,7 +145,7 @@ fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> D
                     json_key: f.json_key.clone(),
                     is_required: f.is_required,
                     default_value: f.default_value.clone(),
-                    xml_attribute: None,
+                    xml_info: f.xml_info.clone(),
                 })
                 .collect(),
             properties: class_type
@@ -326,6 +326,14 @@ fn register_schema(
                         _ => None,
                     };
 
+                    let xml_info = prop.xml.as_ref().map(|x| XmlInfo {
+                        name: x.name.clone().unwrap_or_default(),
+                        namespace: x.namespace.clone(),
+                        prefix: x.prefix.clone(),
+                        attribute: x.attribute,
+                        wrapped: x.wrapped,
+                    });
+
                     class.fields.push(DelphiField {
                         name: prop_name.clone(),
                         is_reference_type: matches!(
@@ -337,7 +345,7 @@ fn register_schema(
                         visibility: DelphiVisibility::Public,
                         json_key: Some(prop_name.clone()),
                         is_required: schema.required.contains(prop_name),
-                        xml_attribute: None,
+                        xml_info: xml_info,
                         comment: None,
                     });
                 }

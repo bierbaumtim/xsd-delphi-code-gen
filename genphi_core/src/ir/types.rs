@@ -139,10 +139,21 @@ pub struct DelphiField {
     pub visibility: DelphiVisibility,
     pub is_reference_type: bool,
     pub json_key: Option<String>,
-    pub xml_attribute: Option<String>,
+    pub xml_info: Option<XmlInfo>,
     pub comment: Option<String>,
     pub default_value: Option<String>,
     pub is_required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct XmlInfo {
+    pub name: String,
+    pub namespace: Option<String>,
+    pub prefix: Option<String>,
+    // Serialize as attribute instead of a property
+    pub attribute: bool,
+    // Add surrounding tag for array
+    pub wrapped: bool,
 }
 
 pub enum ExpressionOrStatement {
