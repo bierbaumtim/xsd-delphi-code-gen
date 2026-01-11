@@ -273,6 +273,7 @@ When adding new functionality:
 - **Minimize external dependencies**: Only add new dependencies when necessary
 - **Prefer well-maintained crates**: Use popular, actively maintained libraries
 - **Document why dependencies exist**: Add comments for non-obvious dependencies
+- **NEVER modify Cargo.lock files**: Changes to `Cargo.lock` are forbidden and must not be committed
 
 ## CLI Design
 
@@ -301,3 +302,4 @@ If you encounter:
 6. ✅ **Follow Rust naming conventions and idioms**
 7. ✅ **Test thoroughly, including error cases**
 8. ✅ **Profile before optimizing for performance**
+9. ✅ **NEVER modify Cargo.lock files - changes are forbidden**
