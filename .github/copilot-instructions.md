@@ -123,6 +123,7 @@ pub fn parse_file_with_reader_and_options(
 /// ```rust
 /// let mut parser = XmlParser::default();
 /// let mut registry = TypeRegistry::new();
+/// // Method call - &mut self is implicit via parser instance
 /// let data = parser.parse_file("schema.xsd", &mut registry)?;
 /// ```
 pub fn parse_file<P: AsRef<Path>>(
