@@ -191,7 +191,7 @@ fn single_node_to_variable(
 
     let required = match order {
         OrderIndicator::Choice(_) => false,
-        _ => min_occurs > 0,
+        _ => min_occurs > 0 && !node.base_attributes.nillable,
     };
 
     match &node.node_type {
