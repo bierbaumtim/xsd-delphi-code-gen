@@ -481,10 +481,7 @@ impl App {
 
 impl From<String> for Source {
     fn from(value: String) -> Self {
-        Url::parse(&value).map_or_else(
-            |_| Source::File(PathBuf::from(value)),
-            Source::Url,
-        )
+        Url::parse(&value).map_or_else(|_| Source::File(PathBuf::from(value)), Source::Url)
     }
 }
 
