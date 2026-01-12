@@ -70,10 +70,15 @@ impl XmlParserHelper {
     pub fn get_base_attributes(node: &BytesStart) -> Result<BaseAttributes, ParserError> {
         let min_occurs = Self::get_occurrence_value(node, "minOccurs")?;
         let max_occurs = Self::get_occurrence_value(node, "maxOccurs")?;
+        let nillable = Self::get_attribute_value(node, "nillable")
+            .ok()
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
 
         Ok(BaseAttributes {
             min_occurs,
             max_occurs,
+            nillable,
         })
     }
 

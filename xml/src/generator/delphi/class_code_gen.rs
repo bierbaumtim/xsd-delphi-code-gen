@@ -73,6 +73,10 @@ impl ClassCodeGenerator {
             | DataType::UnsignedLongInteger => {
                 format!("StrToInt({value})")
             }
+            DataType::InlineList(inner_type) => {
+                // For inline lists, recursively call with the inner type
+                Self::generate_standard_type_from_xml(inner_type, value, pattern)
+            }
             _ => String::new(),
         }
     }

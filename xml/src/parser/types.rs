@@ -99,6 +99,7 @@ pub enum NodeBaseType {
 pub struct BaseAttributes {
     pub min_occurs: Option<i64>,
     pub max_occurs: Option<i64>,
+    pub nillable: bool,
 }
 
 #[derive(Debug)]
