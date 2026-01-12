@@ -4,7 +4,6 @@ use std::{fs::File, io::BufWriter, path::PathBuf, time::Instant};
 
 pub mod generator;
 pub mod parser;
-mod type_registry;
 
 use generator::{
     code_generator_trait::{CodeGenOptions, CodeGenerator},
