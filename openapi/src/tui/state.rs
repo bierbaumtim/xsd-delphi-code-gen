@@ -264,7 +264,7 @@ impl App {
     }
 
     // Endpoints Functions
-    pub fn get_endpoints_list_items(&self) -> Vec<EndpointListItem> {
+    pub fn get_endpoints_list_items(&self) -> Vec<EndpointListItem<'_>> {
         let Some(spec) = &self.spec else {
             return vec![];
         };
@@ -314,13 +314,13 @@ impl App {
                 }
             });
 
-            a_sort_id.cmp(&b_sort_id).then_with(|| a.2.cmp(&b.2))
+            a_sort_id.cmp(&b_sort_id).then_with(|| a.2.cmp(b.2))
         });
 
         items
     }
 
-    pub fn get_endpoint_at(&self, index: usize) -> Option<EndpointListItem> {
+    pub fn get_endpoint_at(&self, index: usize) -> Option<EndpointListItem<'_>> {
         let items = self.get_endpoints_list_items();
 
         items.get(index).cloned()
@@ -483,7 +483,7 @@ impl From<String> for Source {
     fn from(value: String) -> Self {
         Url::parse(&value).map_or_else(
             |_| Source::File(PathBuf::from(value)),
-            |url| Source::Url(url),
+            Source::Url,
         )
     }
 }

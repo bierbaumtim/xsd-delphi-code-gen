@@ -120,7 +120,7 @@ fn get_endpoint_name(operation: &Operation, path: &str, method: &str) -> String 
                     capitalize(
                         path.trim_end_matches('/')
                             .split('/')
-                            .last()
+                            .next_back()
                             .unwrap()
                             .to_string()
                             .as_str()
@@ -136,7 +136,7 @@ fn get_endpoint_name(operation: &Operation, path: &str, method: &str) -> String 
             capitalize(
                 path.trim_end_matches('/')
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .to_string()
                     .as_str()

@@ -32,7 +32,7 @@ pub fn run(source: String) -> anyhow::Result<()> {
     let mut app = App::new(source.into(), tx_worker, worker_result_recv);
     let _ = app
         .worker_sender
-        .send(WorkerCommands::ParseSpec(app.source.clone().into()));
+        .send(WorkerCommands::ParseSpec(app.source.clone()));
 
     let _res = run_app(&mut terminal, &mut app);
 
@@ -47,7 +47,7 @@ pub fn run(source: String) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_app<'a, B: Backend>(terminal: &mut Terminal<B>, app: &'a mut App) -> anyhow::Result<bool> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyhow::Result<bool> {
     let rx_ticker = tick(Duration::from_millis(100));
 
     loop {
@@ -86,8 +86,8 @@ fn run_app<'a, B: Backend>(terminal: &mut Terminal<B>, app: &'a mut App) -> anyh
 }
 
 fn handle_events(app: &mut App) -> anyhow::Result<bool> {
-    if event::poll(Duration::from_millis(50))? {
-        if let Event::Key(key) = event::read()? {
+    if event::poll(Duration::from_millis(50))?
+        && let Event::Key(key) = event::read()? {
             if key.kind == event::KeyEventKind::Release {
                 return Ok(false);
             }
@@ -191,7 +191,6 @@ fn handle_events(app: &mut App) -> anyhow::Result<bool> {
                 _ => (),
             }
         }
-    }
 
     Ok(false)
 }

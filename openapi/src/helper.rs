@@ -5,7 +5,7 @@ pub(crate) fn capitalize(value: &str) -> String {
 
     c.next()
         .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
-        .unwrap_or(String::new())
+        .unwrap_or_default()
 }
 
 pub(crate) fn get_enum_variant_prefix(name: &str, type_prefix: &str) -> String {

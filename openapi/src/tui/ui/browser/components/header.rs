@@ -54,7 +54,7 @@ pub fn ui<'a>(
             SchemaOrRef::Item(schema) => (None, Some(schema), None),
             SchemaOrRef::Ref { reference } => (
                 reference.split("/").last(),
-                spec.resolve_schema(&reference),
+                spec.resolve_schema(reference),
                 Some(reference),
             ),
         };

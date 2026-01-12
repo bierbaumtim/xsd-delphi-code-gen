@@ -94,7 +94,7 @@ fn register_operation_schema(
                 continue;
             };
 
-            let _ = register_schema(spec, models_registry, schema, reference, &m_name);
+            let _ = register_schema(spec, models_registry, schema, reference, m_name);
         }
     }
 }
@@ -135,7 +135,7 @@ fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> D
                 .iter()
                 .map(|f| DelphiField {
                     name: capitalize(&f.name),
-                    field_type: f.field_type.resolve(&models_registry),
+                    field_type: f.field_type.resolve(models_registry),
                     comment: f.comment.clone(),
                     visibility: DelphiVisibility::StrictPrivate,
                     is_reference_type: matches!(
@@ -153,7 +153,7 @@ fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> D
                 .iter()
                 .map(|f| DelphiProperty {
                     name: capitalize(&f.name),
-                    property_type: f.field_type.resolve(&models_registry),
+                    property_type: f.field_type.resolve(models_registry),
                     getter: Some(capitalize(&f.name)),
                     setter: if !matches!(f.field_type, DelphiType::Class(_) | DelphiType::List(_)) {
                         Some(capitalize(&f.name))
@@ -184,7 +184,7 @@ fn register_schema(
         return None;
     };
 
-    return match r#type.as_str() {
+    match r#type.as_str() {
         "string" => {
             if schema.enum_.is_empty() {
                 if let Some(format) = &schema.format {
@@ -345,7 +345,7 @@ fn register_schema(
                         visibility: DelphiVisibility::Public,
                         json_key: Some(prop_name.clone()),
                         is_required: schema.required.contains(prop_name),
-                        xml_info: xml_info,
+                        xml_info,
                         comment: None,
                     });
                 }
@@ -362,7 +362,7 @@ fn register_schema(
             Some(DelphiType::Class(IrTypeIdOrName::Id(id)))
         }
         _ => None,
-    };
+    }
 }
 
 fn build_unit_name(spec: &OpenAPI, trailing: &str) -> String {
@@ -378,7 +378,7 @@ fn build_operation_method_name(operation_id: &Option<String>, path: &str) -> Str
         let path_part = path
             .split('/')
             .filter(|p| !p.is_empty())
-            .last()
+            .next_back()
             .unwrap_or("unknown");
 
         format!("Get{path_part}")

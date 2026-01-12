@@ -650,7 +650,6 @@ impl OpenAPI {
         self.tags
             .iter()
             .enumerate()
-            .map(|(sortid, tag)| (sortid, tag))
             .collect::<Vec<_>>()
     }
 

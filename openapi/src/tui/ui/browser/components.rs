@@ -64,7 +64,7 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
 
             items
                 .iter()
-                .map(|(name, _)| ListItem::new(format!("{name}")))
+                .map(|(name, _)| ListItem::new(name.to_string()))
                 .collect::<Vec<_>>()
         }
         1 => {
@@ -72,7 +72,7 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
 
             items
                 .iter()
-                .map(|(name, _)| ListItem::new(format!("{name}")))
+                .map(|(name, _)| ListItem::new(name.to_string()))
                 .collect::<Vec<_>>()
         }
         2 => {
@@ -180,7 +180,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
                 let name = name.clone();
 
                 title = name.clone();
-                lines = parameter::ui(spec, &param, name, 0, true);
+                lines = parameter::ui(spec, param, name, 0, true);
             }
         }
         1 => {
@@ -188,7 +188,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
                 let name = name.clone();
 
                 title = name.clone();
-                lines = request_body::ui(spec, &request_body, name, 0);
+                lines = request_body::ui(spec, request_body, name, 0);
             }
         }
         2 => {
@@ -200,21 +200,20 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         3 => {
-            if let Some((name, component)) = app.get_schema_at(index) {
-                if let Some(type_) = component.r#type.as_ref() {
+            if let Some((name, component)) = app.get_schema_at(index)
+                && let Some(type_) = component.r#type.as_ref() {
                     let name = name.clone();
 
                     title = format!("{} - {}", name, type_);
-                    lines = schema::ui(spec, &component, name, None, 0, true);
+                    lines = schema::ui(spec, component, name, None, 0, true);
                 };
-            }
         }
         4 => {
             if let Some((name, header)) = app.get_header_at(index) {
                 let name = name.clone();
 
                 title = name.clone();
-                lines = header::ui(spec, &header, name, 0);
+                lines = header::ui(spec, header, name, 0);
             }
         }
         _ => {

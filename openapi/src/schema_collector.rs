@@ -48,7 +48,7 @@ pub(crate) fn schema_to_type(
             let enum_type = build_enum_type(name, &schema.enum_values, prefix.clone());
             let name = enum_type.name.clone();
 
-            if !enum_types.iter().any(|e| *e == enum_type) {
+            if !enum_types.contains(&enum_type) {
                 enum_types.push(enum_type);
             }
 
@@ -67,7 +67,7 @@ pub(crate) fn schema_to_type(
                                         build_enum_type(k, &s.enum_values, prefix.clone());
                                     let name = enum_type.name.clone();
 
-                                    if !enum_types.iter().any(|e| *e == enum_type) {
+                                    if !enum_types.contains(&enum_type) {
                                         enum_types.push(enum_type);
                                     }
 
@@ -132,7 +132,7 @@ pub(crate) fn schema_to_type(
                 properties,
             };
 
-            if !class_types.iter().any(|c| *c == class_type) {
+            if !class_types.contains(&class_type) {
                 class_types.push(class_type);
             }
 

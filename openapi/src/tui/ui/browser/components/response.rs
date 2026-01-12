@@ -5,7 +5,7 @@ use crate::parser::types::*;
 pub fn style_from_status_code(code: usize) -> Style {
     match code {
         100..=199 => Style::default().magenta(),
-        200..=299 | 300..=399 => Style::default().green(),
+        200..=399 => Style::default().green(),
         400..=499 => Style::default().yellow(),
         500..=599 => Style::default().red(),
         _ => Style::default(),
@@ -48,7 +48,7 @@ pub fn ui<'a>(
                 Some(SchemaOrRef::Item(schema)) => (None, Some(schema), None),
                 Some(SchemaOrRef::Ref { reference }) => (
                     reference.split("/").last(),
-                    spec.resolve_schema(&reference),
+                    spec.resolve_schema(reference),
                     Some(reference),
                 ),
                 None => (None, None, None),

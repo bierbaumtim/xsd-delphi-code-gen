@@ -44,7 +44,7 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(
                 format!("[{method}]"),
                 Style::default()
-                    .fg(color.clone())
+                    .fg(*color)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::from(format!(" {path} ")),
@@ -131,15 +131,14 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
             _ => main_layout[1],
         });
 
-        if let Some(description) = &op.description {
-            if !description.is_empty() {
+        if let Some(description) = &op.description
+            && !description.is_empty() {
                 let description = Paragraph::new(Line::from(description.as_str()))
                     .block(Block::bordered().title("Description"))
                     .wrap(Wrap { trim: true });
 
                 f.render_widget(description, layout_1_main[0]);
             }
-        }
 
         let mut tabs = vec![];
 
@@ -197,7 +196,7 @@ fn render_details(f: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
-            app.endpoints_details_path_selected_tab = content_type.clone();
+            app.endpoints_details_path_selected_tab = *content_type;
         }
 
         app.endpoints_details_path_tabs_count = tabs_count;
@@ -243,7 +242,7 @@ fn render_body(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
                 Some(SchemaOrRef::Item(schema)) => (None, Some(schema), None),
                 Some(SchemaOrRef::Ref { reference }) => (
                     reference.split("/").last(),
-                    spec.resolve_schema(&reference),
+                    spec.resolve_schema(reference),
                     Some(reference),
                 ),
                 None => (None, None, None),
@@ -338,7 +337,7 @@ fn render_parameter(f: &mut Frame, app: &mut App, op: &Operation, area: Rect) {
 
             if let Some(param) = param {
                 let mut lines =
-                    components::parameter::ui(spec, &param, param.name.clone(), 0, true);
+                    components::parameter::ui(spec, param, param.name.clone(), 0, true);
                 if !lines.is_empty() {
                     lines.push(Line::from(""));
                 }
