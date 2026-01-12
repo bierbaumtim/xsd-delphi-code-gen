@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 
 use genphi_core::type_registry::TypeRegistry;
 use xml::generator::code_generator_trait::{CodeGenOptions, CodeGenerator};
@@ -28,14 +28,16 @@ fn test_nillable_attribute_parses_and_generates() {
 
     let mut parser = XmlParser::default();
     let mut registry = TypeRegistry::<CustomTypeDefinition>::new();
-    
-    let data = parser.parse_file(tmp_file, &mut registry).expect("Failed to parse XSD with nillable");
-    
+
+    let data = parser
+        .parse_file(tmp_file, &mut registry)
+        .expect("Failed to parse XSD with nillable");
+
     // Check that nillable attribute is parsed
     assert!(data.nodes.len() >= 1, "Should have parsed elements");
-    
+
     let ir = InternalRepresentation::build(&data, &registry);
-    
+
     let output = Vec::new();
     let buffer = BufWriter::new(output);
     let options = CodeGenOptions {
@@ -44,17 +46,14 @@ fn test_nillable_attribute_parses_and_generates() {
         generate_from_xml: true,
         generate_to_xml: true,
     };
-    
-    let mut generator = DelphiCodeGenerator::new(
-        buffer,
-        options,
-        ir,
-        data.documentations,
-    );
-    
+
+    let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
+
     // Test that generation succeeds
-    generator.generate().expect("Failed to generate code from nillable XSD");
-    
+    generator
+        .generate()
+        .expect("Failed to generate code from nillable XSD");
+
     fs::remove_file(tmp_file).ok();
 }
 
@@ -83,18 +82,29 @@ fn test_list_type_parses_and_generates() {
 
     let mut parser = XmlParser::default();
     let mut registry = TypeRegistry::<CustomTypeDefinition>::new();
-    
-    let data = parser.parse_file(tmp_file, &mut registry).expect("Failed to parse XSD with list types");
-    
+
+    let data = parser
+        .parse_file(tmp_file, &mut registry)
+        .expect("Failed to parse XSD with list types");
+
     // Verify list types were registered
-    assert!(registry.types.contains_key("StringList"), "StringList should be registered");
-    assert!(registry.types.contains_key("IntegerList"), "IntegerList should be registered");
-    
+    assert!(
+        registry.types.contains_key("StringList"),
+        "StringList should be registered"
+    );
+    assert!(
+        registry.types.contains_key("IntegerList"),
+        "IntegerList should be registered"
+    );
+
     let ir = InternalRepresentation::build(&data, &registry);
-    
+
     // Verify list types are in type aliases
-    assert!(!ir.types_aliases.is_empty(), "Should have type aliases for list types");
-    
+    assert!(
+        !ir.types_aliases.is_empty(),
+        "Should have type aliases for list types"
+    );
+
     let output = Vec::new();
     let buffer = BufWriter::new(output);
     let options = CodeGenOptions {
@@ -103,17 +113,14 @@ fn test_list_type_parses_and_generates() {
         generate_from_xml: true,
         generate_to_xml: true,
     };
-    
-    let mut generator = DelphiCodeGenerator::new(
-        buffer,
-        options,
-        ir,
-        data.documentations,
-    );
-    
+
+    let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
+
     // Test that generation succeeds
-    generator.generate().expect("Failed to generate code from list types XSD");
-    
+    generator
+        .generate()
+        .expect("Failed to generate code from list types XSD");
+
     fs::remove_file(tmp_file).ok();
 }
 
@@ -136,17 +143,22 @@ fn test_choice_parses_and_generates() {
 
     let mut parser = XmlParser::default();
     let mut registry = TypeRegistry::<CustomTypeDefinition>::new();
-    
-    let data = parser.parse_file(tmp_file, &mut registry).expect("Failed to parse XSD with choice");
-    
+
+    let data = parser
+        .parse_file(tmp_file, &mut registry)
+        .expect("Failed to parse XSD with choice");
+
     // Verify ChoiceType was registered
-    assert!(registry.types.contains_key("ChoiceType"), "ChoiceType should be registered");
-    
+    assert!(
+        registry.types.contains_key("ChoiceType"),
+        "ChoiceType should be registered"
+    );
+
     let ir = InternalRepresentation::build(&data, &registry);
-    
+
     // Verify class was created for choice type
     assert!(!ir.classes.is_empty(), "Should have class for choice type");
-    
+
     let output = Vec::new();
     let buffer = BufWriter::new(output);
     let options = CodeGenOptions {
@@ -155,17 +167,14 @@ fn test_choice_parses_and_generates() {
         generate_from_xml: true,
         generate_to_xml: true,
     };
-    
-    let mut generator = DelphiCodeGenerator::new(
-        buffer,
-        options,
-        ir,
-        data.documentations,
-    );
-    
+
+    let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
+
     // Test that generation succeeds
-    generator.generate().expect("Failed to generate code from choice XSD");
-    
+    generator
+        .generate()
+        .expect("Failed to generate code from choice XSD");
+
     fs::remove_file(tmp_file).ok();
 }
 
@@ -201,19 +210,27 @@ fn test_combined_features_parses_and_generates() {
 
     let mut parser = XmlParser::default();
     let mut registry = TypeRegistry::<CustomTypeDefinition>::new();
-    
-    let data = parser.parse_file(tmp_file, &mut registry).expect("Failed to parse combined features XSD");
-    
+
+    let data = parser
+        .parse_file(tmp_file, &mut registry)
+        .expect("Failed to parse combined features XSD");
+
     // Verify all types were registered
-    assert!(registry.types.contains_key("Tags"), "Tags list type should be registered");
-    assert!(registry.types.contains_key("OptionType"), "OptionType should be registered");
-    
+    assert!(
+        registry.types.contains_key("Tags"),
+        "Tags list type should be registered"
+    );
+    assert!(
+        registry.types.contains_key("OptionType"),
+        "OptionType should be registered"
+    );
+
     let ir = InternalRepresentation::build(&data, &registry);
-    
+
     // Verify generated structures
     assert!(!ir.types_aliases.is_empty(), "Should have type aliases");
     assert!(!ir.classes.is_empty(), "Should have classes");
-    
+
     let output = Vec::new();
     let buffer = BufWriter::new(output);
     let options = CodeGenOptions {
@@ -222,16 +239,13 @@ fn test_combined_features_parses_and_generates() {
         generate_from_xml: true,
         generate_to_xml: true,
     };
-    
-    let mut generator = DelphiCodeGenerator::new(
-        buffer,
-        options,
-        ir,
-        data.documentations,
-    );
-    
+
+    let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
+
     // Test that generation succeeds with all features combined
-    generator.generate().expect("Failed to generate code from combined features XSD");
-    
+    generator
+        .generate()
+        .expect("Failed to generate code from combined features XSD");
+
     fs::remove_file(tmp_file).ok();
 }
