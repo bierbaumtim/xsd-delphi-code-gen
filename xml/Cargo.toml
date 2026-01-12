@@ -8,7 +8,7 @@ edition = "2024"
 [dependencies]
 
 genphi_core = { path = "../genphi_core" }
-quick-xml = "0.36.2"
+quick-xml = "0.39.0"
 unicode-segmentation = "1.12.0"
 chrono = "0.4.42"
 tera = "1.20.1"
