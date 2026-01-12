@@ -138,8 +138,8 @@ impl InternalRepresentation {
                     aliases_dep_graph.push(alias);
                 }
                 CustomTypeDefinition::Simple(st) if st.list_type.is_some() => {
-                    if let Some(lt) = &st.list_type {
-                        if let Some(d_type) = helper::list_type_to_data_type(lt, registry) {
+                    if let Some(lt) = &st.list_type
+                        && let Some(d_type) = helper::list_type_to_data_type(lt, registry) {
                             let type_alias = TypeAlias {
                                 name: st.name.clone(),
                                 qualified_name: st.qualified_name.clone(),
@@ -150,7 +150,6 @@ impl InternalRepresentation {
 
                             aliases_dep_graph.push(type_alias);
                         }
-                    }
                 }
                 CustomTypeDefinition::Simple(st) if st.variants.is_some() => {
                     let union_type = union_type::build_union_type_ir(st, registry);

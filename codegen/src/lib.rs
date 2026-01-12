@@ -985,9 +985,7 @@ interface"#,
             if let Some(_json_key) = &field.json_key {
                 let const_name = format!("cn{}JsonKey", field.name);
                 let default_value = field
-                    .default_value
-                    .as_ref()
-                    .map(|v| v.as_str())
+                    .default_value.as_deref()
                     .unwrap_or("");
 
                 if let DelphiType::Class(IrTypeIdOrName::Name(name)) = &field.field_type {
@@ -1221,14 +1219,12 @@ interface"#,
         let begin_marker = format!("// __begin_{}__", section_name);
         let end_marker = format!("// __end_{}__", section_name);
 
-        if let Some(start_pos) = generated_code.find(&begin_marker) {
-            if let Some(end_pos) = generated_code.find(&end_marker) {
-                if end_pos > start_pos {
+        if let Some(start_pos) = generated_code.find(&begin_marker)
+            && let Some(end_pos) = generated_code.find(&end_marker)
+                && end_pos > start_pos {
                     let section = &generated_code[start_pos..end_pos + end_marker.len()];
                     return Some(section.to_string());
                 }
-            }
-        }
 
         None
     }

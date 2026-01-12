@@ -11,6 +11,12 @@ pub struct TypeRegistry {
     enums: HashMap<IrTypeId, DelphiEnum>,
 }
 
+impl Default for TypeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypeRegistry {
     pub fn new() -> Self {
         Self {

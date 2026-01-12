@@ -50,7 +50,7 @@ pub fn build_type_alias_ir(st: &SimpleType) -> TypeAlias {
     let for_type = match st.base_type.as_ref().unwrap() {
         NodeType::Standard(t) => super::helper::node_base_type_to_datatype(t),
         NodeType::Custom(n) => {
-            let name = n.split('/').last().unwrap_or(n.as_str());
+            let name = n.split('/').next_back().unwrap_or(n.as_str());
 
             DataType::Custom(name.to_owned())
         }
