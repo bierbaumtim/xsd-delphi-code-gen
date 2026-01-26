@@ -226,8 +226,8 @@ begin
 
   {%- if class.deserialize_attribute_variables | length > 0 %}
   // Attributes
-  {%- for attr in deserialize_attribute_variables %}
-  if node.HasAttribute('{{attr.xml_value}}') then begin
+  {%- for attr in class.deserialize_attribute_variables %}
+  if node.HasAttribute('{{attr.xml_name}}') then begin
     {% if attr.has_optional_wrapper %}F{% endif %}{{attr.name}} := {{attr.from_xml_code_available}};
   end else begin
     {% if attr.has_optional_wrapper %}F{% endif %}{{attr.name}} := {{attr.from_xml_code_missing}};
