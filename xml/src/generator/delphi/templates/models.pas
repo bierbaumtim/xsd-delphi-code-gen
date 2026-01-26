@@ -22,7 +22,12 @@ uses System.DateUtils,
      System.StrUtils,
      System.SysUtils,
      Xml.XMLDoc,
-     Xml.XMLIntf;
+     Xml.XMLIntf
+{%- if enable_validation -%}
+,
+     msxml,
+     uValidationSchemes
+{%- endif %};
 
 type
   {$REGION 'Optional Helper'}
@@ -121,7 +126,11 @@ type
   {%- endif %}
 
   {$REGION 'Declarations}
+  {% if enable_validation -%}
+  {{ macros::document_class_declaration(class=document) }}
+  {%- else -%}
   {{ macros::class_declaration(class=document) }}
+  {%- endif %}
   {{""}}
   {%- for class in classes %}
   {{ macros::class_declaration(class=class) }}
@@ -247,6 +256,10 @@ end;
 
 {$REGION 'Declarations}
 {{  macros::class_implementation(class=document)  }}
+{%- if enable_validation %}
+{{""}}
+{{  macros::document_class_validation_implementation(class=document)  }}
+{%- endif %}
 {{""}}
 {%- for class in classes %}
 {{  macros::class_implementation(class=class)  }}
