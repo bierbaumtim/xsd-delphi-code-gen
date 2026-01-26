@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_lines)]
-
 use std::{fs::File, io::BufWriter, path::PathBuf, time::Instant};
 
 pub mod generator;
@@ -29,8 +27,8 @@ pub fn generate_xml(source: &[PathBuf], output_path: &PathBuf, options: CodeGenO
     let mut parser = XmlParser::default();
     let mut type_registry = TypeRegistry::<CustomTypeDefinition>::new();
 
-    let data: ParsedData = if source.len() == 1 {
-        match parser.parse_file(source.first().unwrap(), &mut type_registry) {
+    let data: ParsedData = if let [single_source] = source {
+        match parser.parse_file(single_source, &mut type_registry) {
             Ok(n) => n,
             Err(error) => {
                 eprintln!("An error occured: {error}");
