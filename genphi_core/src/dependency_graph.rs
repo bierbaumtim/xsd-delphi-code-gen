@@ -17,7 +17,7 @@ where
 ///
 /// # Example
 ///
-/// ```
+/// ```text
 /// CustomNumber
 /// Alias1 -> Alias2 -> CustomNumber
 /// Alias3 -> CustomNumber
@@ -34,7 +34,6 @@ where
 /// => List
 /// CustomNumber, Alias3, Alias2, Alias1, Alias4, Alias5
 /// ```
-
 pub struct DependencyGraph<K, T>
 where
     K: Eq + PartialEq + Hash + Clone,

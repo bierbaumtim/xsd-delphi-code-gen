@@ -374,10 +374,8 @@ pub enum ParameterOrRef {
 #[serde(rename_all = "camelCase")]
 pub struct Parameter {
     pub name: String,
-    pub in_: String,
-    #[serde(default)]
     #[serde(rename = "in")]
-    pub _in: (),
+    pub in_: String,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]

@@ -203,7 +203,21 @@ fn single_node_to_variable(
             {
                 DataType::List(Box::new(d_type))
             } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
-                let size = usize::try_from(max_occurs).unwrap();
+                // max_occurs is positive and greater than DEFAULT_OCCURANCE, safe to convert
+                let Ok(size) = usize::try_from(max_occurs) else {
+                    // Fallback to dynamic list if conversion fails
+                    return Some(Variable {
+                        name: node.name.clone(),
+                        xml_name: node.name.clone(),
+                        requires_free: true,
+                        data_type: DataType::List(Box::new(d_type)),
+                        required,
+                        default_value: None,
+                        is_const: false,
+                        source: XMLSource::Element,
+                        documentations: node.documentations.as_ref().cloned().unwrap_or_default(),
+                    });
+                };
 
                 DataType::FixedSizeList(Box::new(d_type.clone()), size)
             } else {
@@ -250,7 +264,21 @@ fn single_node_to_variable(
             {
                 DataType::List(Box::new(data_type))
             } else if min_occurs == max_occurs && max_occurs > DEFAULT_OCCURANCE {
-                let size = usize::try_from(max_occurs).unwrap();
+                // max_occurs is positive and greater than DEFAULT_OCCURANCE, safe to convert
+                let Ok(size) = usize::try_from(max_occurs) else {
+                    // Fallback to dynamic list if conversion fails
+                    return Some(Variable {
+                        name: node.name.clone(),
+                        xml_name: node.name.clone(),
+                        requires_free: true,
+                        data_type: DataType::List(Box::new(data_type)),
+                        required,
+                        default_value: None,
+                        is_const: false,
+                        source: XMLSource::Element,
+                        documentations: node.documentations.as_ref().cloned().unwrap_or_default(),
+                    });
+                };
 
                 DataType::FixedSizeList(Box::new(data_type), size)
             } else {
