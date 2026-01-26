@@ -72,7 +72,7 @@ pub fn generate_xml(source: &[PathBuf], output_path: &PathBuf, options: CodeGenO
 
     // Generate validation schemes unit if validation is enabled
     if options.enable_validation {
-        if let Err(e) = generate_validation_schemes_unit(source, output_path) {
+        if let Err(e) = generate_validation_schemes_unit(&options.xsd_file_paths, output_path) {
             eprintln!("Failed to generate validation schemes unit: {e:?}");
         }
     }

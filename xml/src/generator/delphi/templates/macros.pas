@@ -364,6 +364,7 @@ begin
 
   try
     // Create COM objects for validation
+    // Using MSXML 6.0 which is available on Windows Vista and later
     vSchemaCache := CreateComObject(CLASS_XMLSchemaCache60) as IXMLDOMSchemaCollection2;
     vDomDoc := CreateComObject(CLASS_DOMDocument60) as IXMLDOMDocument2;
 
