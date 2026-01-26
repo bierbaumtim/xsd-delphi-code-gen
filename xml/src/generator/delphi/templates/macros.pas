@@ -68,6 +68,68 @@
   end;
 {%- endmacro class_declaration -%}
 
+{% macro document_class_declaration(class) -%}
+  // XML Qualified Name: {{class.qualified_name}}
+  {% for line in class.documentations -%}
+  // {{line}}
+  {% endfor -%}
+  {{class.name}} = class({{class.super_type | default(value="TObject") }})
+  {%- if class.has_optional_fields %}
+  strict private
+    {% for variable in class.optional_variables -%}
+    F{{variable.name}}: TOptional<{{variable.data_type_repr}}>;
+    {% endfor -%}
+    {{""}}
+    {% for variable in class.optional_variables -%}
+    procedure Set{{variable.name}}(pValue: TOptional<{{variable.data_type_repr}}>);
+    {% endfor -%}
+  {%- endif %}
+  public
+    {% if has_constant_fields -%}
+      {% for variable in class.constant_variables -%}
+      const {{variable.name}}: {{variable.data_type_repr}} = {{variable.default_value}};
+      {% endfor -%}
+      var
+    {% endif -%}
+    {% if class.variables | length > 0 -%}
+    {% for variable in class.variables -%}
+    {% if variable.required -%}
+    /// <summary>Required</summary>
+    {% endif -%}
+    {% for line in variable.documentations -%}
+    // {{line}}
+    {% endfor -%}
+    {{variable.name}}: {{variable.data_type_repr}};
+    {% endfor %}
+    {% endif -%}
+    {% if gen_to_xml -%}
+    constructor Create; {% if class.super_type %}override;{% else %}virtual;{% endif %}
+    {% endif -%}
+    {% if gen_from_xml -%}
+    constructor FromXml(node: IXMLNode); {% if class.super_type %}override;{% else %}virtual;{% endif %}
+    {% endif -%}
+    {% if class.needs_destructor -%}
+    destructor Destroy; override;
+    {% endif -%}
+    {{""}}
+    {% if gen_to_xml -%}
+    procedure AppendToXmlRaw(pParent: IXMLNode); {% if class.super_type %}override;{% else %}virtual;{% endif %}
+    function ToXml: String; {% if class.super_type %}override;{% else %}virtual;{% endif %}
+    /// <summary>Validates the XML instance against the XSD schema</summary>
+    /// <returns>True if validation succeeds, False otherwise</returns>
+    function Validate(out pErrorMsg: String): Boolean; virtual;
+    {%- endif %}
+    {%- if class.has_optional_fields %}
+    {% for variable in class.optional_variables %}
+    {%- for line in variable.documentations %}
+    // {{line}}
+    {%- endfor %}
+    property {{variable.name}}: TOptional<{{variable.data_type_repr}}> read F{{variable.name}} write Set{{variable.name}};
+    {%- endfor %}
+    {%- endif %}
+  end;
+{%- endmacro document_class_declaration -%}
+
 {% macro class_implementation(class) -%}
 {{"{"}} {{class.name}} {{"}"}}
 {% if gen_to_xml -%}
@@ -164,8 +226,8 @@ begin
 
   {%- if class.deserialize_attribute_variables | length > 0 %}
   // Attributes
-  {%- for attr in deserialize_attribute_variables %}
-  if node.HasAttribute('{{attr.xml_value}}') then begin
+  {%- for attr in class.deserialize_attribute_variables %}
+  if node.HasAttribute('{{attr.xml_name}}') then begin
     {% if attr.has_optional_wrapper %}F{% endif %}{{attr.name}} := {{attr.from_xml_code_available}};
   end else begin
     {% if attr.has_optional_wrapper %}F{% endif %}{{attr.name}} := {{attr.from_xml_code_missing}};
@@ -288,3 +350,50 @@ begin
 end;
 {%- endif %}
 {%- endmacro class_implementation -%}
+
+{% macro document_class_validation_implementation(class) -%}
+function {{class.name}}.Validate(out pErrorMsg: String): Boolean;
+var
+  vXmlDoc: IXMLDocument;
+  vSchemaCache: IXMLDOMSchemaCollection2;
+  vDomDoc: IXMLDOMDocument2;
+  vParseError: IXMLDOMParseError;
+begin
+  Result := False;
+  pErrorMsg := '';
+
+  try
+    // Create COM objects for validation
+    // Using MSXML 6.0 which is available on Windows Vista and later
+    vSchemaCache := CreateComObject(CLASS_XMLSchemaCache60) as IXMLDOMSchemaCollection2;
+    vDomDoc := CreateComObject(CLASS_DOMDocument60) as IXMLDOMDocument2;
+
+    // Load schemas from uValidationSchemes unit
+    uValidationSchemes.LoadSchemas(vSchemaCache);
+
+    // Configure DOM document for validation
+    vDomDoc.async := False;
+    vDomDoc.validateOnParse := True;
+    vDomDoc.resolveExternals := False;
+    vDomDoc.schemas := vSchemaCache;
+
+    // Load XML to validate
+    vDomDoc.loadXML(Self.ToXml);
+
+    // Check for errors
+    vParseError := vDomDoc.validate;
+    if vParseError.errorCode <> 0 then begin
+      pErrorMsg := Format('Validation failed at line %d, position %d: %s',
+        [vParseError.line, vParseError.linepos, vParseError.reason]);
+      Exit(False);
+    end;
+
+    Result := True;
+  except
+    on E: Exception do begin
+      pErrorMsg := 'Validation error: ' + E.Message;
+      Result := False;
+    end;
+  end;
+end;
+{%- endmacro document_class_validation_implementation -%}
