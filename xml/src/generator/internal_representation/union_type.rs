@@ -51,14 +51,9 @@ pub fn build_union_type_ir(
     st: &SimpleType,
     registry: &TypeRegistry<CustomTypeDefinition>,
 ) -> UnionType {
-    UnionType {
-        name: st.name.clone(),
-        qualified_name: st.qualified_name.clone(),
-        documentations: st.documentations.clone(),
-        variants: st
-            .variants
-            .as_ref()
-            .unwrap()
+    // variants is guaranteed to be Some by caller's is_some() check
+    let variants = st.variants.as_ref().map_or_else(Vec::new, |variants| {
+        variants
             .iter()
             .enumerate()
             .filter_map(|(i, v)| {
@@ -98,6 +93,13 @@ pub fn build_union_type_ir(
                     data_type: dt,
                 })
             })
-            .collect::<Vec<UnionVariant>>(),
+            .collect::<Vec<UnionVariant>>()
+    });
+    
+    UnionType {
+        name: st.name.clone(),
+        qualified_name: st.qualified_name.clone(),
+        documentations: st.documentations.clone(),
+        variants,
     }
 }

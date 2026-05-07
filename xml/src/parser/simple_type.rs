@@ -170,11 +170,10 @@ impl SimpleTypeParser {
                 },
                 Ok(Event::End(e)) => match e.name().as_ref() {
                     b"xs:enumeration" => {
-                        if current_enum_variant.is_none() {
+                        let Some(variant) = current_enum_variant else {
                             return Err(ParserError::UnexpectedError); // TODO: Add better error
-                        }
+                        };
 
-                        let variant = current_enum_variant.unwrap();
                         enumerations.push(variant);
 
                         current_enum_variant = None;

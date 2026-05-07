@@ -14,8 +14,10 @@ use genphi_core::ir::{
 pub fn generate_code(spec: &OpenAPI) -> anyhow::Result<(String, String)> {
     let mut models_registry = TypeRegistry::new();
 
-    let mut client_unit = DelphiUnit::default();
-    client_unit.unit_name = build_unit_name(spec, "Client");
+    let mut client_unit = DelphiUnit {
+        unit_name: build_unit_name(spec, "Client"),
+        ..Default::default()
+    };
 
     let client_class = DelphiClass::new(
         format!("TM{}", spec.info.title.replace(['-', '.', ':', ' '], "")),
@@ -70,7 +72,7 @@ fn register_operation_schema(
     models_registry: &mut TypeRegistry,
     operation: &Operation,
 ) {
-    for (r_name, response) in operation.responses.iter() {
+    for (_r_name, response) in operation.responses.iter() {
         let response = match response {
             ResponseOrRef::Item(response) => Some(response),
             ResponseOrRef::Ref { reference } => spec.resolve_response(reference),
@@ -100,8 +102,10 @@ fn register_operation_schema(
 }
 
 fn generate_models_unit(spec: &OpenAPI, models_registry: &mut TypeRegistry) -> DelphiUnit {
-    let mut unit = DelphiUnit::default();
-    unit.unit_name = build_unit_name(spec, "Models");
+    let mut unit = DelphiUnit {
+        unit_name: build_unit_name(spec, "Models"),
+        ..Default::default()
+    };
 
     for enum_type in models_registry.enum_iter() {
         let enum_class = DelphiEnum {
@@ -180,9 +184,7 @@ fn register_schema(
     class_name: Option<String>,
     media_type: &str,
 ) -> Option<DelphiType> {
-    let Some(r#type) = schema.r#type.as_ref() else {
-        return None;
-    };
+    let r#type = schema.r#type.as_ref()?;
 
     match r#type.as_str() {
         "string" => {
@@ -260,9 +262,7 @@ fn register_schema(
                     ),
                 };
 
-                let Some(schema) = schema else {
-                    return None;
-                };
+                let schema = schema?;
 
                 let inner_type =
                     register_schema(spec, models_registry, schema, reference, media_type)?;
@@ -371,14 +371,14 @@ fn build_unit_name(spec: &OpenAPI, trailing: &str) -> String {
     format!("uM{title}{trailing}")
 }
 
+#[allow(dead_code)]
 fn build_operation_method_name(operation_id: &Option<String>, path: &str) -> String {
     if let Some(id) = operation_id {
         id.replace(['-', '.', ':', ' ', '/', '\\'], "")
     } else {
         let path_part = path
             .split('/')
-            .filter(|p| !p.is_empty())
-            .next_back()
+            .rfind(|p| !p.is_empty())
             .unwrap_or("unknown");
 
         format!("Get{path_part}")

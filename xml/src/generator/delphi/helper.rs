@@ -15,7 +15,7 @@ impl Helper {
     ];
 
     #[inline]
-    pub(crate) fn first_char_uppercase(name: &String) -> String {
+    pub(crate) fn first_char_uppercase(name: &str) -> String {
         let mut graphemes = name.graphemes(true);
 
         graphemes
@@ -25,7 +25,7 @@ impl Helper {
 
     #[allow(dead_code)]
     #[inline]
-    pub(crate) fn first_char_lowercase(name: &String) -> String {
+    pub(crate) fn first_char_lowercase(name: &str) -> String {
         let mut graphemes = name.graphemes(true);
 
         graphemes
@@ -34,7 +34,7 @@ impl Helper {
     }
 
     #[inline]
-    pub(crate) fn as_type_name(name: &String, prefix: &Option<String>) -> String {
+    pub(crate) fn as_type_name(name: &str, prefix: &Option<String>) -> String {
         if name.is_empty() {
             return String::new();
         }
@@ -127,7 +127,7 @@ impl Helper {
 
     pub(crate) fn get_variable_value_as_string(
         data_type: &DataType,
-        variable_name: &String,
+        variable_name: &str,
         pattern: &Option<String>,
     ) -> String {
         match data_type {

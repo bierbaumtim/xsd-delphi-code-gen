@@ -51,17 +51,20 @@ use crate::{
 /// assert_eq!(ir.enumerations.len(), 1);
 /// ```
 pub fn build_enumeration_ir(st: &SimpleType) -> Enumeration {
+    // enumeration is guaranteed to be Some by caller's is_some() check
     let values = st
         .enumeration
         .as_ref()
-        .unwrap()
-        .iter()
-        .map(|v| EnumerationValue {
-            variant_name: v.name.clone(),
-            xml_value: v.name.clone(),
-            documentations: v.documentations.clone(),
-        })
-        .collect::<Vec<EnumerationValue>>();
+        .map_or_else(Vec::new, |enumeration| {
+            enumeration
+                .iter()
+                .map(|v| EnumerationValue {
+                    variant_name: v.name.clone(),
+                    xml_value: v.name.clone(),
+                    documentations: v.documentations.clone(),
+                })
+                .collect::<Vec<EnumerationValue>>()
+        });
 
     Enumeration {
         name: st.name.clone(),

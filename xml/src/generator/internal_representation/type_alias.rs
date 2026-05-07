@@ -7,7 +7,7 @@ use crate::{
 ///
 /// # Arguments
 ///
-/// * `st` - The simple type definition of the type alias.
+/// * `st` - The simple type definition of the type alias. Must have `base_type` set to Some.
 ///
 /// # Returns
 ///
@@ -47,7 +47,20 @@ use crate::{
 /// assert_eq!(ir.types_aliases.len(), 1);
 /// ```
 pub fn build_type_alias_ir(st: &SimpleType) -> TypeAlias {
-    let for_type = match st.base_type.as_ref().unwrap() {
+    // base_type is guaranteed to be Some by caller's is_some() check
+    let Some(base_type) = st.base_type.as_ref() else {
+        // This should never happen as caller checks is_some() first
+        // Using a safe default to avoid panic in production
+        return TypeAlias {
+            name: st.name.clone(),
+            qualified_name: st.qualified_name.clone(),
+            pattern: st.pattern.clone(),
+            for_type: DataType::String,
+            documentations: st.documentations.clone(),
+        };
+    };
+    
+    let for_type = match base_type {
         NodeType::Standard(t) => super::helper::node_base_type_to_datatype(t),
         NodeType::Custom(n) => {
             let name = n.split('/').next_back().unwrap_or(n.as_str());
