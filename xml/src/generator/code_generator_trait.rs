@@ -18,7 +18,7 @@ pub trait CodeGenerator<T: Write> {
 }
 
 /// Options for the code generator
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CodeGenOptions {
     /// Generate the `from_xml` function
     pub generate_from_xml: bool,
@@ -31,6 +31,12 @@ pub struct CodeGenOptions {
 
     /// The prefix for the type
     pub type_prefix: Option<String>,
+
+    /// Enable XSD validation code generation
+    pub enable_validation: bool,
+
+    /// Paths to XSD files for validation
+    pub xsd_file_paths: Vec<std::path::PathBuf>,
 }
 
 /// Errors that can occur during code generation

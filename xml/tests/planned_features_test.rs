@@ -45,6 +45,8 @@ fn test_nillable_attribute_parses_and_generates() {
         type_prefix: None,
         generate_from_xml: true,
         generate_to_xml: true,
+        enable_validation: false,
+        xsd_file_paths: vec![],
     };
 
     let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
@@ -112,6 +114,8 @@ fn test_list_type_parses_and_generates() {
         type_prefix: None,
         generate_from_xml: true,
         generate_to_xml: true,
+        enable_validation: false,
+        xsd_file_paths: vec![],
     };
 
     let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
@@ -166,6 +170,8 @@ fn test_choice_parses_and_generates() {
         type_prefix: None,
         generate_from_xml: true,
         generate_to_xml: true,
+        enable_validation: false,
+        xsd_file_paths: vec![],
     };
 
     let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
@@ -238,6 +244,8 @@ fn test_combined_features_parses_and_generates() {
         type_prefix: None,
         generate_from_xml: true,
         generate_to_xml: true,
+        enable_validation: false,
+        xsd_file_paths: vec![],
     };
 
     let mut generator = DelphiCodeGenerator::new(buffer, options, ir, data.documentations);
@@ -246,6 +254,82 @@ fn test_combined_features_parses_and_generates() {
     generator
         .generate()
         .expect("Failed to generate code from combined features XSD");
+
+    fs::remove_file(tmp_file).ok();
+}
+
+#[test]
+fn test_validation_code_generation() {
+    let xsd = r#"<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="Person">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="Name" type="xs:string"/>
+                <xs:element name="Age" type="xs:int"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>"#;
+
+    let tmp_file = "/tmp/test_validation.xsd";
+    fs::write(tmp_file, xsd).expect("Failed to write test XSD");
+
+    let mut parser = XmlParser::default();
+    let mut registry = TypeRegistry::<CustomTypeDefinition>::new();
+
+    let data = parser
+        .parse_file(tmp_file, &mut registry)
+        .expect("Failed to parse validation test XSD");
+
+    let ir = InternalRepresentation::build(&data, &registry);
+
+    // Test with validation enabled
+    let output = Vec::new();
+    let buffer = BufWriter::new(output);
+    let options_with_validation = CodeGenOptions {
+        unit_name: "TestValidation".to_string(),
+        type_prefix: None,
+        generate_from_xml: true,
+        generate_to_xml: true,
+        enable_validation: true,
+        xsd_file_paths: vec![tmp_file.into()],
+    };
+
+    let mut generator = DelphiCodeGenerator::new(
+        buffer,
+        options_with_validation,
+        ir,
+        data.documentations.clone(),
+    );
+
+    generator
+        .generate()
+        .expect("Failed to generate code with validation");
+
+    // Test without validation enabled
+    let output2 = Vec::new();
+    let buffer2 = BufWriter::new(output2);
+    let options_without_validation = CodeGenOptions {
+        unit_name: "TestNoValidation".to_string(),
+        type_prefix: None,
+        generate_from_xml: true,
+        generate_to_xml: true,
+        enable_validation: false,
+        xsd_file_paths: vec![],
+    };
+
+    let ir2 = InternalRepresentation::build(&data, &registry);
+    let mut generator2 = DelphiCodeGenerator::new(
+        buffer2,
+        options_without_validation,
+        ir2,
+        data.documentations,
+    );
+
+    generator2
+        .generate()
+        .expect("Failed to generate code without validation");
 
     fs::remove_file(tmp_file).ok();
 }

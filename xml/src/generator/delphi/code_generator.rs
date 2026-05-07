@@ -89,6 +89,7 @@ impl<T: Write> DelphiCodeGenerator<T> {
             "needs_net_encoding_unit_use_clause",
             &self.needs_net_encoding_unit_use_clause,
         );
+        models_context.insert("enable_validation", &self.options.enable_validation);
 
         // Add calculated fields
         let gen_bool_consts = self.internal_representation.classes.iter().any(|c| {

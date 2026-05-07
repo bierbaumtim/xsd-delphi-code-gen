@@ -42,6 +42,12 @@ fn build_code_gen_options(args: &Args) -> CodeGenOptions {
         generate_to_xml: !matches!(&args.mode, CodeGenMode::FromXml),
         unit_name: args.unit_name.clone().expect("Unit name is required"),
         type_prefix: args.type_prefix.clone(),
+        enable_validation: args.enable_validation,
+        xsd_file_paths: if args.enable_validation {
+            args.input.iter().map(PathBuf::from).collect()
+        } else {
+            Vec::new()
+        },
     }
 }
 
@@ -120,6 +126,10 @@ pub struct Args {
     /// Source format of the input files. Can be one of `Xml`, `OpenApi`. Default is `Xml`
     #[arg(long, value_enum)]
     pub(crate) source_format: SourceFormat,
+
+    /// Enable XSD validation in generated code. Generates validation methods and uValidationSchemes unit.
+    #[arg(long, default_value_t = false)]
+    pub(crate) enable_validation: bool,
 }
 
 /// Which code should be generated. Can be one of `All`, `ToXml`, `FromXml`. Default is `All`
